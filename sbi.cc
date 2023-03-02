@@ -143,11 +143,13 @@ void plicInit(){
     mmio<uint8_t>(platform::plic::enableOf(hart))=1<<platform::uart0::irq;
     uartInit();
 }
+extern void plic_init();
 extern "C" void sbi_init(){
     // csrWritei(mtvec,mtraphandler);
     // {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtraphandler));}
     uartInit();
-    plicInit();
+    // plicInit();
+    plic_init();
     platform::uart0::puts("here");
 
     // csrSet(mie,BIT(csr::mie::meie));
