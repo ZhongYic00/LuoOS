@@ -23,14 +23,8 @@ struct MIP{
     REPFIELD(tip,1);
     REPFIELD(eip,1);
 };
-namespace mstatus{
-    enum fields{
-        UIE,
-        MIE,
-    };
-}
 FORCEDINLINE void MIEnable(){
-    csrSeti(mstatus,BIT(mstatus::fields::MIE));
+    csrSeti(mstatus,BIT(csr::mstatus::fields::mie));
 }
 FORCEDINLINE bool isInterrupt(xlen_t mcause){
     return (mcause>>63)&1;
@@ -95,6 +89,7 @@ void externalInterruptHandler(){
 
 __attribute__ ((interrupt ("machine")))void mtraphandler(){
     // saveContext();
+    platform::uart0::puts("mtraphandler!");
     ptr_t mepc; csrRead(mepc,mepc);
     xlen_t mcause; csrRead(mcause,mcause);
 
@@ -139,17 +134,26 @@ void plicInit(){
     // int hart=Hart();
     int hart=0;
     xlen_t addr=platform::plic::priorityOf(platform::uart0::irq);
-    mmio<uint8_t>(addr)=1;
-    mmio<uint8_t>(platform::plic::enableOf(hart))=1<<platform::uart0::irq;
+    mmio<word_t>(addr)=1;
+    mmio<word_t>(platform::plic::enableOf(hart))=1<<platform::uart0::irq;
     uartInit();
+}
+void mtrap_test(){
+    ExecInst(ecall);
 }
 extern "C" void sbi_init(){
     // csrWritei(mtvec,mtraphandler);
-    // {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtraphandler));}
-    uartInit();
-    plicInit();
-    platform::uart0::puts("here");
+    {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtraphandler));}
+    using platform::uart0::puts;
+    // uartInit();
+    // plicInit();
+    platform::uart0::puts("here\n");
 
-    // csrSet(mie,BIT(csr::mie::meie));
+    csrSet(mie,BIT(csr::mie::msie));
+    // csrSet(mstatus,BIT(csr::mstatus::mie));
     // MIEnable();
+    puts("here2\n");
+    csrWrite(mepc,mtrap_test);
+	ExecInst(mret);
+    puts("here3");
 }

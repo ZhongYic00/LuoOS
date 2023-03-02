@@ -22,4 +22,9 @@ namespace csr
             secall=9,
         };
     }
+    namespace mstatus{
+        enum fields{
+            REPFIELD(ie)
+        };
+    }
 } // namespace csr
