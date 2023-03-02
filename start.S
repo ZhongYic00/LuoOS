@@ -1,4 +1,5 @@
-#include "platform.h"
+##include "platform.h"
+#define MAXNUM_CPU 8
 
 	# size of each hart's stack is 1024 bytes
 	.equ	STACK_SIZE, 1024
@@ -19,6 +20,8 @@ _start:
 					# to the end of the first stack space
 	add	sp, sp, t0		# move the current hart stack pointer
 					# to its place in the stack space
+
+    j   sbi_init            # hart 0 jump to sbi
 
 	j	start_kernel		# hart 0 jump to c
 

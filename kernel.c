@@ -1,3 +1,0 @@
-void start_kernel(){
-    
-}

@@ -4,7 +4,8 @@ SRCS_ASM = \
 	start.S \
 
 SRCS_C = \
-	kernel.c \
+	$(shell find -name "*.cc")
+$(info SRCS_C=${SRCS_C})
 
 OBJS = $(SRCS_ASM:.S=.o)
 OBJS += $(SRCS_C:.c=.o)
@@ -34,11 +35,12 @@ debug: all
 	@echo "Press Ctrl-C and then input 'quit' to exit GDB and QEMU"
 	@echo "-------------------------------------------------------"
 	@${QEMU} ${QFLAGS} -kernel os.elf -s -S &
-	@${GDB} os.elf -q -x gdbinit
+	@${GDB} os.elf -q -x gdbinit && killall ${QEMU}
 
 .PHONY : code
 code: all
-	@${OBJDUMP} -S os.elf | less
+	@${OBJDUMP} -S os.elf > os-elf.txt
+	@less os-elf.txt
 
 .PHONY : clean
 clean:
