@@ -1,761 +1,821 @@
 
-os.elf:     file format elf64-littleriscv
+os.elf:     file format elf32-littleriscv
 
 
 Disassembly of section .text:
 
-0000000080000000 <_start>:
-	.global	_start
+80000000 <_start>:
+    .extern trapvector
 
 	.text
 _start:
 	# park harts with id != 0
 	csrr	t0, mhartid		# read current hart id
-    80000000:	f14022f3          	csrr	t0,mhartid
+80000000:	f14022f3          	csrr	t0,mhartid
 	mv	tp, t0			# keep CPU's hartid in its tp for later usage.
-    80000004:	00028213          	mv	tp,t0
+80000004:	00028213          	mv	tp,t0
 	bnez	t0, park		# if we're not on the hart 0
-    80000008:	00029e63          	bnez	t0,80000024 <park>
+80000008:	00029c63          	bnez	t0,80000020 <park>
 					# we park the hart
 	# Setup stacks, the stack grows from bottom to top, so we put the
 	# stack pointer to the very end of the stack range.
 	slli	t0, t0, 10		# shift left the hart id by 1024
-    8000000c:	00a29293          	slli	t0,t0,0xa
+8000000c:	00a29293          	slli	t0,t0,0xa
 	la	sp, stacks + STACK_SIZE	# set the initial stack pointer
-    80000010:	00000117          	auipc	sp,0x0
-    80000014:	41c10113          	addi	sp,sp,1052 # 8000042c <stacks+0x400>
+80000010:	00001117          	auipc	sp,0x1
+80000014:	3f010113          	addi	sp,sp,1008 # 80001400 <stacks+0x400>
 					# to the end of the first stack space
 	add	sp, sp, t0		# move the current hart stack pointer
-    80000018:	00510133          	add	sp,sp,t0
+80000018:	00510133          	add	sp,sp,t0
 					# to its place in the stack space
 
     j   sbi_init            # hart 0 jump to sbi
-    8000001c:	4980206f          	j	800024b4 <sbi_init>
+8000001c:	61c0006f          	j	80000638 <sbi_init>
 
-	j	start_kernel		# hart 0 jump to c
-    80000020:	69c0206f          	j	800026bc <start_kernel>
+80000020 <park>:
+    # j park
 
-0000000080000024 <park>:
+	# j	start_kernel		# hart 0 jump to c
 
 park:
 	wfi
-    80000024:	10500073          	wfi
+80000020:	10500073          	wfi
 	j	park
-    80000028:	ffdff06f          	j	80000024 <park>
+80000024:	ffdff06f          	j	80000020 <park>
 
-000000008000002c <stacks>:
-	...
+80000028 <trapvector>:
+trapvector:
+    csrrw	t6, mscratch, t6
+80000028:	340f9ff3          	csrrw	t6,mscratch,t6
+    # call mtraphandler
+    csrr t6,mepc
+8000002c:	34102ff3          	csrr	t6,mepc
+    addi t6,t6,4
+80000030:	004f8f93          	addi	t6,t6,4
+    csrw mepc,t6
+80000034:	341f9073          	csrw	mepc,t6
+    csrr t6,mscratch
+80000038:	34002ff3          	csrr	t6,mscratch
+    mret
+8000003c:	30200073          	mret
 
-000000008000202c <_Z8MIEnablev>:
-    enum fields{
-        UIE,
-        MIE,
-    };
-}
-FORCEDINLINE void MIEnable(){
-    8000202c:	ff010113          	addi	sp,sp,-16
-    80002030:	00813423          	sd	s0,8(sp)
-    80002034:	01010413          	addi	s0,sp,16
-    csrSeti(mstatus,BIT(mstatus::fields::MIE));
-    80002038:	30016073          	csrsi	mstatus,2
-}
-    8000203c:	00000013          	nop
-    80002040:	00813403          	ld	s0,8(sp)
-    80002044:	01010113          	addi	sp,sp,16
-    80002048:	00008067          	ret
+80000040 <mtraptest1>:
+mtraptest1:
+    li t0,0
+80000040:	00000293          	li	t0,0
+    sw t0,0(t0)
+80000044:	0052a023          	sw	t0,0(t0)
 
-000000008000204c <_Z11isInterruptm>:
-FORCEDINLINE bool isInterrupt(xlen_t mcause){
-    8000204c:	fe010113          	addi	sp,sp,-32
-    80002050:	00813c23          	sd	s0,24(sp)
-    80002054:	02010413          	addi	s0,sp,32
-    80002058:	fea43423          	sd	a0,-24(s0)
-    return (mcause>>63)&1;
-    8000205c:	fe843783          	ld	a5,-24(s0)
-    80002060:	03f7d793          	srli	a5,a5,0x3f
-    80002064:	0ff7f793          	andi	a5,a5,255
-}
-    80002068:	00078513          	mv	a0,a5
-    8000206c:	01813403          	ld	s0,24(sp)
-    80002070:	02010113          	addi	sp,sp,32
-    80002074:	00008067          	ret
+80000048 <endless>:
+endless:
+    j endless
+80000048:	0000006f          	j	80000048 <endless>
 
-0000000080002078 <_Z9plicClaimv>:
-}*/
-inline int Hart(){
-    int rt; csrRead(mhartid,rt);
-    return rt;
-}
-int plicClaim(){
-    80002078:	fe010113          	addi	sp,sp,-32
-    8000207c:	00113c23          	sd	ra,24(sp)
-    80002080:	00813823          	sd	s0,16(sp)
-    80002084:	02010413          	addi	s0,sp,32
-    int hart=Hart();
-    80002088:	60c000ef          	jal	ra,80002694 <_Z4Hartv>
-    8000208c:	00050793          	mv	a5,a0
-    80002090:	fef42623          	sw	a5,-20(s0)
-    int irq=mmio<int>(platform::plic::claimOf(hart));
-    80002094:	fec42783          	lw	a5,-20(s0)
-    80002098:	00078513          	mv	a0,a5
-    8000209c:	5b8000ef          	jal	ra,80002654 <_ZN8platform4plic7claimOfEi>
-    800020a0:	00050793          	mv	a5,a0
-    800020a4:	fef43023          	sd	a5,-32(s0)
- */
-#define MAXNUM_CPU 8
-
-template<typename T>
-FORCEDINLINE T& mmio(xlen_t addr){
-    return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
-    800020a8:	fe043783          	ld	a5,-32(s0)
-    800020ac:	0007a783          	lw	a5,0(a5)
-    800020b0:	fef42423          	sw	a5,-24(s0)
-}
-    800020b4:	00000013          	nop
-    800020b8:	00078513          	mv	a0,a5
-    800020bc:	01813083          	ld	ra,24(sp)
-    800020c0:	01013403          	ld	s0,16(sp)
-    800020c4:	02010113          	addi	sp,sp,32
-    800020c8:	00008067          	ret
-
-00000000800020cc <_Z12plicCompletei>:
-void plicComplete(int irq){
-    800020cc:	fd010113          	addi	sp,sp,-48
-    800020d0:	02113423          	sd	ra,40(sp)
-    800020d4:	02813023          	sd	s0,32(sp)
-    800020d8:	03010413          	addi	s0,sp,48
-    800020dc:	00050793          	mv	a5,a0
-    800020e0:	fcf42e23          	sw	a5,-36(s0)
-    int hart=Hart();
-    800020e4:	5b0000ef          	jal	ra,80002694 <_Z4Hartv>
-    800020e8:	00050793          	mv	a5,a0
-    800020ec:	fef42623          	sw	a5,-20(s0)
-    mmio<int>(platform::plic::claimOf(hart))=irq;
-    800020f0:	fec42783          	lw	a5,-20(s0)
-    800020f4:	00078513          	mv	a0,a5
-    800020f8:	55c000ef          	jal	ra,80002654 <_ZN8platform4plic7claimOfEi>
-    800020fc:	00050793          	mv	a5,a0
-    80002100:	fef43023          	sd	a5,-32(s0)
-    80002104:	fe043783          	ld	a5,-32(s0)
-    80002108:	fdc42703          	lw	a4,-36(s0)
-    8000210c:	00e7a023          	sw	a4,0(a5)
-}
-    80002110:	00000013          	nop
-    80002114:	02813083          	ld	ra,40(sp)
-    80002118:	02013403          	ld	s0,32(sp)
-    8000211c:	03010113          	addi	sp,sp,48
-    80002120:	00008067          	ret
-
-0000000080002124 <_Z24externalInterruptHandlerv>:
-
-void externalInterruptHandler(){
-    80002124:	fc010113          	addi	sp,sp,-64
-    80002128:	02113c23          	sd	ra,56(sp)
-    8000212c:	02813823          	sd	s0,48(sp)
-    80002130:	02913423          	sd	s1,40(sp)
-    80002134:	04010413          	addi	s0,sp,64
-    int irq=plicClaim();
-    80002138:	f41ff0ef          	jal	ra,80002078 <_Z9plicClaimv>
-    8000213c:	00050793          	mv	a5,a0
-    80002140:	fcf42e23          	sw	a5,-36(s0)
-    if(irq==platform::uart0::irq){
-    80002144:	fdc42783          	lw	a5,-36(s0)
-    80002148:	0007871b          	sext.w	a4,a5
-    8000214c:	00a00793          	li	a5,10
-    80002150:	06f71063          	bne	a4,a5,800021b0 <_Z24externalInterruptHandlerv+0x8c>
-        using namespace platform::uart0;
-        while(mmio<volatile lsr>(reg(LSR)).rxnemp){
-    80002154:	00500513          	li	a0,5
-    80002158:	384000ef          	jal	ra,800024dc <_ZN8platform5uart03regENS0_4regsE>
-    8000215c:	00050793          	mv	a5,a0
-    80002160:	fcf43823          	sd	a5,-48(s0)
-    80002164:	fd043783          	ld	a5,-48(s0)
-    80002168:	0007c783          	lbu	a5,0(a5)
-    8000216c:	0017f793          	andi	a5,a5,1
-    80002170:	0ff7f793          	andi	a5,a5,255
-    80002174:	02078e63          	beqz	a5,800021b0 <_Z24externalInterruptHandlerv+0x8c>
-            mmio<volatile uint8_t>(reg(THR))=mmio<volatile uint8_t>(reg(RHR));
-    80002178:	00000513          	li	a0,0
-    8000217c:	360000ef          	jal	ra,800024dc <_ZN8platform5uart03regENS0_4regsE>
-    80002180:	00050793          	mv	a5,a0
-    80002184:	fcf43023          	sd	a5,-64(s0)
-    80002188:	fc043483          	ld	s1,-64(s0)
-    8000218c:	00000513          	li	a0,0
-    80002190:	34c000ef          	jal	ra,800024dc <_ZN8platform5uart03regENS0_4regsE>
-    80002194:	00050793          	mv	a5,a0
-    80002198:	fcf43423          	sd	a5,-56(s0)
-    8000219c:	fc843783          	ld	a5,-56(s0)
-    800021a0:	0004c703          	lbu	a4,0(s1)
-    800021a4:	0ff77713          	andi	a4,a4,255
-    800021a8:	00e78023          	sb	a4,0(a5)
-        while(mmio<volatile lsr>(reg(LSR)).rxnemp){
-    800021ac:	fa9ff06f          	j	80002154 <_Z24externalInterruptHandlerv+0x30>
-        }
-    }
-    plicComplete(irq);
-    800021b0:	fdc42783          	lw	a5,-36(s0)
-    800021b4:	00078513          	mv	a0,a5
-    800021b8:	f15ff0ef          	jal	ra,800020cc <_Z12plicCompletei>
-}
-    800021bc:	00000013          	nop
-    800021c0:	03813083          	ld	ra,56(sp)
-    800021c4:	03013403          	ld	s0,48(sp)
-    800021c8:	02813483          	ld	s1,40(sp)
-    800021cc:	04010113          	addi	sp,sp,64
-    800021d0:	00008067          	ret
-
-00000000800021d4 <_Z12mtraphandlerv>:
-
-__attribute__ ((interrupt ("machine")))void mtraphandler(){
-    800021d4:	e5010113          	addi	sp,sp,-432
-    800021d8:	1a113423          	sd	ra,424(sp)
-    800021dc:	1a513023          	sd	t0,416(sp)
-    800021e0:	18613c23          	sd	t1,408(sp)
-    800021e4:	18713823          	sd	t2,400(sp)
-    800021e8:	18813423          	sd	s0,392(sp)
-    800021ec:	18a13023          	sd	a0,384(sp)
-    800021f0:	16b13c23          	sd	a1,376(sp)
-    800021f4:	16c13823          	sd	a2,368(sp)
-    800021f8:	16d13423          	sd	a3,360(sp)
-    800021fc:	16e13023          	sd	a4,352(sp)
-    80002200:	14f13c23          	sd	a5,344(sp)
-    80002204:	15013823          	sd	a6,336(sp)
-    80002208:	15113423          	sd	a7,328(sp)
-    8000220c:	15c13023          	sd	t3,320(sp)
-    80002210:	13d13c23          	sd	t4,312(sp)
-    80002214:	13e13823          	sd	t5,304(sp)
-    80002218:	13f13423          	sd	t6,296(sp)
-    8000221c:	10013c27          	fsd	ft0,280(sp)
-    80002220:	10113827          	fsd	ft1,272(sp)
-    80002224:	10213427          	fsd	ft2,264(sp)
-    80002228:	10313027          	fsd	ft3,256(sp)
-    8000222c:	0e413c27          	fsd	ft4,248(sp)
-    80002230:	0e513827          	fsd	ft5,240(sp)
-    80002234:	0e613427          	fsd	ft6,232(sp)
-    80002238:	0e713027          	fsd	ft7,224(sp)
-    8000223c:	0c813c27          	fsd	fs0,216(sp)
-    80002240:	0c913827          	fsd	fs1,208(sp)
-    80002244:	0ca13427          	fsd	fa0,200(sp)
-    80002248:	0cb13027          	fsd	fa1,192(sp)
-    8000224c:	0ac13c27          	fsd	fa2,184(sp)
-    80002250:	0ad13827          	fsd	fa3,176(sp)
-    80002254:	0ae13427          	fsd	fa4,168(sp)
-    80002258:	0af13027          	fsd	fa5,160(sp)
-    8000225c:	09013c27          	fsd	fa6,152(sp)
-    80002260:	09113827          	fsd	fa7,144(sp)
-    80002264:	09213427          	fsd	fs2,136(sp)
-    80002268:	09313027          	fsd	fs3,128(sp)
-    8000226c:	07413c27          	fsd	fs4,120(sp)
-    80002270:	07513827          	fsd	fs5,112(sp)
-    80002274:	07613427          	fsd	fs6,104(sp)
-    80002278:	07713027          	fsd	fs7,96(sp)
-    8000227c:	05813c27          	fsd	fs8,88(sp)
-    80002280:	05913827          	fsd	fs9,80(sp)
-    80002284:	05a13427          	fsd	fs10,72(sp)
-    80002288:	05b13027          	fsd	fs11,64(sp)
-    8000228c:	03c13c27          	fsd	ft8,56(sp)
-    80002290:	03d13827          	fsd	ft9,48(sp)
-    80002294:	03e13427          	fsd	ft10,40(sp)
-    80002298:	03f13027          	fsd	ft11,32(sp)
-    8000229c:	1b010413          	addi	s0,sp,432
-    // saveContext();
-    ptr_t mepc; csrRead(mepc,mepc);
-    800022a0:	341027f3          	csrr	a5,mepc
-    800022a4:	e6f43423          	sd	a5,-408(s0)
-    xlen_t mcause; csrRead(mcause,mcause);
-    800022a8:	342027f3          	csrr	a5,mcause
-    800022ac:	e6f43023          	sd	a5,-416(s0)
-    800022b0:	e6043783          	ld	a5,-416(s0)
-    800022b4:	e4f43c23          	sd	a5,-424(s0)
-    return (mcause>>63)&1;
-    800022b8:	e5843783          	ld	a5,-424(s0)
-    800022bc:	03f7d793          	srli	a5,a5,0x3f
-    800022c0:	0ff7f793          	andi	a5,a5,255
-
-    if(isInterrupt(mcause)){
-    800022c4:	04078263          	beqz	a5,80002308 <_Z12mtraphandlerv+0x134>
-    800022c8:	e6043703          	ld	a4,-416(s0)
-    800022cc:	00b00793          	li	a5,11
-    800022d0:	06e7e463          	bltu	a5,a4,80002338 <_Z12mtraphandlerv+0x164>
-    800022d4:	e6043783          	ld	a5,-416(s0)
-    800022d8:	00279713          	slli	a4,a5,0x2
-    800022dc:	00000797          	auipc	a5,0x0
-    800022e0:	53478793          	addi	a5,a5,1332 # 80002810 <_Z9uart_putsPc+0x54>
-    800022e4:	00f707b3          	add	a5,a4,a5
-    800022e8:	0007a783          	lw	a5,0(a5)
-    800022ec:	0007871b          	sext.w	a4,a5
-    800022f0:	00000797          	auipc	a5,0x0
-    800022f4:	52078793          	addi	a5,a5,1312 # 80002810 <_Z9uart_putsPc+0x54>
-    800022f8:	00f707b3          	add	a5,a4,a5
-    800022fc:	00078067          	jr	a5
-            case mti: break;
-
-            case uei: break;
-            case sei: break;
-            case hei: break;
-            case mei: externalInterruptHandler();
-    80002300:	e25ff0ef          	jal	ra,80002124 <_Z24externalInterruptHandlerv>
-                break;
-        }
-    }
-    // restoreContext();
-    // ExecInst(mret);
-}
-    80002304:	0340006f          	j	80002338 <_Z12mtraphandlerv+0x164>
-        switch(mcause){
-    80002308:	e6043703          	ld	a4,-416(s0)
-    8000230c:	00800793          	li	a5,8
-    80002310:	00f70e63          	beq	a4,a5,8000232c <_Z12mtraphandlerv+0x158>
-    80002314:	e6043703          	ld	a4,-416(s0)
-    80002318:	00900793          	li	a5,9
-    8000231c:	00f70c63          	beq	a4,a5,80002334 <_Z12mtraphandlerv+0x160>
-                break;
-    80002320:	0180006f          	j	80002338 <_Z12mtraphandlerv+0x164>
-            case usi: break;
-    80002324:	00000013          	nop
-    80002328:	0100006f          	j	80002338 <_Z12mtraphandlerv+0x164>
-            case uecall:break;
-    8000232c:	00000013          	nop
-    80002330:	0080006f          	j	80002338 <_Z12mtraphandlerv+0x164>
-            case secall:break;
-    80002334:	00000013          	nop
-}
-    80002338:	00000013          	nop
-    8000233c:	1a813083          	ld	ra,424(sp)
-    80002340:	1a013283          	ld	t0,416(sp)
-    80002344:	19813303          	ld	t1,408(sp)
-    80002348:	19013383          	ld	t2,400(sp)
-    8000234c:	18813403          	ld	s0,392(sp)
-    80002350:	18013503          	ld	a0,384(sp)
-    80002354:	17813583          	ld	a1,376(sp)
-    80002358:	17013603          	ld	a2,368(sp)
-    8000235c:	16813683          	ld	a3,360(sp)
-    80002360:	16013703          	ld	a4,352(sp)
-    80002364:	15813783          	ld	a5,344(sp)
-    80002368:	15013803          	ld	a6,336(sp)
-    8000236c:	14813883          	ld	a7,328(sp)
-    80002370:	14013e03          	ld	t3,320(sp)
-    80002374:	13813e83          	ld	t4,312(sp)
-    80002378:	13013f03          	ld	t5,304(sp)
-    8000237c:	12813f83          	ld	t6,296(sp)
-    80002380:	11813007          	fld	ft0,280(sp)
-    80002384:	11013087          	fld	ft1,272(sp)
-    80002388:	10813107          	fld	ft2,264(sp)
-    8000238c:	10013187          	fld	ft3,256(sp)
-    80002390:	0f813207          	fld	ft4,248(sp)
-    80002394:	0f013287          	fld	ft5,240(sp)
-    80002398:	0e813307          	fld	ft6,232(sp)
-    8000239c:	0e013387          	fld	ft7,224(sp)
-    800023a0:	0d813407          	fld	fs0,216(sp)
-    800023a4:	0d013487          	fld	fs1,208(sp)
-    800023a8:	0c813507          	fld	fa0,200(sp)
-    800023ac:	0c013587          	fld	fa1,192(sp)
-    800023b0:	0b813607          	fld	fa2,184(sp)
-    800023b4:	0b013687          	fld	fa3,176(sp)
-    800023b8:	0a813707          	fld	fa4,168(sp)
-    800023bc:	0a013787          	fld	fa5,160(sp)
-    800023c0:	09813807          	fld	fa6,152(sp)
-    800023c4:	09013887          	fld	fa7,144(sp)
-    800023c8:	08813907          	fld	fs2,136(sp)
-    800023cc:	08013987          	fld	fs3,128(sp)
-    800023d0:	07813a07          	fld	fs4,120(sp)
-    800023d4:	07013a87          	fld	fs5,112(sp)
-    800023d8:	06813b07          	fld	fs6,104(sp)
-    800023dc:	06013b87          	fld	fs7,96(sp)
-    800023e0:	05813c07          	fld	fs8,88(sp)
-    800023e4:	05013c87          	fld	fs9,80(sp)
-    800023e8:	04813d07          	fld	fs10,72(sp)
-    800023ec:	04013d87          	fld	fs11,64(sp)
-    800023f0:	03813e07          	fld	ft8,56(sp)
-    800023f4:	03013e87          	fld	ft9,48(sp)
-    800023f8:	02813f07          	fld	ft10,40(sp)
-    800023fc:	02013f87          	fld	ft11,32(sp)
-    80002400:	1b010113          	addi	sp,sp,432
-    80002404:	30200073          	mret
-
-0000000080002408 <_Z8uartInitv>:
-void uartInit(){
-    80002408:	fe010113          	addi	sp,sp,-32
-    8000240c:	00113c23          	sd	ra,24(sp)
-    80002410:	00813823          	sd	s0,16(sp)
-    80002414:	02010413          	addi	s0,sp,32
-    using namespace platform::uart0;
-    mmio<uint8_t>(reg(IER))=0x00;
-    80002418:	00100513          	li	a0,1
-    8000241c:	0c0000ef          	jal	ra,800024dc <_ZN8platform5uart03regENS0_4regsE>
-    80002420:	00050793          	mv	a5,a0
-    80002424:	fef43423          	sd	a5,-24(s0)
-    80002428:	fe843783          	ld	a5,-24(s0)
-    8000242c:	00078023          	sb	zero,0(a5)
-    // while(true){
-        puts("Hello Uart\n");
-    80002430:	00000517          	auipc	a0,0x0
-    80002434:	41050513          	addi	a0,a0,1040 # 80002840 <_Z9uart_putsPc+0x84>
-    80002438:	154000ef          	jal	ra,8000258c <_ZN8platform5uart04putsEPKc>
-    // }
-}
-    8000243c:	00000013          	nop
-    80002440:	01813083          	ld	ra,24(sp)
-    80002444:	01013403          	ld	s0,16(sp)
-    80002448:	02010113          	addi	sp,sp,32
-    8000244c:	00008067          	ret
-
-0000000080002450 <_Z8plicInitv>:
-void plicInit(){
-    80002450:	fd010113          	addi	sp,sp,-48
-    80002454:	02113423          	sd	ra,40(sp)
-    80002458:	02813023          	sd	s0,32(sp)
-    8000245c:	03010413          	addi	s0,sp,48
-    // int hart=Hart();
-    int hart=0;
-    80002460:	fe042623          	sw	zero,-20(s0)
-    mmio<uint8_t>(platform::plic::priorityOf(platform::uart0::irq))=1;
-    80002464:	00a00513          	li	a0,10
-    80002468:	174000ef          	jal	ra,800025dc <_ZN8platform4plic10priorityOfEi>
-    8000246c:	00050793          	mv	a5,a0
-    80002470:	fcf43c23          	sd	a5,-40(s0)
-    80002474:	fd843783          	ld	a5,-40(s0)
-    80002478:	00100713          	li	a4,1
-    8000247c:	00e78023          	sb	a4,0(a5)
-    mmio<uint8_t>(platform::plic::enableOf(hart))=1<<platform::uart0::irq;
-    80002480:	fec42783          	lw	a5,-20(s0)
-    80002484:	00078513          	mv	a0,a5
-    80002488:	190000ef          	jal	ra,80002618 <_ZN8platform4plic8enableOfEi>
-    8000248c:	00050793          	mv	a5,a0
-    80002490:	fef43023          	sd	a5,-32(s0)
-    80002494:	fe043783          	ld	a5,-32(s0)
-    80002498:	00078023          	sb	zero,0(a5)
-    uartInit();
-    8000249c:	f6dff0ef          	jal	ra,80002408 <_Z8uartInitv>
-}
-    800024a0:	00000013          	nop
-    800024a4:	02813083          	ld	ra,40(sp)
-    800024a8:	02013403          	ld	s0,32(sp)
-    800024ac:	03010113          	addi	sp,sp,48
-    800024b0:	00008067          	ret
-
-00000000800024b4 <sbi_init>:
-extern "C" void sbi_init(){
-    800024b4:	ff010113          	addi	sp,sp,-16
-    800024b8:	00113423          	sd	ra,8(sp)
-    800024bc:	00813023          	sd	s0,0(sp)
-    800024c0:	01010413          	addi	s0,sp,16
-    // csrWritei(mtvec,mtraphandler);
-    // {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtraphandler));}
-    // plicInit();
-    uartInit();
-    800024c4:	f45ff0ef          	jal	ra,80002408 <_Z8uartInitv>
-
-    // csrSet(mie,BIT(csr::mie::meie));
-    // MIEnable();
-    800024c8:	00000013          	nop
-    800024cc:	00813083          	ld	ra,8(sp)
-    800024d0:	00013403          	ld	s0,0(sp)
-    800024d4:	01010113          	addi	sp,sp,16
-    800024d8:	00008067          	ret
-
-00000000800024dc <_ZN8platform5uart03regENS0_4regsE>:
-            MCR=4,	// Modem Control Register
-            LSR=5,	// Line Status Register
-            MSR=6,	// Modem Status Register
-            SPR=7,	// ScratchPad Register
-        };
-        constexpr xlen_t reg(regs r){return base+r;}
-    800024dc:	fe010113          	addi	sp,sp,-32
-    800024e0:	00813c23          	sd	s0,24(sp)
-    800024e4:	02010413          	addi	s0,sp,32
-    800024e8:	00050793          	mv	a5,a0
-    800024ec:	fef42623          	sw	a5,-20(s0)
-    800024f0:	fec42783          	lw	a5,-20(s0)
-    800024f4:	00078713          	mv	a4,a5
-    800024f8:	100007b7          	lui	a5,0x10000
-    800024fc:	00f707b3          	add	a5,a4,a5
-    80002500:	00078513          	mv	a0,a5
-    80002504:	01813403          	ld	s0,24(sp)
-    80002508:	02010113          	addi	sp,sp,32
-    8000250c:	00008067          	ret
-
-0000000080002510 <_ZN8platform5uart04putcEc>:
-            uint8_t rxnemp:1;
-            uint8_t unused:4;
-            uint8_t txidle:1;
-            uint8_t unused1:2;
-        };
-        inline void putc(char c) {
-    80002510:	fd010113          	addi	sp,sp,-48
-    80002514:	02113423          	sd	ra,40(sp)
-    80002518:	02813023          	sd	s0,32(sp)
-    8000251c:	03010413          	addi	s0,sp,48
-    80002520:	00050793          	mv	a5,a0
-    80002524:	fcf40fa3          	sb	a5,-33(s0)
-            while(!mmio<lsr>(reg(LSR)).txidle);
-    80002528:	00500513          	li	a0,5
-    8000252c:	fb1ff0ef          	jal	ra,800024dc <_ZN8platform5uart03regENS0_4regsE>
-    80002530:	00050793          	mv	a5,a0
-    80002534:	fef43423          	sd	a5,-24(s0)
-    return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
-    80002538:	fe843783          	ld	a5,-24(s0)
-            while(!mmio<lsr>(reg(LSR)).txidle);
-    8000253c:	0007c783          	lbu	a5,0(a5) # 10000000 <STACK_SIZE+0xffffc00>
-    80002540:	0207f793          	andi	a5,a5,32
-    80002544:	0ff7f793          	andi	a5,a5,255
-    80002548:	0007879b          	sext.w	a5,a5
-    8000254c:	0017b793          	seqz	a5,a5
-    80002550:	0ff7f793          	andi	a5,a5,255
-    80002554:	00078463          	beqz	a5,8000255c <_ZN8platform5uart04putcEc+0x4c>
-    80002558:	fd1ff06f          	j	80002528 <_ZN8platform5uart04putcEc+0x18>
-            mmio<char>(reg(THR))=c;
-    8000255c:	00000513          	li	a0,0
-    80002560:	f7dff0ef          	jal	ra,800024dc <_ZN8platform5uart03regENS0_4regsE>
-    80002564:	00050793          	mv	a5,a0
-    80002568:	fef43023          	sd	a5,-32(s0)
-    return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
-    8000256c:	fe043783          	ld	a5,-32(s0)
-            mmio<char>(reg(THR))=c;
-    80002570:	fdf44703          	lbu	a4,-33(s0)
-    80002574:	00e78023          	sb	a4,0(a5)
-        }
-    80002578:	00000013          	nop
-    8000257c:	02813083          	ld	ra,40(sp)
-    80002580:	02013403          	ld	s0,32(sp)
-    80002584:	03010113          	addi	sp,sp,48
-    80002588:	00008067          	ret
-
-000000008000258c <_ZN8platform5uart04putsEPKc>:
-        inline char& getc() {
-            while(mmio<lsr>(reg(LSR)).rxnemp);
-            return mmio<char>(reg(RHR));
-        }
-        inline void puts(const char *s){
-    8000258c:	fe010113          	addi	sp,sp,-32
-    80002590:	00113c23          	sd	ra,24(sp)
-    80002594:	00813823          	sd	s0,16(sp)
-    80002598:	02010413          	addi	s0,sp,32
-    8000259c:	fea43423          	sd	a0,-24(s0)
-            while(*s)putc(*s++);
-    800025a0:	fe843783          	ld	a5,-24(s0)
-    800025a4:	0007c783          	lbu	a5,0(a5)
-    800025a8:	02078063          	beqz	a5,800025c8 <_ZN8platform5uart04putsEPKc+0x3c>
-    800025ac:	fe843783          	ld	a5,-24(s0)
-    800025b0:	00178713          	addi	a4,a5,1
-    800025b4:	fee43423          	sd	a4,-24(s0)
-    800025b8:	0007c783          	lbu	a5,0(a5)
-    800025bc:	00078513          	mv	a0,a5
-    800025c0:	f51ff0ef          	jal	ra,80002510 <_ZN8platform5uart04putcEc>
-    800025c4:	fddff06f          	j	800025a0 <_ZN8platform5uart04putsEPKc+0x14>
-        }
-    800025c8:	00000013          	nop
-    800025cc:	01813083          	ld	ra,24(sp)
-    800025d0:	01013403          	ld	s0,16(sp)
-    800025d4:	02010113          	addi	sp,sp,32
-    800025d8:	00008067          	ret
-
-00000000800025dc <_ZN8platform4plic10priorityOfEi>:
-            priority=base,
-            pending=base+0x1000,
-            enable=base+0x2000,
-            threshold=base+0x200000,
-            claim=base+0x200004;
-        constexpr xlen_t priorityOf(int id) {return priority+id*4;}
-    800025dc:	fe010113          	addi	sp,sp,-32
-    800025e0:	00813c23          	sd	s0,24(sp)
-    800025e4:	02010413          	addi	s0,sp,32
-    800025e8:	00050793          	mv	a5,a0
-    800025ec:	fef42623          	sw	a5,-20(s0)
-    800025f0:	fec42783          	lw	a5,-20(s0)
-    800025f4:	0027979b          	slliw	a5,a5,0x2
-    800025f8:	0007879b          	sext.w	a5,a5
-    800025fc:	00078713          	mv	a4,a5
-    80002600:	0c0007b7          	lui	a5,0xc000
-    80002604:	00f707b3          	add	a5,a4,a5
-    80002608:	00078513          	mv	a0,a5
-    8000260c:	01813403          	ld	s0,24(sp)
-    80002610:	02010113          	addi	sp,sp,32
-    80002614:	00008067          	ret
-
-0000000080002618 <_ZN8platform4plic8enableOfEi>:
-        constexpr xlen_t enableOf(int hart) { return enable+hart*0x80; }
-    80002618:	fe010113          	addi	sp,sp,-32
-    8000261c:	00813c23          	sd	s0,24(sp)
-    80002620:	02010413          	addi	s0,sp,32
-    80002624:	00050793          	mv	a5,a0
-    80002628:	fef42623          	sw	a5,-20(s0)
-    8000262c:	fec42783          	lw	a5,-20(s0)
-    80002630:	0077979b          	slliw	a5,a5,0x7
-    80002634:	0007879b          	sext.w	a5,a5
-    80002638:	00078713          	mv	a4,a5
-    8000263c:	0c0027b7          	lui	a5,0xc002
-    80002640:	00f707b3          	add	a5,a4,a5
-    80002644:	00078513          	mv	a0,a5
-    80002648:	01813403          	ld	s0,24(sp)
-    8000264c:	02010113          	addi	sp,sp,32
-    80002650:	00008067          	ret
-
-0000000080002654 <_ZN8platform4plic7claimOfEi>:
-        constexpr xlen_t thresholdOf(int hart) { return threshold+hart*0x1000; }
-        constexpr xlen_t claimOf(int hart) { return claim+hart*0x1000; }
-    80002654:	fe010113          	addi	sp,sp,-32
-    80002658:	00813c23          	sd	s0,24(sp)
-    8000265c:	02010413          	addi	s0,sp,32
-    80002660:	00050793          	mv	a5,a0
-    80002664:	fef42623          	sw	a5,-20(s0)
-    80002668:	fec42783          	lw	a5,-20(s0)
-    8000266c:	00c7979b          	slliw	a5,a5,0xc
-    80002670:	0007879b          	sext.w	a5,a5
-    80002674:	00078713          	mv	a4,a5
-    80002678:	0c2007b7          	lui	a5,0xc200
-    8000267c:	00478793          	addi	a5,a5,4 # c200004 <STACK_SIZE+0xc1ffc04>
-    80002680:	00f707b3          	add	a5,a4,a5
-    80002684:	00078513          	mv	a0,a5
-    80002688:	01813403          	ld	s0,24(sp)
-    8000268c:	02010113          	addi	sp,sp,32
-    80002690:	00008067          	ret
-
-0000000080002694 <_Z4Hartv>:
-inline int Hart(){
-    80002694:	fe010113          	addi	sp,sp,-32
-    80002698:	00813c23          	sd	s0,24(sp)
-    8000269c:	02010413          	addi	s0,sp,32
-    int rt; csrRead(mhartid,rt);
-    800026a0:	f14027f3          	csrr	a5,mhartid
-    800026a4:	fef42623          	sw	a5,-20(s0)
-    return rt;
-    800026a8:	fec42783          	lw	a5,-20(s0)
-}
-    800026ac:	00078513          	mv	a0,a5
-    800026b0:	01813403          	ld	s0,24(sp)
-    800026b4:	02010113          	addi	sp,sp,32
-    800026b8:	00008067          	ret
-
-00000000800026bc <start_kernel>:
-extern "C" void start_kernel(){
-    800026bc:	ff010113          	addi	sp,sp,-16
-    800026c0:	00813423          	sd	s0,8(sp)
-    800026c4:	01010413          	addi	s0,sp,16
-    
-    800026c8:	00000013          	nop
-    800026cc:	00813403          	ld	s0,8(sp)
-    800026d0:	01010113          	addi	sp,sp,16
-    800026d4:	00008067          	ret
-
-00000000800026d8 <_Z9uart_initv>:
+8000004c <_Z9uart_initv>:
 
 #define uart_read_reg(reg) (*(UART_REG(reg)))
 #define uart_write_reg(reg, v) (*(UART_REG(reg)) = (v))
 
 void uart_init()
 {
-    800026d8:	fe010113          	addi	sp,sp,-32
-    800026dc:	00813c23          	sd	s0,24(sp)
-    800026e0:	02010413          	addi	s0,sp,32
+8000004c:	fe010113          	addi	sp,sp,-32
+80000050:	00812e23          	sw	s0,28(sp)
+80000054:	02010413          	addi	s0,sp,32
 	/* disable interrupts. */
 	uart_write_reg(IER, 0x00);
-    800026e4:	100007b7          	lui	a5,0x10000
-    800026e8:	00178793          	addi	a5,a5,1 # 10000001 <STACK_SIZE+0xffffc01>
-    800026ec:	00078023          	sb	zero,0(a5)
+80000058:	100007b7          	lui	a5,0x10000
+8000005c:	00178793          	addi	a5,a5,1 # 10000001 <STACK_SIZE+0xffffc01>
+80000060:	00078023          	sb	zero,0(a5)
 	 * We use 38.4K when 1.8432 MHZ crystal, so the corresponding value is 3.
 	 * And due to the divisor register is two bytes (16 bits), so we need to
 	 * split the value of 3(0x0003) into two bytes, DLL stores the low byte,
 	 * DLM stores the high byte.
 	 */
 	uint8_t lcr = uart_read_reg(LCR);
-    800026f0:	100007b7          	lui	a5,0x10000
-    800026f4:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
-    800026f8:	0007c783          	lbu	a5,0(a5)
-    800026fc:	fef407a3          	sb	a5,-17(s0)
+80000064:	100007b7          	lui	a5,0x10000
+80000068:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
+8000006c:	0007c783          	lbu	a5,0(a5)
+80000070:	fef407a3          	sb	a5,-17(s0)
 	uart_write_reg(LCR, lcr | (1 << 7));
-    80002700:	100007b7          	lui	a5,0x10000
-    80002704:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
-    80002708:	fef44703          	lbu	a4,-17(s0)
-    8000270c:	f8076713          	ori	a4,a4,-128
-    80002710:	0ff77713          	andi	a4,a4,255
-    80002714:	00e78023          	sb	a4,0(a5)
+80000074:	100007b7          	lui	a5,0x10000
+80000078:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
+8000007c:	fef44703          	lbu	a4,-17(s0)
+80000080:	f8076713          	ori	a4,a4,-128
+80000084:	0ff77713          	andi	a4,a4,255
+80000088:	00e78023          	sb	a4,0(a5)
 	uart_write_reg(DLL, 0x03);
-    80002718:	100007b7          	lui	a5,0x10000
-    8000271c:	00300713          	li	a4,3
-    80002720:	00e78023          	sb	a4,0(a5) # 10000000 <STACK_SIZE+0xffffc00>
+8000008c:	100007b7          	lui	a5,0x10000
+80000090:	00300713          	li	a4,3
+80000094:	00e78023          	sb	a4,0(a5) # 10000000 <STACK_SIZE+0xffffc00>
 	uart_write_reg(DLM, 0x00);
-    80002724:	100007b7          	lui	a5,0x10000
-    80002728:	00178793          	addi	a5,a5,1 # 10000001 <STACK_SIZE+0xffffc01>
-    8000272c:	00078023          	sb	zero,0(a5)
+80000098:	100007b7          	lui	a5,0x10000
+8000009c:	00178793          	addi	a5,a5,1 # 10000001 <STACK_SIZE+0xffffc01>
+800000a0:	00078023          	sb	zero,0(a5)
 	 * - number of stop bits：1 bit when word length is 8 bits
 	 * - no parity
 	 * - no break control
 	 * - disabled baud latch
 	 */
 	lcr = 0;
-    80002730:	fe0407a3          	sb	zero,-17(s0)
+800000a4:	fe0407a3          	sb	zero,-17(s0)
 	uart_write_reg(LCR, lcr | (3 << 0));
-    80002734:	100007b7          	lui	a5,0x10000
-    80002738:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
-    8000273c:	fef44703          	lbu	a4,-17(s0)
-    80002740:	00376713          	ori	a4,a4,3
-    80002744:	0ff77713          	andi	a4,a4,255
-    80002748:	00e78023          	sb	a4,0(a5)
+800000a8:	100007b7          	lui	a5,0x10000
+800000ac:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
+800000b0:	fef44703          	lbu	a4,-17(s0)
+800000b4:	00376713          	ori	a4,a4,3
+800000b8:	0ff77713          	andi	a4,a4,255
+800000bc:	00e78023          	sb	a4,0(a5)
 }
-    8000274c:	00000013          	nop
-    80002750:	01813403          	ld	s0,24(sp)
-    80002754:	02010113          	addi	sp,sp,32
-    80002758:	00008067          	ret
+800000c0:	00000013          	nop
+800000c4:	01c12403          	lw	s0,28(sp)
+800000c8:	02010113          	addi	sp,sp,32
+800000cc:	00008067          	ret
 
-000000008000275c <_Z9uart_putcc>:
+800000d0 <_Z9uart_putcc>:
 
 int uart_putc(char ch)
 {
-    8000275c:	fe010113          	addi	sp,sp,-32
-    80002760:	00813c23          	sd	s0,24(sp)
-    80002764:	02010413          	addi	s0,sp,32
-    80002768:	00050793          	mv	a5,a0
-    8000276c:	fef407a3          	sb	a5,-17(s0)
+800000d0:	fe010113          	addi	sp,sp,-32
+800000d4:	00812e23          	sw	s0,28(sp)
+800000d8:	02010413          	addi	s0,sp,32
+800000dc:	00050793          	mv	a5,a0
+800000e0:	fef407a3          	sb	a5,-17(s0)
 	while ((uart_read_reg(LSR) & LSR_TX_IDLE) == 0);
-    80002770:	100007b7          	lui	a5,0x10000
-    80002774:	00578793          	addi	a5,a5,5 # 10000005 <STACK_SIZE+0xffffc05>
-    80002778:	0007c783          	lbu	a5,0(a5)
-    8000277c:	0ff7f793          	andi	a5,a5,255
-    80002780:	0007879b          	sext.w	a5,a5
-    80002784:	0207f793          	andi	a5,a5,32
-    80002788:	0007879b          	sext.w	a5,a5
-    8000278c:	0017b793          	seqz	a5,a5
-    80002790:	0ff7f793          	andi	a5,a5,255
-    80002794:	00078463          	beqz	a5,8000279c <_Z9uart_putcc+0x40>
-    80002798:	fd9ff06f          	j	80002770 <_Z9uart_putcc+0x14>
+800000e4:	100007b7          	lui	a5,0x10000
+800000e8:	00578793          	addi	a5,a5,5 # 10000005 <STACK_SIZE+0xffffc05>
+800000ec:	0007c783          	lbu	a5,0(a5)
+800000f0:	0ff7f793          	andi	a5,a5,255
+800000f4:	0207f793          	andi	a5,a5,32
+800000f8:	0017b793          	seqz	a5,a5
+800000fc:	0ff7f793          	andi	a5,a5,255
+80000100:	00078463          	beqz	a5,80000108 <_Z9uart_putcc+0x38>
+80000104:	fe1ff06f          	j	800000e4 <_Z9uart_putcc+0x14>
 	return uart_write_reg(THR, ch);
-    8000279c:	10000737          	lui	a4,0x10000
-    800027a0:	fef44783          	lbu	a5,-17(s0)
-    800027a4:	00f70023          	sb	a5,0(a4) # 10000000 <STACK_SIZE+0xffffc00>
-    800027a8:	0007879b          	sext.w	a5,a5
+80000108:	10000737          	lui	a4,0x10000
+8000010c:	fef44783          	lbu	a5,-17(s0)
+80000110:	00f70023          	sb	a5,0(a4) # 10000000 <STACK_SIZE+0xffffc00>
 }
-    800027ac:	00078513          	mv	a0,a5
-    800027b0:	01813403          	ld	s0,24(sp)
-    800027b4:	02010113          	addi	sp,sp,32
-    800027b8:	00008067          	ret
+80000114:	00078513          	mv	a0,a5
+80000118:	01c12403          	lw	s0,28(sp)
+8000011c:	02010113          	addi	sp,sp,32
+80000120:	00008067          	ret
 
-00000000800027bc <_Z9uart_putsPc>:
+80000124 <_Z9uart_putsPc>:
 
 void uart_puts(char *s)
 {
-    800027bc:	fe010113          	addi	sp,sp,-32
-    800027c0:	00113c23          	sd	ra,24(sp)
-    800027c4:	00813823          	sd	s0,16(sp)
-    800027c8:	02010413          	addi	s0,sp,32
-    800027cc:	fea43423          	sd	a0,-24(s0)
+80000124:	fe010113          	addi	sp,sp,-32
+80000128:	00112e23          	sw	ra,28(sp)
+8000012c:	00812c23          	sw	s0,24(sp)
+80000130:	02010413          	addi	s0,sp,32
+80000134:	fea42623          	sw	a0,-20(s0)
 	while (*s) {
-    800027d0:	fe843783          	ld	a5,-24(s0)
-    800027d4:	0007c783          	lbu	a5,0(a5)
-    800027d8:	02078063          	beqz	a5,800027f8 <_Z9uart_putsPc+0x3c>
+80000138:	fec42783          	lw	a5,-20(s0)
+8000013c:	0007c783          	lbu	a5,0(a5)
+80000140:	02078063          	beqz	a5,80000160 <_Z9uart_putsPc+0x3c>
 		uart_putc(*s++);
-    800027dc:	fe843783          	ld	a5,-24(s0)
-    800027e0:	00178713          	addi	a4,a5,1
-    800027e4:	fee43423          	sd	a4,-24(s0)
-    800027e8:	0007c783          	lbu	a5,0(a5)
-    800027ec:	00078513          	mv	a0,a5
-    800027f0:	f6dff0ef          	jal	ra,8000275c <_Z9uart_putcc>
+80000144:	fec42783          	lw	a5,-20(s0)
+80000148:	00178713          	addi	a4,a5,1
+8000014c:	fee42623          	sw	a4,-20(s0)
+80000150:	0007c783          	lbu	a5,0(a5)
+80000154:	00078513          	mv	a0,a5
+80000158:	f79ff0ef          	jal	ra,800000d0 <_Z9uart_putcc>
 	while (*s) {
-    800027f4:	fddff06f          	j	800027d0 <_Z9uart_putsPc+0x14>
+8000015c:	fddff06f          	j	80000138 <_Z9uart_putsPc+0x14>
 	}
 }
-    800027f8:	00000013          	nop
-    800027fc:	01813083          	ld	ra,24(sp)
-    80002800:	01013403          	ld	s0,16(sp)
-    80002804:	02010113          	addi	sp,sp,32
-    80002808:	00008067          	ret
+80000160:	00000013          	nop
+80000164:	01c12083          	lw	ra,28(sp)
+80000168:	01812403          	lw	s0,24(sp)
+8000016c:	02010113          	addi	sp,sp,32
+80000170:	00008067          	ret
+
+80000174 <start_kernel>:
+extern "C" void start_kernel(){
+80000174:	ff010113          	addi	sp,sp,-16
+80000178:	00812623          	sw	s0,12(sp)
+8000017c:	01010413          	addi	s0,sp,16
+    
+80000180:	00000013          	nop
+80000184:	00c12403          	lw	s0,12(sp)
+80000188:	01010113          	addi	sp,sp,16
+8000018c:	00008067          	ret
+
+80000190 <_Z11isInterruptm>:
+#define csrClear(reg, val) {asm volatile ("csrc "#reg", %0" :: "r"(val)); }
+#define csrRW(val0,reg,val1) {asm volatile ("csrrw %0, "#reg", %1" :"=r"(val0):"r"(val1));}
+#define csrSwap(reg,val) csrRW(val,reg,val)
+#define ExecInst(inst) {asm volatile (#inst ::);}
+
+FORCEDINLINE bool isInterrupt(xlen_t mcause){
+80000190:	fe010113          	addi	sp,sp,-32
+80000194:	00812e23          	sw	s0,28(sp)
+80000198:	02010413          	addi	s0,sp,32
+8000019c:	fea42623          	sw	a0,-20(s0)
+    return (mcause>>63)&1;
+800001a0:	03f00793          	li	a5,63
+800001a4:	fec42703          	lw	a4,-20(s0)
+800001a8:	00f757b3          	srl	a5,a4,a5
+800001ac:	0017f793          	andi	a5,a5,1
+800001b0:	00f037b3          	snez	a5,a5
+800001b4:	0ff7f793          	andi	a5,a5,255
+}
+800001b8:	00078513          	mv	a0,a5
+800001bc:	01c12403          	lw	s0,28(sp)
+800001c0:	02010113          	addi	sp,sp,32
+800001c4:	00008067          	ret
+
+800001c8 <_Z9plicClaimv>:
+}*/
+inline int Hart(){
+    int rt; csrRead(mhartid,rt);
+    return rt;
+}
+int plicClaim(){
+800001c8:	fe010113          	addi	sp,sp,-32
+800001cc:	00112e23          	sw	ra,28(sp)
+800001d0:	00812c23          	sw	s0,24(sp)
+800001d4:	02010413          	addi	s0,sp,32
+    int hart=Hart();
+800001d8:	608000ef          	jal	ra,800007e0 <_Z4Hartv>
+800001dc:	fea42623          	sw	a0,-20(s0)
+    int irq=mmio<int>(platform::plic::claimOf(hart));
+800001e0:	fec42503          	lw	a0,-20(s0)
+800001e4:	5c8000ef          	jal	ra,800007ac <_ZN8platform4plic7claimOfEi>
+800001e8:	00050793          	mv	a5,a0
+800001ec:	fef42223          	sw	a5,-28(s0)
+ */
+#define MAXNUM_CPU 8
+
+template<typename T>
+FORCEDINLINE T& mmio(xlen_t addr){
+    return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
+800001f0:	fe442783          	lw	a5,-28(s0)
+800001f4:	0007a783          	lw	a5,0(a5)
+800001f8:	fef42423          	sw	a5,-24(s0)
+}
+800001fc:	00000013          	nop
+80000200:	00078513          	mv	a0,a5
+80000204:	01c12083          	lw	ra,28(sp)
+80000208:	01812403          	lw	s0,24(sp)
+8000020c:	02010113          	addi	sp,sp,32
+80000210:	00008067          	ret
+
+80000214 <_Z12plicCompletei>:
+void plicComplete(int irq){
+80000214:	fd010113          	addi	sp,sp,-48
+80000218:	02112623          	sw	ra,44(sp)
+8000021c:	02812423          	sw	s0,40(sp)
+80000220:	03010413          	addi	s0,sp,48
+80000224:	fca42e23          	sw	a0,-36(s0)
+    int hart=Hart();
+80000228:	5b8000ef          	jal	ra,800007e0 <_Z4Hartv>
+8000022c:	fea42623          	sw	a0,-20(s0)
+    mmio<int>(platform::plic::claimOf(hart))=irq;
+80000230:	fec42503          	lw	a0,-20(s0)
+80000234:	578000ef          	jal	ra,800007ac <_ZN8platform4plic7claimOfEi>
+80000238:	00050793          	mv	a5,a0
+8000023c:	fef42423          	sw	a5,-24(s0)
+80000240:	fe842783          	lw	a5,-24(s0)
+80000244:	fdc42703          	lw	a4,-36(s0)
+80000248:	00e7a023          	sw	a4,0(a5)
+}
+8000024c:	00000013          	nop
+80000250:	02c12083          	lw	ra,44(sp)
+80000254:	02812403          	lw	s0,40(sp)
+80000258:	03010113          	addi	sp,sp,48
+8000025c:	00008067          	ret
+
+80000260 <_Z24externalInterruptHandlerv>:
+
+void externalInterruptHandler(){
+80000260:	fe010113          	addi	sp,sp,-32
+80000264:	00112e23          	sw	ra,28(sp)
+80000268:	00812c23          	sw	s0,24(sp)
+8000026c:	00912a23          	sw	s1,20(sp)
+80000270:	02010413          	addi	s0,sp,32
+    int irq=plicClaim();
+80000274:	f55ff0ef          	jal	ra,800001c8 <_Z9plicClaimv>
+80000278:	00050793          	mv	a5,a0
+8000027c:	fef42623          	sw	a5,-20(s0)
+    if(irq==platform::uart0::irq){
+80000280:	fec42703          	lw	a4,-20(s0)
+80000284:	00a00793          	li	a5,10
+80000288:	06f71063          	bne	a4,a5,800002e8 <_Z24externalInterruptHandlerv+0x88>
+        using namespace platform::uart0;
+        while(mmio<volatile lsr>(reg(LSR)).rxnemp){
+8000028c:	00500513          	li	a0,5
+80000290:	3f4000ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
+80000294:	00050793          	mv	a5,a0
+80000298:	fef42423          	sw	a5,-24(s0)
+8000029c:	fe842783          	lw	a5,-24(s0)
+800002a0:	0007c783          	lbu	a5,0(a5)
+800002a4:	0017f793          	andi	a5,a5,1
+800002a8:	0ff7f793          	andi	a5,a5,255
+800002ac:	02078e63          	beqz	a5,800002e8 <_Z24externalInterruptHandlerv+0x88>
+            mmio<volatile uint8_t>(reg(THR))=mmio<volatile uint8_t>(reg(RHR));
+800002b0:	00000513          	li	a0,0
+800002b4:	3d0000ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
+800002b8:	00050793          	mv	a5,a0
+800002bc:	fef42023          	sw	a5,-32(s0)
+800002c0:	fe042483          	lw	s1,-32(s0)
+800002c4:	00000513          	li	a0,0
+800002c8:	3bc000ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
+800002cc:	00050793          	mv	a5,a0
+800002d0:	fef42223          	sw	a5,-28(s0)
+800002d4:	fe442783          	lw	a5,-28(s0)
+800002d8:	0004c703          	lbu	a4,0(s1)
+800002dc:	0ff77713          	andi	a4,a4,255
+800002e0:	00e78023          	sb	a4,0(a5)
+        while(mmio<volatile lsr>(reg(LSR)).rxnemp){
+800002e4:	fa9ff06f          	j	8000028c <_Z24externalInterruptHandlerv+0x2c>
+        }
+    }
+    plicComplete(irq);
+800002e8:	fec42503          	lw	a0,-20(s0)
+800002ec:	f29ff0ef          	jal	ra,80000214 <_Z12plicCompletei>
+}
+800002f0:	00000013          	nop
+800002f4:	01c12083          	lw	ra,28(sp)
+800002f8:	01812403          	lw	s0,24(sp)
+800002fc:	01412483          	lw	s1,20(sp)
+80000300:	02010113          	addi	sp,sp,32
+80000304:	00008067          	ret
+
+80000308 <trap_handler>:
+extern "C" xlen_t trap_handler(xlen_t epc, xlen_t cause)
+{
+80000308:	fd010113          	addi	sp,sp,-48
+8000030c:	02112623          	sw	ra,44(sp)
+80000310:	02812423          	sw	s0,40(sp)
+80000314:	03010413          	addi	s0,sp,48
+80000318:	fca42e23          	sw	a0,-36(s0)
+8000031c:	fcb42c23          	sw	a1,-40(s0)
+	xlen_t return_pc = epc;
+80000320:	fdc42783          	lw	a5,-36(s0)
+80000324:	fef42623          	sw	a5,-20(s0)
+	xlen_t cause_code = cause & 0xfff;
+80000328:	fd842703          	lw	a4,-40(s0)
+8000032c:	000017b7          	lui	a5,0x1
+80000330:	fff78793          	addi	a5,a5,-1 # fff <STACK_SIZE+0xbff>
+80000334:	00f777b3          	and	a5,a4,a5
+80000338:	fef42423          	sw	a5,-24(s0)
+	
+	if (cause & 0x80000000) {
+8000033c:	fd842783          	lw	a5,-40(s0)
+80000340:	0607dc63          	bgez	a5,800003b8 <trap_handler+0xb0>
+		/* Asynchronous trap - interrupt */
+		switch (cause_code) {
+80000344:	fe842703          	lw	a4,-24(s0)
+80000348:	00b00793          	li	a5,11
+8000034c:	04f70663          	beq	a4,a5,80000398 <trap_handler+0x90>
+80000350:	fe842703          	lw	a4,-24(s0)
+80000354:	00b00793          	li	a5,11
+80000358:	04e7e863          	bltu	a5,a4,800003a8 <trap_handler+0xa0>
+8000035c:	fe842703          	lw	a4,-24(s0)
+80000360:	00300793          	li	a5,3
+80000364:	00f70a63          	beq	a4,a5,80000378 <trap_handler+0x70>
+80000368:	fe842703          	lw	a4,-24(s0)
+8000036c:	00700793          	li	a5,7
+80000370:	00f70c63          	beq	a4,a5,80000388 <trap_handler+0x80>
+80000374:	0340006f          	j	800003a8 <trap_handler+0xa0>
+		case 3:
+			platform::uart0::puts("software interruption!\n");
+80000378:	00000517          	auipc	a0,0x0
+8000037c:	49050513          	addi	a0,a0,1168 # 80000808 <_Z4Hartv+0x28>
+80000380:	3a8000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
+			break;
+80000384:	0400006f          	j	800003c4 <trap_handler+0xbc>
+		case 7:
+			platform::uart0::puts("timer interruption!\n");
+80000388:	00000517          	auipc	a0,0x0
+8000038c:	49850513          	addi	a0,a0,1176 # 80000820 <_Z4Hartv+0x40>
+80000390:	398000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
+			break;
+80000394:	0300006f          	j	800003c4 <trap_handler+0xbc>
+		case 11:
+			platform::uart0::puts("external interruption!\n");
+80000398:	00000517          	auipc	a0,0x0
+8000039c:	4a050513          	addi	a0,a0,1184 # 80000838 <_Z4Hartv+0x58>
+800003a0:	388000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
+			break;
+800003a4:	0200006f          	j	800003c4 <trap_handler+0xbc>
+		default:
+			platform::uart0::puts("unknown async exception!\n");
+800003a8:	00000517          	auipc	a0,0x0
+800003ac:	4a850513          	addi	a0,a0,1192 # 80000850 <_Z4Hartv+0x70>
+800003b0:	378000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
+			break;
+800003b4:	0100006f          	j	800003c4 <trap_handler+0xbc>
+		}
+	} else {
+		/* Synchronous trap - exception */
+		// printf("Sync exceptions!, code = %d\n", cause_code);
+		// panic("OOPS! What can I do!");
+		return_pc += 4;
+800003b8:	fec42783          	lw	a5,-20(s0)
+800003bc:	00478793          	addi	a5,a5,4
+800003c0:	fef42623          	sw	a5,-20(s0)
+	}
+
+	return return_pc;
+800003c4:	fec42783          	lw	a5,-20(s0)
+}
+800003c8:	00078513          	mv	a0,a5
+800003cc:	02c12083          	lw	ra,44(sp)
+800003d0:	02812403          	lw	s0,40(sp)
+800003d4:	03010113          	addi	sp,sp,48
+800003d8:	00008067          	ret
+
+800003dc <mtraphandler>:
+extern "C" __attribute__((interrupt("machine"))) void mtraphandler(){
+800003dc:	fa010113          	addi	sp,sp,-96
+800003e0:	04112e23          	sw	ra,92(sp)
+800003e4:	04512c23          	sw	t0,88(sp)
+800003e8:	04612a23          	sw	t1,84(sp)
+800003ec:	04712823          	sw	t2,80(sp)
+800003f0:	04812623          	sw	s0,76(sp)
+800003f4:	04a12423          	sw	a0,72(sp)
+800003f8:	04b12223          	sw	a1,68(sp)
+800003fc:	04c12023          	sw	a2,64(sp)
+80000400:	02d12e23          	sw	a3,60(sp)
+80000404:	02e12c23          	sw	a4,56(sp)
+80000408:	02f12a23          	sw	a5,52(sp)
+8000040c:	03012823          	sw	a6,48(sp)
+80000410:	03112623          	sw	a7,44(sp)
+80000414:	03c12423          	sw	t3,40(sp)
+80000418:	03d12223          	sw	t4,36(sp)
+8000041c:	03e12023          	sw	t5,32(sp)
+80000420:	01f12e23          	sw	t6,28(sp)
+80000424:	06010413          	addi	s0,sp,96
+    // saveContext();
+    platform::uart0::puts("mtraphandler!\n");
+80000428:	00000517          	auipc	a0,0x0
+8000042c:	44450513          	addi	a0,a0,1092 # 8000086c <_Z4Hartv+0x8c>
+80000430:	2f8000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
+    ptr_t mepc; csrRead(mepc,mepc);
+80000434:	341027f3          	csrr	a5,mepc
+80000438:	faf42623          	sw	a5,-84(s0)
+    xlen_t mcause; csrRead(mcause,mcause);
+8000043c:	342027f3          	csrr	a5,mcause
+80000440:	faf42423          	sw	a5,-88(s0)
+    platform::uart0::puts("cause=");
+80000444:	00000517          	auipc	a0,0x0
+80000448:	43850513          	addi	a0,a0,1080 # 8000087c <_Z4Hartv+0x9c>
+8000044c:	2dc000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
+    platform::uart0::putc(mcause+'0');
+80000450:	fa842783          	lw	a5,-88(s0)
+80000454:	0ff7f793          	andi	a5,a5,255
+80000458:	03078793          	addi	a5,a5,48
+8000045c:	0ff7f793          	andi	a5,a5,255
+80000460:	00078513          	mv	a0,a5
+80000464:	24c000ef          	jal	ra,800006b0 <_ZN8platform5uart04putcEc>
+    platform::uart0::putc('\n');
+80000468:	00a00513          	li	a0,10
+8000046c:	244000ef          	jal	ra,800006b0 <_ZN8platform5uart04putcEc>
+80000470:	fa842783          	lw	a5,-88(s0)
+80000474:	faf42223          	sw	a5,-92(s0)
+    return (mcause>>63)&1;
+80000478:	03f00793          	li	a5,63
+8000047c:	fa442703          	lw	a4,-92(s0)
+80000480:	00f757b3          	srl	a5,a4,a5
+80000484:	0017f793          	andi	a5,a5,1
+80000488:	00f037b3          	snez	a5,a5
+8000048c:	0ff7f793          	andi	a5,a5,255
+
+    if(isInterrupt(mcause)){
+80000490:	04078063          	beqz	a5,800004d0 <mtraphandler+0xf4>
+80000494:	fa842703          	lw	a4,-88(s0)
+80000498:	00b00793          	li	a5,11
+8000049c:	06e7ee63          	bltu	a5,a4,80000518 <mtraphandler+0x13c>
+800004a0:	fa842783          	lw	a5,-88(s0)
+800004a4:	00279713          	slli	a4,a5,0x2
+800004a8:	00000797          	auipc	a5,0x0
+800004ac:	3e878793          	addi	a5,a5,1000 # 80000890 <_Z4Hartv+0xb0>
+800004b0:	00f707b3          	add	a5,a4,a5
+800004b4:	0007a703          	lw	a4,0(a5)
+800004b8:	00000797          	auipc	a5,0x0
+800004bc:	3d878793          	addi	a5,a5,984 # 80000890 <_Z4Hartv+0xb0>
+800004c0:	00f707b3          	add	a5,a4,a5
+800004c4:	00078067          	jr	a5
+            case mti: break;
+
+            case uei: break;
+            case sei: break;
+            case hei: break;
+            case mei: externalInterruptHandler();
+800004c8:	d99ff0ef          	jal	ra,80000260 <_Z24externalInterruptHandlerv>
+        }
+        csrWrite(mepc,mepc+8);
+    }
+    // restoreContext();
+    // ExecInst(mret);
+}
+800004cc:	04c0006f          	j	80000518 <mtraphandler+0x13c>
+        switch(mcause){
+800004d0:	fa842703          	lw	a4,-88(s0)
+800004d4:	00800793          	li	a5,8
+800004d8:	02f70063          	beq	a4,a5,800004f8 <mtraphandler+0x11c>
+800004dc:	fa842703          	lw	a4,-88(s0)
+800004e0:	00900793          	li	a5,9
+800004e4:	00f70e63          	beq	a4,a5,80000500 <mtraphandler+0x124>
+                platform::uart0::puts("exception\n");
+800004e8:	00000517          	auipc	a0,0x0
+800004ec:	39c50513          	addi	a0,a0,924 # 80000884 <_Z4Hartv+0xa4>
+800004f0:	238000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
+                break;
+800004f4:	0100006f          	j	80000504 <mtraphandler+0x128>
+            case uecall:break;
+800004f8:	00000013          	nop
+800004fc:	0080006f          	j	80000504 <mtraphandler+0x128>
+            case secall:break;
+80000500:	00000013          	nop
+        csrWrite(mepc,mepc+8);
+80000504:	fac42783          	lw	a5,-84(s0)
+80000508:	00878793          	addi	a5,a5,8
+8000050c:	34179073          	csrw	mepc,a5
+}
+80000510:	0080006f          	j	80000518 <mtraphandler+0x13c>
+            case usi: break;
+80000514:	00000013          	nop
+}
+80000518:	00000013          	nop
+8000051c:	05c12083          	lw	ra,92(sp)
+80000520:	05812283          	lw	t0,88(sp)
+80000524:	05412303          	lw	t1,84(sp)
+80000528:	05012383          	lw	t2,80(sp)
+8000052c:	04c12403          	lw	s0,76(sp)
+80000530:	04812503          	lw	a0,72(sp)
+80000534:	04412583          	lw	a1,68(sp)
+80000538:	04012603          	lw	a2,64(sp)
+8000053c:	03c12683          	lw	a3,60(sp)
+80000540:	03812703          	lw	a4,56(sp)
+80000544:	03412783          	lw	a5,52(sp)
+80000548:	03012803          	lw	a6,48(sp)
+8000054c:	02c12883          	lw	a7,44(sp)
+80000550:	02812e03          	lw	t3,40(sp)
+80000554:	02412e83          	lw	t4,36(sp)
+80000558:	02012f03          	lw	t5,32(sp)
+8000055c:	01c12f83          	lw	t6,28(sp)
+80000560:	06010113          	addi	sp,sp,96
+80000564:	30200073          	mret
+
+80000568 <_Z8uartInitv>:
+void uartInit(){
+80000568:	fe010113          	addi	sp,sp,-32
+8000056c:	00112e23          	sw	ra,28(sp)
+80000570:	00812c23          	sw	s0,24(sp)
+80000574:	02010413          	addi	s0,sp,32
+    using namespace platform::uart0;
+    mmio<uint8_t>(reg(IER))=0x00;
+80000578:	00100513          	li	a0,1
+8000057c:	108000ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
+80000580:	00050793          	mv	a5,a0
+80000584:	fef42623          	sw	a5,-20(s0)
+80000588:	fec42783          	lw	a5,-20(s0)
+8000058c:	00078023          	sb	zero,0(a5)
+    // while(true){
+        puts("Hello Uart\n");
+80000590:	00000517          	auipc	a0,0x0
+80000594:	33050513          	addi	a0,a0,816 # 800008c0 <_Z4Hartv+0xe0>
+80000598:	190000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
+    // }
+}
+8000059c:	00000013          	nop
+800005a0:	01c12083          	lw	ra,28(sp)
+800005a4:	01812403          	lw	s0,24(sp)
+800005a8:	02010113          	addi	sp,sp,32
+800005ac:	00008067          	ret
+
+800005b0 <_Z8plicInitv>:
+void plicInit(){
+800005b0:	fe010113          	addi	sp,sp,-32
+800005b4:	00112e23          	sw	ra,28(sp)
+800005b8:	00812c23          	sw	s0,24(sp)
+800005bc:	02010413          	addi	s0,sp,32
+    // int hart=Hart();
+    int hart=0;
+800005c0:	fe042623          	sw	zero,-20(s0)
+    xlen_t addr=platform::plic::priorityOf(platform::uart0::irq);
+800005c4:	0c0007b7          	lui	a5,0xc000
+800005c8:	02878793          	addi	a5,a5,40 # c000028 <STACK_SIZE+0xbfffc28>
+800005cc:	fef42423          	sw	a5,-24(s0)
+800005d0:	fe842783          	lw	a5,-24(s0)
+800005d4:	fef42023          	sw	a5,-32(s0)
+800005d8:	fe042783          	lw	a5,-32(s0)
+    mmio<word_t>(addr)=1;
+800005dc:	00100713          	li	a4,1
+800005e0:	00e7a023          	sw	a4,0(a5)
+    mmio<word_t>(platform::plic::enableOf(hart))=1<<platform::uart0::irq;
+800005e4:	fec42503          	lw	a0,-20(s0)
+800005e8:	190000ef          	jal	ra,80000778 <_ZN8platform4plic8enableOfEi>
+800005ec:	00050793          	mv	a5,a0
+800005f0:	fef42223          	sw	a5,-28(s0)
+800005f4:	fe442783          	lw	a5,-28(s0)
+800005f8:	40000713          	li	a4,1024
+800005fc:	00e7a023          	sw	a4,0(a5)
+    uartInit();
+80000600:	f69ff0ef          	jal	ra,80000568 <_Z8uartInitv>
+}
+80000604:	00000013          	nop
+80000608:	01c12083          	lw	ra,28(sp)
+8000060c:	01812403          	lw	s0,24(sp)
+80000610:	02010113          	addi	sp,sp,32
+80000614:	00008067          	ret
+
+80000618 <_Z10mtrap_testv>:
+void mtrap_test(){
+80000618:	ff010113          	addi	sp,sp,-16
+8000061c:	00812623          	sw	s0,12(sp)
+80000620:	01010413          	addi	s0,sp,16
+    ExecInst(ecall);
+80000624:	00000073          	ecall
+    // *(int *)0x00000000 = 100;
+}
+80000628:	00000013          	nop
+8000062c:	00c12403          	lw	s0,12(sp)
+80000630:	01010113          	addi	sp,sp,16
+80000634:	00008067          	ret
+
+80000638 <sbi_init>:
+extern "C" void sbi_init(){
+80000638:	ff010113          	addi	sp,sp,-16
+8000063c:	00112623          	sw	ra,12(sp)
+80000640:	00812423          	sw	s0,8(sp)
+80000644:	01010413          	addi	s0,sp,16
+    asm volatile (
+"csrw pmpaddr0, %1\n\t"
+"csrw pmpcfg0, %0\n\t"
+: : "r" (0xf), "r" (0x3fffffffffffffull) :);
+80000648:	00f00793          	li	a5,15
+8000064c:	fff00613          	li	a2,-1
+80000650:	004006b7          	lui	a3,0x400
+80000654:	fff68693          	addi	a3,a3,-1 # 3fffff <STACK_SIZE+0x3ffbff>
+80000658:	3b061073          	csrw	pmpaddr0,a2
+8000065c:	3a079073          	csrw	pmpcfg0,a5
+
+    // csrSet(mie,BIT(csr::mie::msie));
+    // csrSet(mstatus,BIT(csr::mstatus::mie));
+    // MIEnable();
+    // puts("here2\n");
+    {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtraphandler));}
+80000660:	00000797          	auipc	a5,0x0
+80000664:	d7c78793          	addi	a5,a5,-644 # 800003dc <mtraphandler>
+80000668:	30579073          	csrw	mtvec,a5
+    mtrap_test();
+8000066c:	fadff0ef          	jal	ra,80000618 <_Z10mtrap_testv>
+    // csrWrite(mepc,mtrap_test);
+	// ExecInst(mret);
+    // puts("here3");
+80000670:	00000013          	nop
+80000674:	00c12083          	lw	ra,12(sp)
+80000678:	00812403          	lw	s0,8(sp)
+8000067c:	01010113          	addi	sp,sp,16
+80000680:	00008067          	ret
+
+80000684 <_ZN8platform5uart03regENS0_4regsE>:
+            MCR=4,	// Modem Control Register
+            LSR=5,	// Line Status Register
+            MSR=6,	// Modem Status Register
+            SPR=7,	// ScratchPad Register
+        };
+        constexpr xlen_t reg(regs r){return base+r;}
+80000684:	fe010113          	addi	sp,sp,-32
+80000688:	00812e23          	sw	s0,28(sp)
+8000068c:	02010413          	addi	s0,sp,32
+80000690:	fea42623          	sw	a0,-20(s0)
+80000694:	fec42703          	lw	a4,-20(s0)
+80000698:	100007b7          	lui	a5,0x10000
+8000069c:	00f707b3          	add	a5,a4,a5
+800006a0:	00078513          	mv	a0,a5
+800006a4:	01c12403          	lw	s0,28(sp)
+800006a8:	02010113          	addi	sp,sp,32
+800006ac:	00008067          	ret
+
+800006b0 <_ZN8platform5uart04putcEc>:
+            uint8_t rxnemp:1;
+            uint8_t unused:4;
+            uint8_t txidle:1;
+            uint8_t unused1:2;
+        };
+        inline void putc(char c) {
+800006b0:	fd010113          	addi	sp,sp,-48
+800006b4:	02112623          	sw	ra,44(sp)
+800006b8:	02812423          	sw	s0,40(sp)
+800006bc:	03010413          	addi	s0,sp,48
+800006c0:	00050793          	mv	a5,a0
+800006c4:	fcf40fa3          	sb	a5,-33(s0)
+            while(!mmio<lsr>(reg(LSR)).txidle);
+800006c8:	00500513          	li	a0,5
+800006cc:	fb9ff0ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
+800006d0:	00050793          	mv	a5,a0
+800006d4:	fef42623          	sw	a5,-20(s0)
+    return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
+800006d8:	fec42783          	lw	a5,-20(s0)
+            while(!mmio<lsr>(reg(LSR)).txidle);
+800006dc:	0007c783          	lbu	a5,0(a5) # 10000000 <STACK_SIZE+0xffffc00>
+800006e0:	0207f793          	andi	a5,a5,32
+800006e4:	0ff7f793          	andi	a5,a5,255
+800006e8:	0017b793          	seqz	a5,a5
+800006ec:	0ff7f793          	andi	a5,a5,255
+800006f0:	00078463          	beqz	a5,800006f8 <_ZN8platform5uart04putcEc+0x48>
+800006f4:	fd5ff06f          	j	800006c8 <_ZN8platform5uart04putcEc+0x18>
+            mmio<char>(reg(THR))=c;
+800006f8:	00000513          	li	a0,0
+800006fc:	f89ff0ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
+80000700:	00050793          	mv	a5,a0
+80000704:	fef42423          	sw	a5,-24(s0)
+    return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
+80000708:	fe842783          	lw	a5,-24(s0)
+            mmio<char>(reg(THR))=c;
+8000070c:	fdf44703          	lbu	a4,-33(s0)
+80000710:	00e78023          	sb	a4,0(a5)
+        }
+80000714:	00000013          	nop
+80000718:	02c12083          	lw	ra,44(sp)
+8000071c:	02812403          	lw	s0,40(sp)
+80000720:	03010113          	addi	sp,sp,48
+80000724:	00008067          	ret
+
+80000728 <_ZN8platform5uart04putsEPKc>:
+        inline char& getc() {
+            while(mmio<lsr>(reg(LSR)).rxnemp);
+            return mmio<char>(reg(RHR));
+        }
+        inline void puts(const char *s){
+80000728:	fe010113          	addi	sp,sp,-32
+8000072c:	00112e23          	sw	ra,28(sp)
+80000730:	00812c23          	sw	s0,24(sp)
+80000734:	02010413          	addi	s0,sp,32
+80000738:	fea42623          	sw	a0,-20(s0)
+            while(*s)putc(*s++);
+8000073c:	fec42783          	lw	a5,-20(s0)
+80000740:	0007c783          	lbu	a5,0(a5)
+80000744:	02078063          	beqz	a5,80000764 <_ZN8platform5uart04putsEPKc+0x3c>
+80000748:	fec42783          	lw	a5,-20(s0)
+8000074c:	00178713          	addi	a4,a5,1
+80000750:	fee42623          	sw	a4,-20(s0)
+80000754:	0007c783          	lbu	a5,0(a5)
+80000758:	00078513          	mv	a0,a5
+8000075c:	f55ff0ef          	jal	ra,800006b0 <_ZN8platform5uart04putcEc>
+80000760:	fddff06f          	j	8000073c <_ZN8platform5uart04putsEPKc+0x14>
+        }
+80000764:	00000013          	nop
+80000768:	01c12083          	lw	ra,28(sp)
+8000076c:	01812403          	lw	s0,24(sp)
+80000770:	02010113          	addi	sp,sp,32
+80000774:	00008067          	ret
+
+80000778 <_ZN8platform4plic8enableOfEi>:
+            pending=base+0x1000,
+            enable=base+0x2000,
+            threshold=base+0x200000,
+            claim=base+0x200004;
+        constexpr xlen_t priorityOf(int id) {return priority+id*4;}
+        constexpr xlen_t enableOf(int hart) { return enable+hart*0x80; }
+80000778:	fe010113          	addi	sp,sp,-32
+8000077c:	00812e23          	sw	s0,28(sp)
+80000780:	02010413          	addi	s0,sp,32
+80000784:	fea42623          	sw	a0,-20(s0)
+80000788:	fec42703          	lw	a4,-20(s0)
+8000078c:	001807b7          	lui	a5,0x180
+80000790:	04078793          	addi	a5,a5,64 # 180040 <STACK_SIZE+0x17fc40>
+80000794:	00f707b3          	add	a5,a4,a5
+80000798:	00779793          	slli	a5,a5,0x7
+8000079c:	00078513          	mv	a0,a5
+800007a0:	01c12403          	lw	s0,28(sp)
+800007a4:	02010113          	addi	sp,sp,32
+800007a8:	00008067          	ret
+
+800007ac <_ZN8platform4plic7claimOfEi>:
+        constexpr xlen_t thresholdOf(int hart) { return threshold+hart*0x1000; }
+        constexpr xlen_t claimOf(int hart) { return claim+hart*0x1000; }
+800007ac:	fe010113          	addi	sp,sp,-32
+800007b0:	00812e23          	sw	s0,28(sp)
+800007b4:	02010413          	addi	s0,sp,32
+800007b8:	fea42623          	sw	a0,-20(s0)
+800007bc:	fec42783          	lw	a5,-20(s0)
+800007c0:	00c79713          	slli	a4,a5,0xc
+800007c4:	0c2007b7          	lui	a5,0xc200
+800007c8:	00478793          	addi	a5,a5,4 # c200004 <STACK_SIZE+0xc1ffc04>
+800007cc:	00f707b3          	add	a5,a4,a5
+800007d0:	00078513          	mv	a0,a5
+800007d4:	01c12403          	lw	s0,28(sp)
+800007d8:	02010113          	addi	sp,sp,32
+800007dc:	00008067          	ret
+
+800007e0 <_Z4Hartv>:
+inline int Hart(){
+800007e0:	fe010113          	addi	sp,sp,-32
+800007e4:	00812e23          	sw	s0,28(sp)
+800007e8:	02010413          	addi	s0,sp,32
+    int rt; csrRead(mhartid,rt);
+800007ec:	f14027f3          	csrr	a5,mhartid
+800007f0:	fef42623          	sw	a5,-20(s0)
+    return rt;
+800007f4:	fec42783          	lw	a5,-20(s0)
+}
+800007f8:	00078513          	mv	a0,a5
+800007fc:	01c12403          	lw	s0,28(sp)
+80000800:	02010113          	addi	sp,sp,32
+80000804:	00008067          	ret

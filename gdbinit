@@ -1,4 +1,4 @@
-set disassemble-next-line on
+set disassemble-next-line off
 layout split
 b _start
 b sbi_init

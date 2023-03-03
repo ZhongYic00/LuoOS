@@ -5,6 +5,7 @@
 	.equ	STACK_SIZE, 1024
 
 	.global	_start
+    .extern trapvector
 
 	.text
 _start:
@@ -21,14 +22,34 @@ _start:
 	add	sp, sp, t0		# move the current hart stack pointer
 					# to its place in the stack space
 
-    j   sbi_init            # hart 0 jump to sbi
+    call   sbi_init            # hart 0 jump to sbi
+    # la t1, trapvector
+    # csrw mtvec,t1
+    # la t6, specialstack
+    # csrw mscratch,t6
+    # j mtraptest1
+    # j park
 
 	j	start_kernel		# hart 0 jump to c
 
 park:
 	wfi
 	j	park
+trapvector:
+    csrrw	t6, mscratch, t6
+    # call mtraphandler
+    csrr t6,mepc
+    addi t6,t6,4
+    csrw mepc,t6
+    csrr t6,mscratch
+    mret
+mtraptest1:
+    li t0,0
+    sw t0,0(t0)
+endless:
+    j endless
 
+.data
 stacks:
 	.skip	STACK_SIZE * MAXNUM_CPU # allocate space for all the harts stacks
 

@@ -1,5 +1,6 @@
 #include "types.h"
 #include "platform.h"
+#include "klib.h"
 #include "rvcsr.h"
 
 #define REPFIELD(name,bits) int u##name:bits; int s##name:bits; int wpri##name:bits; int m##name:bits;
@@ -13,19 +14,7 @@
 #define csrRW(val0,reg,val1) {asm volatile ("csrrw %0, "#reg", %1" :"=r"(val0):"r"(val1));}
 #define csrSwap(reg,val) csrRW(val,reg,val)
 #define ExecInst(inst) {asm volatile (#inst ::);}
-struct MIE{
-    REPFIELD(sie,1);
-    REPFIELD(tie,1);
-    REPFIELD(eie,1);
-};
-struct MIP{
-    REPFIELD(sip,1);
-    REPFIELD(tip,1);
-    REPFIELD(eip,1);
-};
-FORCEDINLINE void MIEnable(){
-    csrSeti(mstatus,BIT(csr::mstatus::fields::mie));
-}
+
 FORCEDINLINE bool isInterrupt(xlen_t mcause){
     return (mcause>>63)&1;
 }
@@ -70,6 +59,7 @@ inline int Hart(){
 int plicClaim(){
     int hart=Hart();
     int irq=mmio<int>(platform::plic::claimOf(hart));
+    return irq;
 }
 void plicComplete(int irq){
     int hart=Hart();
@@ -86,12 +76,11 @@ void externalInterruptHandler(){
     }
     plicComplete(irq);
 }
-
-__attribute__ ((interrupt ("machine")))void mtraphandler(){
+extern "C" __attribute__((interrupt("machine"))) void mtraphandler(){
     // saveContext();
-    platform::uart0::puts("mtraphandler!");
     ptr_t mepc; csrRead(mepc,mepc);
     xlen_t mcause; csrRead(mcause,mcause);
+    printf("mtraphandler cause=%d mepc=%lx\n",mcause,mepc);
 
     if(isInterrupt(mcause)){
         switch(mcause){
@@ -117,8 +106,10 @@ __attribute__ ((interrupt ("machine")))void mtraphandler(){
             case uecall:break;
             case secall:break;
             default:
+                platform::uart0::puts("exception\n");
                 break;
         }
+        csrWrite(mepc,mepc+4);
     }
     // restoreContext();
     // ExecInst(mret);
@@ -126,9 +117,8 @@ __attribute__ ((interrupt ("machine")))void mtraphandler(){
 void uartInit(){
     using namespace platform::uart0;
     mmio<uint8_t>(reg(IER))=0x00;
-    // while(true){
-        puts("Hello Uart\n");
-    // }
+    puts("Hello Uart\n");
+    
 }
 void plicInit(){
     // int hart=Hart();
@@ -139,21 +129,29 @@ void plicInit(){
     uartInit();
 }
 void mtrap_test(){
-    ExecInst(ecall);
+    // ExecInst(ecall);
+    *(int *)0x00000000 = 100;
+    for(int k=2;k;k--);
+    return;
 }
 extern "C" void sbi_init(){
+//     asm volatile (
+// "csrw pmpaddr0, %1\n\t"
+// "csrw pmpcfg0, %0\n\t"
+// : : "r" (0xf), "r" (0x3fffffffffffffull) :);
     // csrWritei(mtvec,mtraphandler);
-    {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtraphandler));}
     using platform::uart0::puts;
-    // uartInit();
+    uartInit();
     // plicInit();
     platform::uart0::puts("here\n");
 
-    csrSet(mie,BIT(csr::mie::msie));
+    // csrSet(mie,BIT(csr::mie::msie));
     // csrSet(mstatus,BIT(csr::mstatus::mie));
     // MIEnable();
-    puts("here2\n");
-    csrWrite(mepc,mtrap_test);
-	ExecInst(mret);
+    // puts("here2\n");
+    {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtraphandler));}
+    mtrap_test();
+    // csrWrite(mepc,mtrap_test);
+	// ExecInst(mret);
     puts("here3");
 }
