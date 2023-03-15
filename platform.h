@@ -43,17 +43,30 @@ namespace platform{
             uint8_t txidle:1;
             uint8_t unused1:2;
         };
-        inline void putc(char c) {
-            while(!mmio<lsr>(reg(LSR)).txidle);
-            mmio<char>(reg(THR))=c;
-        }
-        inline char& getc() {
-            while(mmio<lsr>(reg(LSR)).rxnemp);
-            return mmio<char>(reg(RHR));
-        }
-        inline void puts(const char *s){
-            while(*s)putc(*s++);
-        }
+        namespace blocking
+        {    
+            inline void putc(char c) {
+                while(!mmio<lsr>(reg(LSR)).txidle);
+                mmio<char>(reg(THR))=c;
+            }
+            inline char getc() {
+                while(mmio<lsr>(reg(LSR)).rxnemp);
+                return mmio<char>(reg(RHR));
+            }
+        } // namespace blocking
+        namespace nonblocking
+        {
+            inline bool putc(char c){
+                if(!mmio<lsr>(reg(LSR)).txidle)return false;
+                mmio<char>(reg(THR))=c;
+                return true;
+            }
+            inline char getc() {
+                if(mmio<lsr>(reg(LSR)).rxnemp)return false;
+                return mmio<char>(reg(RHR));
+            }
+        } // namespace nonblocking
+        
     } // namespace uart0
     namespace plic
     {

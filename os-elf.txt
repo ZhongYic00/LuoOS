@@ -1,821 +1,1490 @@
 
-os.elf:     file format elf32-littleriscv
+os.elf:     file format elf64-littleriscv
 
 
 Disassembly of section .text:
 
-80000000 <_start>:
+0000000080000000 <_start>:
     .extern trapvector
 
 	.text
 _start:
 	# park harts with id != 0
 	csrr	t0, mhartid		# read current hart id
-80000000:	f14022f3          	csrr	t0,mhartid
+    80000000:	f14022f3          	csrr	t0,mhartid
 	mv	tp, t0			# keep CPU's hartid in its tp for later usage.
-80000004:	00028213          	mv	tp,t0
+    80000004:	00028213          	mv	tp,t0
 	bnez	t0, park		# if we're not on the hart 0
-80000008:	00029c63          	bnez	t0,80000020 <park>
+    80000008:	00029e63          	bnez	t0,80000024 <park>
 					# we park the hart
 	# Setup stacks, the stack grows from bottom to top, so we put the
 	# stack pointer to the very end of the stack range.
 	slli	t0, t0, 10		# shift left the hart id by 1024
-8000000c:	00a29293          	slli	t0,t0,0xa
+    8000000c:	00a29293          	slli	t0,t0,0xa
 	la	sp, stacks + STACK_SIZE	# set the initial stack pointer
-80000010:	00001117          	auipc	sp,0x1
-80000014:	3f010113          	addi	sp,sp,1008 # 80001400 <stacks+0x400>
+    80000010:	00002117          	auipc	sp,0x2
+    80000014:	3f010113          	addi	sp,sp,1008 # 80002400 <stacks+0x400>
 					# to the end of the first stack space
 	add	sp, sp, t0		# move the current hart stack pointer
-80000018:	00510133          	add	sp,sp,t0
+    80000018:	00510133          	add	sp,sp,t0
 					# to its place in the stack space
 
-    j   sbi_init            # hart 0 jump to sbi
-8000001c:	61c0006f          	j	80000638 <sbi_init>
-
-80000020 <park>:
+    call   sbi_init            # hart 0 jump to sbi
+    8000001c:	6d4000ef          	jal	ra,800006f0 <sbi_init>
+    # la t6, specialstack
+    # csrw mscratch,t6
+    # j mtraptest1
     # j park
 
-	# j	start_kernel		# hart 0 jump to c
+	j	start_kernel		# hart 0 jump to c
+    80000020:	1400006f          	j	80000160 <start_kernel>
+
+0000000080000024 <park>:
 
 park:
 	wfi
-80000020:	10500073          	wfi
+    80000024:	10500073          	wfi
 	j	park
-80000024:	ffdff06f          	j	80000020 <park>
+    80000028:	ffdff06f          	j	80000024 <park>
 
-80000028 <trapvector>:
-trapvector:
-    csrrw	t6, mscratch, t6
-80000028:	340f9ff3          	csrrw	t6,mscratch,t6
-    # call mtraphandler
-    csrr t6,mepc
-8000002c:	34102ff3          	csrr	t6,mepc
-    addi t6,t6,4
-80000030:	004f8f93          	addi	t6,t6,4
-    csrw mepc,t6
-80000034:	341f9073          	csrw	mepc,t6
-    csrr t6,mscratch
-80000038:	34002ff3          	csrr	t6,mscratch
-    mret
-8000003c:	30200073          	mret
-
-80000040 <mtraptest1>:
-mtraptest1:
-    li t0,0
-80000040:	00000293          	li	t0,0
-    sw t0,0(t0)
-80000044:	0052a023          	sw	t0,0(t0)
-
-80000048 <endless>:
-endless:
-    j endless
-80000048:	0000006f          	j	80000048 <endless>
-
-8000004c <_Z9uart_initv>:
+000000008000002c <_Z9uart_initv>:
 
 #define uart_read_reg(reg) (*(UART_REG(reg)))
 #define uart_write_reg(reg, v) (*(UART_REG(reg)) = (v))
 
 void uart_init()
 {
-8000004c:	fe010113          	addi	sp,sp,-32
-80000050:	00812e23          	sw	s0,28(sp)
-80000054:	02010413          	addi	s0,sp,32
+    8000002c:	fe010113          	addi	sp,sp,-32
+    80000030:	00813c23          	sd	s0,24(sp)
+    80000034:	02010413          	addi	s0,sp,32
 	/* disable interrupts. */
 	uart_write_reg(IER, 0x00);
-80000058:	100007b7          	lui	a5,0x10000
-8000005c:	00178793          	addi	a5,a5,1 # 10000001 <STACK_SIZE+0xffffc01>
-80000060:	00078023          	sb	zero,0(a5)
+    80000038:	100007b7          	lui	a5,0x10000
+    8000003c:	00178793          	addi	a5,a5,1 # 10000001 <STACK_SIZE+0xffffc01>
+    80000040:	00078023          	sb	zero,0(a5)
 	 * We use 38.4K when 1.8432 MHZ crystal, so the corresponding value is 3.
 	 * And due to the divisor register is two bytes (16 bits), so we need to
 	 * split the value of 3(0x0003) into two bytes, DLL stores the low byte,
 	 * DLM stores the high byte.
 	 */
 	uint8_t lcr = uart_read_reg(LCR);
-80000064:	100007b7          	lui	a5,0x10000
-80000068:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
-8000006c:	0007c783          	lbu	a5,0(a5)
-80000070:	fef407a3          	sb	a5,-17(s0)
+    80000044:	100007b7          	lui	a5,0x10000
+    80000048:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
+    8000004c:	0007c783          	lbu	a5,0(a5)
+    80000050:	fef407a3          	sb	a5,-17(s0)
 	uart_write_reg(LCR, lcr | (1 << 7));
-80000074:	100007b7          	lui	a5,0x10000
-80000078:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
-8000007c:	fef44703          	lbu	a4,-17(s0)
-80000080:	f8076713          	ori	a4,a4,-128
-80000084:	0ff77713          	andi	a4,a4,255
-80000088:	00e78023          	sb	a4,0(a5)
+    80000054:	100007b7          	lui	a5,0x10000
+    80000058:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
+    8000005c:	fef44703          	lbu	a4,-17(s0)
+    80000060:	f8076713          	ori	a4,a4,-128
+    80000064:	0ff77713          	andi	a4,a4,255
+    80000068:	00e78023          	sb	a4,0(a5)
 	uart_write_reg(DLL, 0x03);
-8000008c:	100007b7          	lui	a5,0x10000
-80000090:	00300713          	li	a4,3
-80000094:	00e78023          	sb	a4,0(a5) # 10000000 <STACK_SIZE+0xffffc00>
+    8000006c:	100007b7          	lui	a5,0x10000
+    80000070:	00300713          	li	a4,3
+    80000074:	00e78023          	sb	a4,0(a5) # 10000000 <STACK_SIZE+0xffffc00>
 	uart_write_reg(DLM, 0x00);
-80000098:	100007b7          	lui	a5,0x10000
-8000009c:	00178793          	addi	a5,a5,1 # 10000001 <STACK_SIZE+0xffffc01>
-800000a0:	00078023          	sb	zero,0(a5)
+    80000078:	100007b7          	lui	a5,0x10000
+    8000007c:	00178793          	addi	a5,a5,1 # 10000001 <STACK_SIZE+0xffffc01>
+    80000080:	00078023          	sb	zero,0(a5)
 	 * - number of stop bits：1 bit when word length is 8 bits
 	 * - no parity
 	 * - no break control
 	 * - disabled baud latch
 	 */
 	lcr = 0;
-800000a4:	fe0407a3          	sb	zero,-17(s0)
+    80000084:	fe0407a3          	sb	zero,-17(s0)
 	uart_write_reg(LCR, lcr | (3 << 0));
-800000a8:	100007b7          	lui	a5,0x10000
-800000ac:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
-800000b0:	fef44703          	lbu	a4,-17(s0)
-800000b4:	00376713          	ori	a4,a4,3
-800000b8:	0ff77713          	andi	a4,a4,255
-800000bc:	00e78023          	sb	a4,0(a5)
+    80000088:	100007b7          	lui	a5,0x10000
+    8000008c:	00378793          	addi	a5,a5,3 # 10000003 <STACK_SIZE+0xffffc03>
+    80000090:	fef44703          	lbu	a4,-17(s0)
+    80000094:	00376713          	ori	a4,a4,3
+    80000098:	0ff77713          	andi	a4,a4,255
+    8000009c:	00e78023          	sb	a4,0(a5)
 }
-800000c0:	00000013          	nop
-800000c4:	01c12403          	lw	s0,28(sp)
-800000c8:	02010113          	addi	sp,sp,32
-800000cc:	00008067          	ret
+    800000a0:	00000013          	nop
+    800000a4:	01813403          	ld	s0,24(sp)
+    800000a8:	02010113          	addi	sp,sp,32
+    800000ac:	00008067          	ret
 
-800000d0 <_Z9uart_putcc>:
+00000000800000b0 <_Z9uart_putcc>:
 
 int uart_putc(char ch)
 {
-800000d0:	fe010113          	addi	sp,sp,-32
-800000d4:	00812e23          	sw	s0,28(sp)
-800000d8:	02010413          	addi	s0,sp,32
-800000dc:	00050793          	mv	a5,a0
-800000e0:	fef407a3          	sb	a5,-17(s0)
+    800000b0:	fe010113          	addi	sp,sp,-32
+    800000b4:	00813c23          	sd	s0,24(sp)
+    800000b8:	02010413          	addi	s0,sp,32
+    800000bc:	00050793          	mv	a5,a0
+    800000c0:	fef407a3          	sb	a5,-17(s0)
 	while ((uart_read_reg(LSR) & LSR_TX_IDLE) == 0);
-800000e4:	100007b7          	lui	a5,0x10000
-800000e8:	00578793          	addi	a5,a5,5 # 10000005 <STACK_SIZE+0xffffc05>
-800000ec:	0007c783          	lbu	a5,0(a5)
-800000f0:	0ff7f793          	andi	a5,a5,255
-800000f4:	0207f793          	andi	a5,a5,32
-800000f8:	0017b793          	seqz	a5,a5
-800000fc:	0ff7f793          	andi	a5,a5,255
-80000100:	00078463          	beqz	a5,80000108 <_Z9uart_putcc+0x38>
-80000104:	fe1ff06f          	j	800000e4 <_Z9uart_putcc+0x14>
+    800000c4:	100007b7          	lui	a5,0x10000
+    800000c8:	00578793          	addi	a5,a5,5 # 10000005 <STACK_SIZE+0xffffc05>
+    800000cc:	0007c783          	lbu	a5,0(a5)
+    800000d0:	0ff7f793          	andi	a5,a5,255
+    800000d4:	0007879b          	sext.w	a5,a5
+    800000d8:	0207f793          	andi	a5,a5,32
+    800000dc:	0007879b          	sext.w	a5,a5
+    800000e0:	0017b793          	seqz	a5,a5
+    800000e4:	0ff7f793          	andi	a5,a5,255
+    800000e8:	00078463          	beqz	a5,800000f0 <_Z9uart_putcc+0x40>
+    800000ec:	fd9ff06f          	j	800000c4 <_Z9uart_putcc+0x14>
 	return uart_write_reg(THR, ch);
-80000108:	10000737          	lui	a4,0x10000
-8000010c:	fef44783          	lbu	a5,-17(s0)
-80000110:	00f70023          	sb	a5,0(a4) # 10000000 <STACK_SIZE+0xffffc00>
+    800000f0:	10000737          	lui	a4,0x10000
+    800000f4:	fef44783          	lbu	a5,-17(s0)
+    800000f8:	00f70023          	sb	a5,0(a4) # 10000000 <STACK_SIZE+0xffffc00>
+    800000fc:	0007879b          	sext.w	a5,a5
 }
-80000114:	00078513          	mv	a0,a5
-80000118:	01c12403          	lw	s0,28(sp)
-8000011c:	02010113          	addi	sp,sp,32
-80000120:	00008067          	ret
+    80000100:	00078513          	mv	a0,a5
+    80000104:	01813403          	ld	s0,24(sp)
+    80000108:	02010113          	addi	sp,sp,32
+    8000010c:	00008067          	ret
 
-80000124 <_Z9uart_putsPc>:
+0000000080000110 <_Z9uart_putsPc>:
 
 void uart_puts(char *s)
 {
-80000124:	fe010113          	addi	sp,sp,-32
-80000128:	00112e23          	sw	ra,28(sp)
-8000012c:	00812c23          	sw	s0,24(sp)
-80000130:	02010413          	addi	s0,sp,32
-80000134:	fea42623          	sw	a0,-20(s0)
+    80000110:	fe010113          	addi	sp,sp,-32
+    80000114:	00113c23          	sd	ra,24(sp)
+    80000118:	00813823          	sd	s0,16(sp)
+    8000011c:	02010413          	addi	s0,sp,32
+    80000120:	fea43423          	sd	a0,-24(s0)
 	while (*s) {
-80000138:	fec42783          	lw	a5,-20(s0)
-8000013c:	0007c783          	lbu	a5,0(a5)
-80000140:	02078063          	beqz	a5,80000160 <_Z9uart_putsPc+0x3c>
+    80000124:	fe843783          	ld	a5,-24(s0)
+    80000128:	0007c783          	lbu	a5,0(a5)
+    8000012c:	02078063          	beqz	a5,8000014c <_Z9uart_putsPc+0x3c>
 		uart_putc(*s++);
-80000144:	fec42783          	lw	a5,-20(s0)
-80000148:	00178713          	addi	a4,a5,1
-8000014c:	fee42623          	sw	a4,-20(s0)
-80000150:	0007c783          	lbu	a5,0(a5)
-80000154:	00078513          	mv	a0,a5
-80000158:	f79ff0ef          	jal	ra,800000d0 <_Z9uart_putcc>
+    80000130:	fe843783          	ld	a5,-24(s0)
+    80000134:	00178713          	addi	a4,a5,1
+    80000138:	fee43423          	sd	a4,-24(s0)
+    8000013c:	0007c783          	lbu	a5,0(a5)
+    80000140:	00078513          	mv	a0,a5
+    80000144:	f6dff0ef          	jal	ra,800000b0 <_Z9uart_putcc>
 	while (*s) {
-8000015c:	fddff06f          	j	80000138 <_Z9uart_putsPc+0x14>
+    80000148:	fddff06f          	j	80000124 <_Z9uart_putsPc+0x14>
 	}
 }
-80000160:	00000013          	nop
-80000164:	01c12083          	lw	ra,28(sp)
-80000168:	01812403          	lw	s0,24(sp)
-8000016c:	02010113          	addi	sp,sp,32
-80000170:	00008067          	ret
+    8000014c:	00000013          	nop
+    80000150:	01813083          	ld	ra,24(sp)
+    80000154:	01013403          	ld	s0,16(sp)
+    80000158:	02010113          	addi	sp,sp,32
+    8000015c:	00008067          	ret
 
-80000174 <start_kernel>:
+0000000080000160 <start_kernel>:
+#include "klib.h"
+
 extern "C" void start_kernel(){
-80000174:	ff010113          	addi	sp,sp,-16
-80000178:	00812623          	sw	s0,12(sp)
-8000017c:	01010413          	addi	s0,sp,16
-    
-80000180:	00000013          	nop
-80000184:	00c12403          	lw	s0,12(sp)
-80000188:	01010113          	addi	sp,sp,16
-8000018c:	00008067          	ret
+    80000160:	fe010113          	addi	sp,sp,-32
+    80000164:	00113c23          	sd	ra,24(sp)
+    80000168:	00813823          	sd	s0,16(sp)
+    8000016c:	02010413          	addi	s0,sp,32
+    for(int i=0;i<10;i++)
+    80000170:	fe042623          	sw	zero,-20(s0)
+    80000174:	fec42783          	lw	a5,-20(s0)
+    80000178:	0007871b          	sext.w	a4,a5
+    8000017c:	00900793          	li	a5,9
+    80000180:	02e7c463          	blt	a5,a4,800001a8 <start_kernel+0x48>
+        printf("%d:Hello RVOS!\n",i);
+    80000184:	fec42783          	lw	a5,-20(s0)
+    80000188:	00078593          	mv	a1,a5
+    8000018c:	00001517          	auipc	a0,0x1
+    80000190:	ea450513          	addi	a0,a0,-348 # 80001030 <halt+0x18>
+    80000194:	5d5000ef          	jal	ra,80000f68 <printf>
+    for(int i=0;i<10;i++)
+    80000198:	fec42783          	lw	a5,-20(s0)
+    8000019c:	0017879b          	addiw	a5,a5,1
+    800001a0:	fef42623          	sw	a5,-20(s0)
+    800001a4:	fd1ff06f          	j	80000174 <start_kernel+0x14>
+    halt();
+    800001a8:	671000ef          	jal	ra,80001018 <halt>
+    800001ac:	00000013          	nop
+    800001b0:	01813083          	ld	ra,24(sp)
+    800001b4:	01013403          	ld	s0,16(sp)
+    800001b8:	02010113          	addi	sp,sp,32
+    800001bc:	00008067          	ret
 
-80000190 <_Z11isInterruptm>:
+00000000800001c0 <_Z11isInterruptm>:
 #define csrClear(reg, val) {asm volatile ("csrc "#reg", %0" :: "r"(val)); }
 #define csrRW(val0,reg,val1) {asm volatile ("csrrw %0, "#reg", %1" :"=r"(val0):"r"(val1));}
 #define csrSwap(reg,val) csrRW(val,reg,val)
 #define ExecInst(inst) {asm volatile (#inst ::);}
 
 FORCEDINLINE bool isInterrupt(xlen_t mcause){
-80000190:	fe010113          	addi	sp,sp,-32
-80000194:	00812e23          	sw	s0,28(sp)
-80000198:	02010413          	addi	s0,sp,32
-8000019c:	fea42623          	sw	a0,-20(s0)
+    800001c0:	fe010113          	addi	sp,sp,-32
+    800001c4:	00813c23          	sd	s0,24(sp)
+    800001c8:	02010413          	addi	s0,sp,32
+    800001cc:	fea43423          	sd	a0,-24(s0)
     return (mcause>>63)&1;
-800001a0:	03f00793          	li	a5,63
-800001a4:	fec42703          	lw	a4,-20(s0)
-800001a8:	00f757b3          	srl	a5,a4,a5
-800001ac:	0017f793          	andi	a5,a5,1
-800001b0:	00f037b3          	snez	a5,a5
-800001b4:	0ff7f793          	andi	a5,a5,255
+    800001d0:	fe843783          	ld	a5,-24(s0)
+    800001d4:	03f7d793          	srli	a5,a5,0x3f
+    800001d8:	0ff7f793          	andi	a5,a5,255
 }
-800001b8:	00078513          	mv	a0,a5
-800001bc:	01c12403          	lw	s0,28(sp)
-800001c0:	02010113          	addi	sp,sp,32
-800001c4:	00008067          	ret
+    800001dc:	00078513          	mv	a0,a5
+    800001e0:	01813403          	ld	s0,24(sp)
+    800001e4:	02010113          	addi	sp,sp,32
+    800001e8:	00008067          	ret
 
-800001c8 <_Z9plicClaimv>:
+00000000800001ec <_Z9plicClaimv>:
 }*/
 inline int Hart(){
     int rt; csrRead(mhartid,rt);
     return rt;
 }
 int plicClaim(){
-800001c8:	fe010113          	addi	sp,sp,-32
-800001cc:	00112e23          	sw	ra,28(sp)
-800001d0:	00812c23          	sw	s0,24(sp)
-800001d4:	02010413          	addi	s0,sp,32
+    800001ec:	fe010113          	addi	sp,sp,-32
+    800001f0:	00113c23          	sd	ra,24(sp)
+    800001f4:	00813823          	sd	s0,16(sp)
+    800001f8:	02010413          	addi	s0,sp,32
     int hart=Hart();
-800001d8:	608000ef          	jal	ra,800007e0 <_Z4Hartv>
-800001dc:	fea42623          	sw	a0,-20(s0)
+    800001fc:	798000ef          	jal	ra,80000994 <_Z4Hartv>
+    80000200:	00050793          	mv	a5,a0
+    80000204:	fef42623          	sw	a5,-20(s0)
     int irq=mmio<int>(platform::plic::claimOf(hart));
-800001e0:	fec42503          	lw	a0,-20(s0)
-800001e4:	5c8000ef          	jal	ra,800007ac <_ZN8platform4plic7claimOfEi>
-800001e8:	00050793          	mv	a5,a0
-800001ec:	fef42223          	sw	a5,-28(s0)
+    80000208:	fec42783          	lw	a5,-20(s0)
+    8000020c:	00078513          	mv	a0,a5
+    80000210:	744000ef          	jal	ra,80000954 <_ZN8platform4plic7claimOfEi>
+    80000214:	00050793          	mv	a5,a0
+    80000218:	fef43023          	sd	a5,-32(s0)
  */
 #define MAXNUM_CPU 8
 
 template<typename T>
 FORCEDINLINE T& mmio(xlen_t addr){
     return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
-800001f0:	fe442783          	lw	a5,-28(s0)
-800001f4:	0007a783          	lw	a5,0(a5)
-800001f8:	fef42423          	sw	a5,-24(s0)
+    8000021c:	fe043783          	ld	a5,-32(s0)
+    80000220:	0007a783          	lw	a5,0(a5)
+    80000224:	fef42423          	sw	a5,-24(s0)
+    return irq;
+    80000228:	fe842783          	lw	a5,-24(s0)
 }
-800001fc:	00000013          	nop
-80000200:	00078513          	mv	a0,a5
-80000204:	01c12083          	lw	ra,28(sp)
-80000208:	01812403          	lw	s0,24(sp)
-8000020c:	02010113          	addi	sp,sp,32
-80000210:	00008067          	ret
+    8000022c:	00078513          	mv	a0,a5
+    80000230:	01813083          	ld	ra,24(sp)
+    80000234:	01013403          	ld	s0,16(sp)
+    80000238:	02010113          	addi	sp,sp,32
+    8000023c:	00008067          	ret
 
-80000214 <_Z12plicCompletei>:
+0000000080000240 <_Z12plicCompletei>:
 void plicComplete(int irq){
-80000214:	fd010113          	addi	sp,sp,-48
-80000218:	02112623          	sw	ra,44(sp)
-8000021c:	02812423          	sw	s0,40(sp)
-80000220:	03010413          	addi	s0,sp,48
-80000224:	fca42e23          	sw	a0,-36(s0)
+    80000240:	fd010113          	addi	sp,sp,-48
+    80000244:	02113423          	sd	ra,40(sp)
+    80000248:	02813023          	sd	s0,32(sp)
+    8000024c:	03010413          	addi	s0,sp,48
+    80000250:	00050793          	mv	a5,a0
+    80000254:	fcf42e23          	sw	a5,-36(s0)
     int hart=Hart();
-80000228:	5b8000ef          	jal	ra,800007e0 <_Z4Hartv>
-8000022c:	fea42623          	sw	a0,-20(s0)
+    80000258:	73c000ef          	jal	ra,80000994 <_Z4Hartv>
+    8000025c:	00050793          	mv	a5,a0
+    80000260:	fef42623          	sw	a5,-20(s0)
     mmio<int>(platform::plic::claimOf(hart))=irq;
-80000230:	fec42503          	lw	a0,-20(s0)
-80000234:	578000ef          	jal	ra,800007ac <_ZN8platform4plic7claimOfEi>
-80000238:	00050793          	mv	a5,a0
-8000023c:	fef42423          	sw	a5,-24(s0)
-80000240:	fe842783          	lw	a5,-24(s0)
-80000244:	fdc42703          	lw	a4,-36(s0)
-80000248:	00e7a023          	sw	a4,0(a5)
+    80000264:	fec42783          	lw	a5,-20(s0)
+    80000268:	00078513          	mv	a0,a5
+    8000026c:	6e8000ef          	jal	ra,80000954 <_ZN8platform4plic7claimOfEi>
+    80000270:	00050793          	mv	a5,a0
+    80000274:	fef43023          	sd	a5,-32(s0)
+    80000278:	fe043783          	ld	a5,-32(s0)
+    8000027c:	fdc42703          	lw	a4,-36(s0)
+    80000280:	00e7a023          	sw	a4,0(a5)
 }
-8000024c:	00000013          	nop
-80000250:	02c12083          	lw	ra,44(sp)
-80000254:	02812403          	lw	s0,40(sp)
-80000258:	03010113          	addi	sp,sp,48
-8000025c:	00008067          	ret
+    80000284:	00000013          	nop
+    80000288:	02813083          	ld	ra,40(sp)
+    8000028c:	02013403          	ld	s0,32(sp)
+    80000290:	03010113          	addi	sp,sp,48
+    80000294:	00008067          	ret
 
-80000260 <_Z24externalInterruptHandlerv>:
+0000000080000298 <_Z24externalInterruptHandlerv>:
 
 void externalInterruptHandler(){
-80000260:	fe010113          	addi	sp,sp,-32
-80000264:	00112e23          	sw	ra,28(sp)
-80000268:	00812c23          	sw	s0,24(sp)
-8000026c:	00912a23          	sw	s1,20(sp)
-80000270:	02010413          	addi	s0,sp,32
+    80000298:	fc010113          	addi	sp,sp,-64
+    8000029c:	02113c23          	sd	ra,56(sp)
+    800002a0:	02813823          	sd	s0,48(sp)
+    800002a4:	02913423          	sd	s1,40(sp)
+    800002a8:	04010413          	addi	s0,sp,64
     int irq=plicClaim();
-80000274:	f55ff0ef          	jal	ra,800001c8 <_Z9plicClaimv>
-80000278:	00050793          	mv	a5,a0
-8000027c:	fef42623          	sw	a5,-20(s0)
+    800002ac:	f41ff0ef          	jal	ra,800001ec <_Z9plicClaimv>
+    800002b0:	00050793          	mv	a5,a0
+    800002b4:	fcf42e23          	sw	a5,-36(s0)
+    // printf("externalInterruptHandler(irq=%d)\n",irq);
     if(irq==platform::uart0::irq){
-80000280:	fec42703          	lw	a4,-20(s0)
-80000284:	00a00793          	li	a5,10
-80000288:	06f71063          	bne	a4,a5,800002e8 <_Z24externalInterruptHandlerv+0x88>
+    800002b8:	fdc42783          	lw	a5,-36(s0)
+    800002bc:	0007871b          	sext.w	a4,a5
+    800002c0:	00a00793          	li	a5,10
+    800002c4:	06f71063          	bne	a4,a5,80000324 <_Z24externalInterruptHandlerv+0x8c>
         using namespace platform::uart0;
         while(mmio<volatile lsr>(reg(LSR)).rxnemp){
-8000028c:	00500513          	li	a0,5
-80000290:	3f4000ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
-80000294:	00050793          	mv	a5,a0
-80000298:	fef42423          	sw	a5,-24(s0)
-8000029c:	fe842783          	lw	a5,-24(s0)
-800002a0:	0007c783          	lbu	a5,0(a5)
-800002a4:	0017f793          	andi	a5,a5,1
-800002a8:	0ff7f793          	andi	a5,a5,255
-800002ac:	02078e63          	beqz	a5,800002e8 <_Z24externalInterruptHandlerv+0x88>
+    800002c8:	00500513          	li	a0,5
+    800002cc:	48c000ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    800002d0:	00050793          	mv	a5,a0
+    800002d4:	fcf43823          	sd	a5,-48(s0)
+    800002d8:	fd043783          	ld	a5,-48(s0)
+    800002dc:	0007c783          	lbu	a5,0(a5)
+    800002e0:	0017f793          	andi	a5,a5,1
+    800002e4:	0ff7f793          	andi	a5,a5,255
+    800002e8:	02078e63          	beqz	a5,80000324 <_Z24externalInterruptHandlerv+0x8c>
             mmio<volatile uint8_t>(reg(THR))=mmio<volatile uint8_t>(reg(RHR));
-800002b0:	00000513          	li	a0,0
-800002b4:	3d0000ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
-800002b8:	00050793          	mv	a5,a0
-800002bc:	fef42023          	sw	a5,-32(s0)
-800002c0:	fe042483          	lw	s1,-32(s0)
-800002c4:	00000513          	li	a0,0
-800002c8:	3bc000ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
-800002cc:	00050793          	mv	a5,a0
-800002d0:	fef42223          	sw	a5,-28(s0)
-800002d4:	fe442783          	lw	a5,-28(s0)
-800002d8:	0004c703          	lbu	a4,0(s1)
-800002dc:	0ff77713          	andi	a4,a4,255
-800002e0:	00e78023          	sb	a4,0(a5)
+    800002ec:	00000513          	li	a0,0
+    800002f0:	468000ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    800002f4:	00050793          	mv	a5,a0
+    800002f8:	fcf43023          	sd	a5,-64(s0)
+    800002fc:	fc043483          	ld	s1,-64(s0)
+    80000300:	00000513          	li	a0,0
+    80000304:	454000ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    80000308:	00050793          	mv	a5,a0
+    8000030c:	fcf43423          	sd	a5,-56(s0)
+    80000310:	fc843783          	ld	a5,-56(s0)
+    80000314:	0004c703          	lbu	a4,0(s1)
+    80000318:	0ff77713          	andi	a4,a4,255
+    8000031c:	00e78023          	sb	a4,0(a5)
         while(mmio<volatile lsr>(reg(LSR)).rxnemp){
-800002e4:	fa9ff06f          	j	8000028c <_Z24externalInterruptHandlerv+0x2c>
+    80000320:	fa9ff06f          	j	800002c8 <_Z24externalInterruptHandlerv+0x30>
         }
     }
     plicComplete(irq);
-800002e8:	fec42503          	lw	a0,-20(s0)
-800002ec:	f29ff0ef          	jal	ra,80000214 <_Z12plicCompletei>
+    80000324:	fdc42783          	lw	a5,-36(s0)
+    80000328:	00078513          	mv	a0,a5
+    8000032c:	f15ff0ef          	jal	ra,80000240 <_Z12plicCompletei>
+    // printf("externalInterruptHandler over");
 }
-800002f0:	00000013          	nop
-800002f4:	01c12083          	lw	ra,28(sp)
-800002f8:	01812403          	lw	s0,24(sp)
-800002fc:	01412483          	lw	s1,20(sp)
-80000300:	02010113          	addi	sp,sp,32
-80000304:	00008067          	ret
+    80000330:	00000013          	nop
+    80000334:	03813083          	ld	ra,56(sp)
+    80000338:	03013403          	ld	s0,48(sp)
+    8000033c:	02813483          	ld	s1,40(sp)
+    80000340:	04010113          	addi	sp,sp,64
+    80000344:	00008067          	ret
 
-80000308 <trap_handler>:
-extern "C" xlen_t trap_handler(xlen_t epc, xlen_t cause)
-{
-80000308:	fd010113          	addi	sp,sp,-48
-8000030c:	02112623          	sw	ra,44(sp)
-80000310:	02812423          	sw	s0,40(sp)
-80000314:	03010413          	addi	s0,sp,48
-80000318:	fca42e23          	sw	a0,-36(s0)
-8000031c:	fcb42c23          	sw	a1,-40(s0)
-	xlen_t return_pc = epc;
-80000320:	fdc42783          	lw	a5,-36(s0)
-80000324:	fef42623          	sw	a5,-20(s0)
-	xlen_t cause_code = cause & 0xfff;
-80000328:	fd842703          	lw	a4,-40(s0)
-8000032c:	000017b7          	lui	a5,0x1
-80000330:	fff78793          	addi	a5,a5,-1 # fff <STACK_SIZE+0xbff>
-80000334:	00f777b3          	and	a5,a4,a5
-80000338:	fef42423          	sw	a5,-24(s0)
-	
-	if (cause & 0x80000000) {
-8000033c:	fd842783          	lw	a5,-40(s0)
-80000340:	0607dc63          	bgez	a5,800003b8 <trap_handler+0xb0>
-		/* Asynchronous trap - interrupt */
-		switch (cause_code) {
-80000344:	fe842703          	lw	a4,-24(s0)
-80000348:	00b00793          	li	a5,11
-8000034c:	04f70663          	beq	a4,a5,80000398 <trap_handler+0x90>
-80000350:	fe842703          	lw	a4,-24(s0)
-80000354:	00b00793          	li	a5,11
-80000358:	04e7e863          	bltu	a5,a4,800003a8 <trap_handler+0xa0>
-8000035c:	fe842703          	lw	a4,-24(s0)
-80000360:	00300793          	li	a5,3
-80000364:	00f70a63          	beq	a4,a5,80000378 <trap_handler+0x70>
-80000368:	fe842703          	lw	a4,-24(s0)
-8000036c:	00700793          	li	a5,7
-80000370:	00f70c63          	beq	a4,a5,80000388 <trap_handler+0x80>
-80000374:	0340006f          	j	800003a8 <trap_handler+0xa0>
-		case 3:
-			platform::uart0::puts("software interruption!\n");
-80000378:	00000517          	auipc	a0,0x0
-8000037c:	49050513          	addi	a0,a0,1168 # 80000808 <_Z4Hartv+0x28>
-80000380:	3a8000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
-			break;
-80000384:	0400006f          	j	800003c4 <trap_handler+0xbc>
-		case 7:
-			platform::uart0::puts("timer interruption!\n");
-80000388:	00000517          	auipc	a0,0x0
-8000038c:	49850513          	addi	a0,a0,1176 # 80000820 <_Z4Hartv+0x40>
-80000390:	398000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
-			break;
-80000394:	0300006f          	j	800003c4 <trap_handler+0xbc>
-		case 11:
-			platform::uart0::puts("external interruption!\n");
-80000398:	00000517          	auipc	a0,0x0
-8000039c:	4a050513          	addi	a0,a0,1184 # 80000838 <_Z4Hartv+0x58>
-800003a0:	388000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
-			break;
-800003a4:	0200006f          	j	800003c4 <trap_handler+0xbc>
-		default:
-			platform::uart0::puts("unknown async exception!\n");
-800003a8:	00000517          	auipc	a0,0x0
-800003ac:	4a850513          	addi	a0,a0,1192 # 80000850 <_Z4Hartv+0x70>
-800003b0:	378000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
-			break;
-800003b4:	0100006f          	j	800003c4 <trap_handler+0xbc>
-		}
-	} else {
-		/* Synchronous trap - exception */
-		// printf("Sync exceptions!, code = %d\n", cause_code);
-		// panic("OOPS! What can I do!");
-		return_pc += 4;
-800003b8:	fec42783          	lw	a5,-20(s0)
-800003bc:	00478793          	addi	a5,a5,4
-800003c0:	fef42623          	sw	a5,-20(s0)
-	}
-
-	return return_pc;
-800003c4:	fec42783          	lw	a5,-20(s0)
-}
-800003c8:	00078513          	mv	a0,a5
-800003cc:	02c12083          	lw	ra,44(sp)
-800003d0:	02812403          	lw	s0,40(sp)
-800003d4:	03010113          	addi	sp,sp,48
-800003d8:	00008067          	ret
-
-800003dc <mtraphandler>:
+0000000080000348 <mtraphandler>:
 extern "C" __attribute__((interrupt("machine"))) void mtraphandler(){
-800003dc:	fa010113          	addi	sp,sp,-96
-800003e0:	04112e23          	sw	ra,92(sp)
-800003e4:	04512c23          	sw	t0,88(sp)
-800003e8:	04612a23          	sw	t1,84(sp)
-800003ec:	04712823          	sw	t2,80(sp)
-800003f0:	04812623          	sw	s0,76(sp)
-800003f4:	04a12423          	sw	a0,72(sp)
-800003f8:	04b12223          	sw	a1,68(sp)
-800003fc:	04c12023          	sw	a2,64(sp)
-80000400:	02d12e23          	sw	a3,60(sp)
-80000404:	02e12c23          	sw	a4,56(sp)
-80000408:	02f12a23          	sw	a5,52(sp)
-8000040c:	03012823          	sw	a6,48(sp)
-80000410:	03112623          	sw	a7,44(sp)
-80000414:	03c12423          	sw	t3,40(sp)
-80000418:	03d12223          	sw	t4,36(sp)
-8000041c:	03e12023          	sw	t5,32(sp)
-80000420:	01f12e23          	sw	t6,28(sp)
-80000424:	06010413          	addi	s0,sp,96
-    // saveContext();
-    platform::uart0::puts("mtraphandler!\n");
-80000428:	00000517          	auipc	a0,0x0
-8000042c:	44450513          	addi	a0,a0,1092 # 8000086c <_Z4Hartv+0x8c>
-80000430:	2f8000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
+    80000348:	f5010113          	addi	sp,sp,-176
+    8000034c:	0a113423          	sd	ra,168(sp)
+    80000350:	0a513023          	sd	t0,160(sp)
+    80000354:	08613c23          	sd	t1,152(sp)
+    80000358:	08713823          	sd	t2,144(sp)
+    8000035c:	08813423          	sd	s0,136(sp)
+    80000360:	08a13023          	sd	a0,128(sp)
+    80000364:	06b13c23          	sd	a1,120(sp)
+    80000368:	06c13823          	sd	a2,112(sp)
+    8000036c:	06d13423          	sd	a3,104(sp)
+    80000370:	06e13023          	sd	a4,96(sp)
+    80000374:	04f13c23          	sd	a5,88(sp)
+    80000378:	05013823          	sd	a6,80(sp)
+    8000037c:	05113423          	sd	a7,72(sp)
+    80000380:	05c13023          	sd	t3,64(sp)
+    80000384:	03d13c23          	sd	t4,56(sp)
+    80000388:	03e13823          	sd	t5,48(sp)
+    8000038c:	03f13423          	sd	t6,40(sp)
+    80000390:	0b010413          	addi	s0,sp,176
     ptr_t mepc; csrRead(mepc,mepc);
-80000434:	341027f3          	csrr	a5,mepc
-80000438:	faf42623          	sw	a5,-84(s0)
+    80000394:	341027f3          	csrr	a5,mepc
+    80000398:	f6f43423          	sd	a5,-152(s0)
     xlen_t mcause; csrRead(mcause,mcause);
-8000043c:	342027f3          	csrr	a5,mcause
-80000440:	faf42423          	sw	a5,-88(s0)
-    platform::uart0::puts("cause=");
-80000444:	00000517          	auipc	a0,0x0
-80000448:	43850513          	addi	a0,a0,1080 # 8000087c <_Z4Hartv+0x9c>
-8000044c:	2dc000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
-    platform::uart0::putc(mcause+'0');
-80000450:	fa842783          	lw	a5,-88(s0)
-80000454:	0ff7f793          	andi	a5,a5,255
-80000458:	03078793          	addi	a5,a5,48
-8000045c:	0ff7f793          	andi	a5,a5,255
-80000460:	00078513          	mv	a0,a5
-80000464:	24c000ef          	jal	ra,800006b0 <_ZN8platform5uart04putcEc>
-    platform::uart0::putc('\n');
-80000468:	00a00513          	li	a0,10
-8000046c:	244000ef          	jal	ra,800006b0 <_ZN8platform5uart04putcEc>
-80000470:	fa842783          	lw	a5,-88(s0)
-80000474:	faf42223          	sw	a5,-92(s0)
+    8000039c:	342027f3          	csrr	a5,mcause
+    800003a0:	f6f43023          	sd	a5,-160(s0)
+    800003a4:	f6043783          	ld	a5,-160(s0)
+    800003a8:	f4f43823          	sd	a5,-176(s0)
     return (mcause>>63)&1;
-80000478:	03f00793          	li	a5,63
-8000047c:	fa442703          	lw	a4,-92(s0)
-80000480:	00f757b3          	srl	a5,a4,a5
-80000484:	0017f793          	andi	a5,a5,1
-80000488:	00f037b3          	snez	a5,a5
-8000048c:	0ff7f793          	andi	a5,a5,255
+    800003ac:	f5043783          	ld	a5,-176(s0)
+    800003b0:	03f7d793          	srli	a5,a5,0x3f
+    800003b4:	0ff7f793          	andi	a5,a5,255
+    printf("mtraphandler cause=[%d]%d mepc=%lx\n",isInterrupt(mcause),mcause<<1>>1,mepc);
+    800003b8:	0007859b          	sext.w	a1,a5
+    800003bc:	f6043703          	ld	a4,-160(s0)
+    800003c0:	fff00793          	li	a5,-1
+    800003c4:	0017d793          	srli	a5,a5,0x1
+    800003c8:	00f777b3          	and	a5,a4,a5
+    800003cc:	f6843683          	ld	a3,-152(s0)
+    800003d0:	00078613          	mv	a2,a5
+    800003d4:	00001517          	auipc	a0,0x1
+    800003d8:	c6c50513          	addi	a0,a0,-916 # 80001040 <halt+0x28>
+    800003dc:	38d000ef          	jal	ra,80000f68 <printf>
+    800003e0:	f6043783          	ld	a5,-160(s0)
+    800003e4:	f4f43c23          	sd	a5,-168(s0)
+    return (mcause>>63)&1;
+    800003e8:	f5843783          	ld	a5,-168(s0)
+    800003ec:	03f7d793          	srli	a5,a5,0x3f
+    800003f0:	0ff7f793          	andi	a5,a5,255
 
     if(isInterrupt(mcause)){
-80000490:	04078063          	beqz	a5,800004d0 <mtraphandler+0xf4>
-80000494:	fa842703          	lw	a4,-88(s0)
-80000498:	00b00793          	li	a5,11
-8000049c:	06e7ee63          	bltu	a5,a4,80000518 <mtraphandler+0x13c>
-800004a0:	fa842783          	lw	a5,-88(s0)
-800004a4:	00279713          	slli	a4,a5,0x2
-800004a8:	00000797          	auipc	a5,0x0
-800004ac:	3e878793          	addi	a5,a5,1000 # 80000890 <_Z4Hartv+0xb0>
-800004b0:	00f707b3          	add	a5,a4,a5
-800004b4:	0007a703          	lw	a4,0(a5)
-800004b8:	00000797          	auipc	a5,0x0
-800004bc:	3d878793          	addi	a5,a5,984 # 80000890 <_Z4Hartv+0xb0>
-800004c0:	00f707b3          	add	a5,a4,a5
-800004c4:	00078067          	jr	a5
-            case mti: break;
+    800003f4:	02078663          	beqz	a5,80000420 <mtraphandler+0xd8>
+        switch(mcause<<1>>1){
+    800003f8:	f6043703          	ld	a4,-160(s0)
+    800003fc:	fff00793          	li	a5,-1
+    80000400:	0017d793          	srli	a5,a5,0x1
+    80000404:	00f77733          	and	a4,a4,a5
+    80000408:	00b00793          	li	a5,11
+    8000040c:	00f71663          	bne	a4,a5,80000418 <mtraphandler+0xd0>
+            // case mti: break;
 
-            case uei: break;
-            case sei: break;
-            case hei: break;
-            case mei: externalInterruptHandler();
-800004c8:	d99ff0ef          	jal	ra,80000260 <_Z24externalInterruptHandlerv>
+            // case uei: break;
+            // case sei: break;
+            // case hei: break;
+            case mei: externalInterruptHandler();break;
+    80000410:	e89ff0ef          	jal	ra,80000298 <_Z24externalInterruptHandlerv>
+    80000414:	0700006f          	j	80000484 <mtraphandler+0x13c>
+            default:
+                halt();
+    80000418:	401000ef          	jal	ra,80001018 <halt>
+    8000041c:	0680006f          	j	80000484 <mtraphandler+0x13c>
         }
-        csrWrite(mepc,mepc+8);
-    }
-    // restoreContext();
-    // ExecInst(mret);
-}
-800004cc:	04c0006f          	j	80000518 <mtraphandler+0x13c>
+    } else {
         switch(mcause){
-800004d0:	fa842703          	lw	a4,-88(s0)
-800004d4:	00800793          	li	a5,8
-800004d8:	02f70063          	beq	a4,a5,800004f8 <mtraphandler+0x11c>
-800004dc:	fa842703          	lw	a4,-88(s0)
-800004e0:	00900793          	li	a5,9
-800004e4:	00f70e63          	beq	a4,a5,80000500 <mtraphandler+0x124>
-                platform::uart0::puts("exception\n");
-800004e8:	00000517          	auipc	a0,0x0
-800004ec:	39c50513          	addi	a0,a0,924 # 80000884 <_Z4Hartv+0xa4>
-800004f0:	238000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
-                break;
-800004f4:	0100006f          	j	80000504 <mtraphandler+0x128>
+    80000420:	f6043703          	ld	a4,-160(s0)
+    80000424:	00900793          	li	a5,9
+    80000428:	02f70e63          	beq	a4,a5,80000464 <mtraphandler+0x11c>
+    8000042c:	f6043703          	ld	a4,-160(s0)
+    80000430:	00900793          	li	a5,9
+    80000434:	00e7ee63          	bltu	a5,a4,80000450 <mtraphandler+0x108>
+    80000438:	f6043703          	ld	a4,-160(s0)
+    8000043c:	00700793          	li	a5,7
+    80000440:	02f70663          	beq	a4,a5,8000046c <mtraphandler+0x124>
+    80000444:	f6043703          	ld	a4,-160(s0)
+    80000448:	00800793          	li	a5,8
+    8000044c:	02f70463          	beq	a4,a5,80000474 <mtraphandler+0x12c>
+            using namespace csr::mcause;
             case uecall:break;
-800004f8:	00000013          	nop
-800004fc:	0080006f          	j	80000504 <mtraphandler+0x128>
             case secall:break;
-80000500:	00000013          	nop
-        csrWrite(mepc,mepc+8);
-80000504:	fac42783          	lw	a5,-84(s0)
-80000508:	00878793          	addi	a5,a5,8
-8000050c:	34179073          	csrw	mepc,a5
+            case storeAccessFault:break;
+            default:
+                printf("exception\n");
+    80000450:	00001517          	auipc	a0,0x1
+    80000454:	c1850513          	addi	a0,a0,-1000 # 80001068 <halt+0x50>
+    80000458:	311000ef          	jal	ra,80000f68 <printf>
+                halt();
+    8000045c:	3bd000ef          	jal	ra,80001018 <halt>
+    80000460:	0180006f          	j	80000478 <mtraphandler+0x130>
+            case secall:break;
+    80000464:	00000013          	nop
+    80000468:	0100006f          	j	80000478 <mtraphandler+0x130>
+            case storeAccessFault:break;
+    8000046c:	00000013          	nop
+    80000470:	0080006f          	j	80000478 <mtraphandler+0x130>
+            case uecall:break;
+    80000474:	00000013          	nop
+        }
+        csrWrite(mepc,mepc+4);
+    80000478:	f6843783          	ld	a5,-152(s0)
+    8000047c:	00478793          	addi	a5,a5,4
+    80000480:	34179073          	csrw	mepc,a5
+    }
+    printf("mtraphandler over\n");
+    80000484:	00001517          	auipc	a0,0x1
+    80000488:	bf450513          	addi	a0,a0,-1036 # 80001078 <halt+0x60>
+    8000048c:	2dd000ef          	jal	ra,80000f68 <printf>
 }
-80000510:	0080006f          	j	80000518 <mtraphandler+0x13c>
-            case usi: break;
-80000514:	00000013          	nop
-}
-80000518:	00000013          	nop
-8000051c:	05c12083          	lw	ra,92(sp)
-80000520:	05812283          	lw	t0,88(sp)
-80000524:	05412303          	lw	t1,84(sp)
-80000528:	05012383          	lw	t2,80(sp)
-8000052c:	04c12403          	lw	s0,76(sp)
-80000530:	04812503          	lw	a0,72(sp)
-80000534:	04412583          	lw	a1,68(sp)
-80000538:	04012603          	lw	a2,64(sp)
-8000053c:	03c12683          	lw	a3,60(sp)
-80000540:	03812703          	lw	a4,56(sp)
-80000544:	03412783          	lw	a5,52(sp)
-80000548:	03012803          	lw	a6,48(sp)
-8000054c:	02c12883          	lw	a7,44(sp)
-80000550:	02812e03          	lw	t3,40(sp)
-80000554:	02412e83          	lw	t4,36(sp)
-80000558:	02012f03          	lw	t5,32(sp)
-8000055c:	01c12f83          	lw	t6,28(sp)
-80000560:	06010113          	addi	sp,sp,96
-80000564:	30200073          	mret
+    80000490:	00000013          	nop
+    80000494:	0a813083          	ld	ra,168(sp)
+    80000498:	0a013283          	ld	t0,160(sp)
+    8000049c:	09813303          	ld	t1,152(sp)
+    800004a0:	09013383          	ld	t2,144(sp)
+    800004a4:	08813403          	ld	s0,136(sp)
+    800004a8:	08013503          	ld	a0,128(sp)
+    800004ac:	07813583          	ld	a1,120(sp)
+    800004b0:	07013603          	ld	a2,112(sp)
+    800004b4:	06813683          	ld	a3,104(sp)
+    800004b8:	06013703          	ld	a4,96(sp)
+    800004bc:	05813783          	ld	a5,88(sp)
+    800004c0:	05013803          	ld	a6,80(sp)
+    800004c4:	04813883          	ld	a7,72(sp)
+    800004c8:	04013e03          	ld	t3,64(sp)
+    800004cc:	03813e83          	ld	t4,56(sp)
+    800004d0:	03013f03          	ld	t5,48(sp)
+    800004d4:	02813f83          	ld	t6,40(sp)
+    800004d8:	0b010113          	addi	sp,sp,176
+    800004dc:	30200073          	mret
 
-80000568 <_Z8uartInitv>:
+00000000800004e0 <_Z11uartIntTestv>:
+void uartIntTest(){
+    800004e0:	fe010113          	addi	sp,sp,-32
+    800004e4:	00113c23          	sd	ra,24(sp)
+    800004e8:	00813823          	sd	s0,16(sp)
+    800004ec:	02010413          	addi	s0,sp,32
+    using namespace platform::uart0::nonblocking;
+    for(int i=1024;i;i--)putc('_');
+    800004f0:	40000793          	li	a5,1024
+    800004f4:	fef42623          	sw	a5,-20(s0)
+    800004f8:	fec42783          	lw	a5,-20(s0)
+    800004fc:	0007879b          	sext.w	a5,a5
+    80000500:	00078e63          	beqz	a5,8000051c <_Z11uartIntTestv+0x3c>
+    80000504:	05f00513          	li	a0,95
+    80000508:	350000ef          	jal	ra,80000858 <_ZN8platform5uart011nonblocking4putcEc>
+    8000050c:	fec42783          	lw	a5,-20(s0)
+    80000510:	fff7879b          	addiw	a5,a5,-1
+    80000514:	fef42623          	sw	a5,-20(s0)
+    80000518:	fe1ff06f          	j	800004f8 <_Z11uartIntTestv+0x18>
+}
+    8000051c:	00000013          	nop
+    80000520:	01813083          	ld	ra,24(sp)
+    80000524:	01013403          	ld	s0,16(sp)
+    80000528:	02010113          	addi	sp,sp,32
+    8000052c:	00008067          	ret
+
+0000000080000530 <_Z8uartInitv>:
 void uartInit(){
-80000568:	fe010113          	addi	sp,sp,-32
-8000056c:	00112e23          	sw	ra,28(sp)
-80000570:	00812c23          	sw	s0,24(sp)
-80000574:	02010413          	addi	s0,sp,32
+    80000530:	fb010113          	addi	sp,sp,-80
+    80000534:	04113423          	sd	ra,72(sp)
+    80000538:	04813023          	sd	s0,64(sp)
+    8000053c:	05010413          	addi	s0,sp,80
     using namespace platform::uart0;
-    mmio<uint8_t>(reg(IER))=0x00;
-80000578:	00100513          	li	a0,1
-8000057c:	108000ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
-80000580:	00050793          	mv	a5,a0
-80000584:	fef42623          	sw	a5,-20(s0)
-80000588:	fec42783          	lw	a5,-20(s0)
-8000058c:	00078023          	sb	zero,0(a5)
-    // while(true){
-        puts("Hello Uart\n");
-80000590:	00000517          	auipc	a0,0x0
-80000594:	33050513          	addi	a0,a0,816 # 800008c0 <_Z4Hartv+0xe0>
-80000598:	190000ef          	jal	ra,80000728 <_ZN8platform5uart04putsEPKc>
-    // }
+    auto &ier=mmio<volatile uint8_t>(reg(IER));
+    80000540:	00100513          	li	a0,1
+    80000544:	214000ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    80000548:	00050793          	mv	a5,a0
+    8000054c:	faf43c23          	sd	a5,-72(s0)
+    80000550:	fb843783          	ld	a5,-72(s0)
+    80000554:	fef43423          	sd	a5,-24(s0)
+    ier=0x00;
+    80000558:	fe843783          	ld	a5,-24(s0)
+    8000055c:	00078023          	sb	zero,0(a5)
+    blocking::puts("Hello Uart\n");
+    80000560:	00001517          	auipc	a0,0x1
+    80000564:	b3050513          	addi	a0,a0,-1232 # 80001090 <halt+0x78>
+    80000568:	2a0000ef          	jal	ra,80000808 <_ZN8platform5uart08blocking4putsEPKc>
+    auto &lcr=mmio<volatile uint8_t>(reg(LCR));
+    8000056c:	00300513          	li	a0,3
+    80000570:	1e8000ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    80000574:	00050793          	mv	a5,a0
+    80000578:	fcf43023          	sd	a5,-64(s0)
+    8000057c:	fc043783          	ld	a5,-64(s0)
+    80000580:	fef43023          	sd	a5,-32(s0)
+    lcr=lcr|(1<<7);
+    80000584:	fe043783          	ld	a5,-32(s0)
+    80000588:	0007c783          	lbu	a5,0(a5)
+    8000058c:	0ff7f793          	andi	a5,a5,255
+    80000590:	f807e793          	ori	a5,a5,-128
+    80000594:	0ff7f713          	andi	a4,a5,255
+    80000598:	fe043783          	ld	a5,-32(s0)
+    8000059c:	00e78023          	sb	a4,0(a5)
+    mmio<volatile uint8_t>(reg(DLL))=0x03;
+    800005a0:	00000513          	li	a0,0
+    800005a4:	1b4000ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    800005a8:	00050793          	mv	a5,a0
+    800005ac:	fcf43423          	sd	a5,-56(s0)
+    800005b0:	fc843783          	ld	a5,-56(s0)
+    800005b4:	00300713          	li	a4,3
+    800005b8:	00e78023          	sb	a4,0(a5)
+    mmio<volatile uint8_t>(reg(DLM))=0x00;
+    800005bc:	00100513          	li	a0,1
+    800005c0:	198000ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    800005c4:	00050793          	mv	a5,a0
+    800005c8:	fcf43823          	sd	a5,-48(s0)
+    800005cc:	fd043783          	ld	a5,-48(s0)
+    800005d0:	00078023          	sb	zero,0(a5)
+    lcr=3;
+    800005d4:	fe043783          	ld	a5,-32(s0)
+    800005d8:	00300713          	li	a4,3
+    800005dc:	00e78023          	sb	a4,0(a5)
+    mmio<volatile uint8_t>(reg(FCR))=0x7;
+    800005e0:	00200513          	li	a0,2
+    800005e4:	174000ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    800005e8:	00050793          	mv	a5,a0
+    800005ec:	fcf43c23          	sd	a5,-40(s0)
+    800005f0:	fd843783          	ld	a5,-40(s0)
+    800005f4:	00700713          	li	a4,7
+    800005f8:	00e78023          	sb	a4,0(a5)
+    ier=0x03;
+    800005fc:	fe843783          	ld	a5,-24(s0)
+    80000600:	00300713          	li	a4,3
+    80000604:	00e78023          	sb	a4,0(a5)
 }
-8000059c:	00000013          	nop
-800005a0:	01c12083          	lw	ra,28(sp)
-800005a4:	01812403          	lw	s0,24(sp)
-800005a8:	02010113          	addi	sp,sp,32
-800005ac:	00008067          	ret
+    80000608:	00000013          	nop
+    8000060c:	04813083          	ld	ra,72(sp)
+    80000610:	04013403          	ld	s0,64(sp)
+    80000614:	05010113          	addi	sp,sp,80
+    80000618:	00008067          	ret
 
-800005b0 <_Z8plicInitv>:
+000000008000061c <_Z8plicInitv>:
 void plicInit(){
-800005b0:	fe010113          	addi	sp,sp,-32
-800005b4:	00112e23          	sw	ra,28(sp)
-800005b8:	00812c23          	sw	s0,24(sp)
-800005bc:	02010413          	addi	s0,sp,32
+    8000061c:	fc010113          	addi	sp,sp,-64
+    80000620:	02113c23          	sd	ra,56(sp)
+    80000624:	02813823          	sd	s0,48(sp)
+    80000628:	04010413          	addi	s0,sp,64
     // int hart=Hart();
+    using namespace platform::plic;
     int hart=0;
-800005c0:	fe042623          	sw	zero,-20(s0)
-    xlen_t addr=platform::plic::priorityOf(platform::uart0::irq);
-800005c4:	0c0007b7          	lui	a5,0xc000
-800005c8:	02878793          	addi	a5,a5,40 # c000028 <STACK_SIZE+0xbfffc28>
-800005cc:	fef42423          	sw	a5,-24(s0)
-800005d0:	fe842783          	lw	a5,-24(s0)
-800005d4:	fef42023          	sw	a5,-32(s0)
-800005d8:	fe042783          	lw	a5,-32(s0)
+    8000062c:	fe042623          	sw	zero,-20(s0)
+    xlen_t addr=priorityOf(platform::uart0::irq);
+    80000630:	0c0007b7          	lui	a5,0xc000
+    80000634:	02878793          	addi	a5,a5,40 # c000028 <STACK_SIZE+0xbfffc28>
+    80000638:	fef43023          	sd	a5,-32(s0)
+    8000063c:	fe043783          	ld	a5,-32(s0)
+    80000640:	fcf43423          	sd	a5,-56(s0)
+    80000644:	fc843783          	ld	a5,-56(s0)
     mmio<word_t>(addr)=1;
-800005dc:	00100713          	li	a4,1
-800005e0:	00e7a023          	sw	a4,0(a5)
-    mmio<word_t>(platform::plic::enableOf(hart))=1<<platform::uart0::irq;
-800005e4:	fec42503          	lw	a0,-20(s0)
-800005e8:	190000ef          	jal	ra,80000778 <_ZN8platform4plic8enableOfEi>
-800005ec:	00050793          	mv	a5,a0
-800005f0:	fef42223          	sw	a5,-28(s0)
-800005f4:	fe442783          	lw	a5,-28(s0)
-800005f8:	40000713          	li	a4,1024
-800005fc:	00e7a023          	sw	a4,0(a5)
+    80000648:	00100713          	li	a4,1
+    8000064c:	00e7a023          	sw	a4,0(a5)
+    mmio<word_t>(enableOf(hart))=1<<platform::uart0::irq;
+    80000650:	fec42783          	lw	a5,-20(s0)
+    80000654:	00078513          	mv	a0,a5
+    80000658:	284000ef          	jal	ra,800008dc <_ZN8platform4plic8enableOfEi>
+    8000065c:	00050793          	mv	a5,a0
+    80000660:	fcf43823          	sd	a5,-48(s0)
+    80000664:	fd043783          	ld	a5,-48(s0)
+    80000668:	40000713          	li	a4,1024
+    8000066c:	00e7a023          	sw	a4,0(a5)
+    mmio<word_t>(thresholdOf(hart))=0;
+    80000670:	fec42783          	lw	a5,-20(s0)
+    80000674:	00078513          	mv	a0,a5
+    80000678:	2a0000ef          	jal	ra,80000918 <_ZN8platform4plic11thresholdOfEi>
+    8000067c:	00050793          	mv	a5,a0
+    80000680:	fcf43c23          	sd	a5,-40(s0)
+    80000684:	fd843783          	ld	a5,-40(s0)
+    80000688:	0007a023          	sw	zero,0(a5)
     uartInit();
-80000600:	f69ff0ef          	jal	ra,80000568 <_Z8uartInitv>
+    8000068c:	ea5ff0ef          	jal	ra,80000530 <_Z8uartInitv>
 }
-80000604:	00000013          	nop
-80000608:	01c12083          	lw	ra,28(sp)
-8000060c:	01812403          	lw	s0,24(sp)
-80000610:	02010113          	addi	sp,sp,32
-80000614:	00008067          	ret
+    80000690:	00000013          	nop
+    80000694:	03813083          	ld	ra,56(sp)
+    80000698:	03013403          	ld	s0,48(sp)
+    8000069c:	04010113          	addi	sp,sp,64
+    800006a0:	00008067          	ret
 
-80000618 <_Z10mtrap_testv>:
+00000000800006a4 <_Z10mtrap_testv>:
 void mtrap_test(){
-80000618:	ff010113          	addi	sp,sp,-16
-8000061c:	00812623          	sw	s0,12(sp)
-80000620:	01010413          	addi	s0,sp,16
-    ExecInst(ecall);
-80000624:	00000073          	ecall
-    // *(int *)0x00000000 = 100;
+    800006a4:	fe010113          	addi	sp,sp,-32
+    800006a8:	00813c23          	sd	s0,24(sp)
+    800006ac:	02010413          	addi	s0,sp,32
+    *(int *)0x00000000 = 100;
+    800006b0:	00000713          	li	a4,0
+    800006b4:	06400793          	li	a5,100
+    800006b8:	00f72023          	sw	a5,0(a4)
+    for(int k=2;k;k--);
+    800006bc:	00200793          	li	a5,2
+    800006c0:	fef42623          	sw	a5,-20(s0)
+    800006c4:	fec42783          	lw	a5,-20(s0)
+    800006c8:	0007879b          	sext.w	a5,a5
+    800006cc:	00078a63          	beqz	a5,800006e0 <_Z10mtrap_testv+0x3c>
+    800006d0:	fec42783          	lw	a5,-20(s0)
+    800006d4:	fff7879b          	addiw	a5,a5,-1
+    800006d8:	fef42623          	sw	a5,-20(s0)
+    800006dc:	fe9ff06f          	j	800006c4 <_Z10mtrap_testv+0x20>
+    return;
+    800006e0:	00000013          	nop
 }
-80000628:	00000013          	nop
-8000062c:	00c12403          	lw	s0,12(sp)
-80000630:	01010113          	addi	sp,sp,16
-80000634:	00008067          	ret
+    800006e4:	01813403          	ld	s0,24(sp)
+    800006e8:	02010113          	addi	sp,sp,32
+    800006ec:	00008067          	ret
 
-80000638 <sbi_init>:
+00000000800006f0 <sbi_init>:
 extern "C" void sbi_init(){
-80000638:	ff010113          	addi	sp,sp,-16
-8000063c:	00112623          	sw	ra,12(sp)
-80000640:	00812423          	sw	s0,8(sp)
-80000644:	01010413          	addi	s0,sp,16
-    asm volatile (
-"csrw pmpaddr0, %1\n\t"
-"csrw pmpcfg0, %0\n\t"
-: : "r" (0xf), "r" (0x3fffffffffffffull) :);
-80000648:	00f00793          	li	a5,15
-8000064c:	fff00613          	li	a2,-1
-80000650:	004006b7          	lui	a3,0x400
-80000654:	fff68693          	addi	a3,a3,-1 # 3fffff <STACK_SIZE+0x3ffbff>
-80000658:	3b061073          	csrw	pmpaddr0,a2
-8000065c:	3a079073          	csrw	pmpcfg0,a5
+    800006f0:	ff010113          	addi	sp,sp,-16
+    800006f4:	00113423          	sd	ra,8(sp)
+    800006f8:	00813023          	sd	s0,0(sp)
+    800006fc:	01010413          	addi	s0,sp,16
+// "csrw pmpcfg0, %0\n\t"
+// : : "r" (0xf), "r" (0x3fffffffffffffull) :);
+    // csrWritei(mtvec,mtraphandler);
+    using platform::uart0::blocking::puts;
+    // uartInit();
+    plicInit();
+    80000700:	f1dff0ef          	jal	ra,8000061c <_Z8plicInitv>
+    puts("plic init over\n");
+    80000704:	00001517          	auipc	a0,0x1
+    80000708:	99c50513          	addi	a0,a0,-1636 # 800010a0 <halt+0x88>
+    8000070c:	0fc000ef          	jal	ra,80000808 <_ZN8platform5uart08blocking4putsEPKc>
 
-    // csrSet(mie,BIT(csr::mie::msie));
-    // csrSet(mstatus,BIT(csr::mstatus::mie));
-    // MIEnable();
-    // puts("here2\n");
     {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtraphandler));}
-80000660:	00000797          	auipc	a5,0x0
-80000664:	d7c78793          	addi	a5,a5,-644 # 800003dc <mtraphandler>
-80000668:	30579073          	csrw	mtvec,a5
+    80000710:	00000797          	auipc	a5,0x0
+    80000714:	c3878793          	addi	a5,a5,-968 # 80000348 <mtraphandler>
+    80000718:	30579073          	csrw	mtvec,a5
+    csrSet(mie,BIT(csr::mie::meie));
+    8000071c:	000017b7          	lui	a5,0x1
+    80000720:	80078793          	addi	a5,a5,-2048 # 800 <STACK_SIZE+0x400>
+    80000724:	3047a073          	csrs	mie,a5
+    csrSet(mstatus,BIT(csr::mstatus::mie));
+    80000728:	00800793          	li	a5,8
+    8000072c:	3007a073          	csrs	mstatus,a5
+    // puts("here2\n");
     mtrap_test();
-8000066c:	fadff0ef          	jal	ra,80000618 <_Z10mtrap_testv>
-    // csrWrite(mepc,mtrap_test);
-	// ExecInst(mret);
-    // puts("here3");
-80000670:	00000013          	nop
-80000674:	00c12083          	lw	ra,12(sp)
-80000678:	00812403          	lw	s0,8(sp)
-8000067c:	01010113          	addi	sp,sp,16
-80000680:	00008067          	ret
+    80000730:	f75ff0ef          	jal	ra,800006a4 <_Z10mtrap_testv>
+    puts("mtrap test over");
+    80000734:	00001517          	auipc	a0,0x1
+    80000738:	97c50513          	addi	a0,a0,-1668 # 800010b0 <halt+0x98>
+    8000073c:	0cc000ef          	jal	ra,80000808 <_ZN8platform5uart08blocking4putsEPKc>
+    uartIntTest();
+    80000740:	da1ff0ef          	jal	ra,800004e0 <_Z11uartIntTestv>
+    80000744:	00000013          	nop
+    80000748:	00813083          	ld	ra,8(sp)
+    8000074c:	00013403          	ld	s0,0(sp)
+    80000750:	01010113          	addi	sp,sp,16
+    80000754:	00008067          	ret
 
-80000684 <_ZN8platform5uart03regENS0_4regsE>:
+0000000080000758 <_ZN8platform5uart03regENS0_4regsE>:
             MCR=4,	// Modem Control Register
             LSR=5,	// Line Status Register
             MSR=6,	// Modem Status Register
             SPR=7,	// ScratchPad Register
         };
         constexpr xlen_t reg(regs r){return base+r;}
-80000684:	fe010113          	addi	sp,sp,-32
-80000688:	00812e23          	sw	s0,28(sp)
-8000068c:	02010413          	addi	s0,sp,32
-80000690:	fea42623          	sw	a0,-20(s0)
-80000694:	fec42703          	lw	a4,-20(s0)
-80000698:	100007b7          	lui	a5,0x10000
-8000069c:	00f707b3          	add	a5,a4,a5
-800006a0:	00078513          	mv	a0,a5
-800006a4:	01c12403          	lw	s0,28(sp)
-800006a8:	02010113          	addi	sp,sp,32
-800006ac:	00008067          	ret
+    80000758:	fe010113          	addi	sp,sp,-32
+    8000075c:	00813c23          	sd	s0,24(sp)
+    80000760:	02010413          	addi	s0,sp,32
+    80000764:	00050793          	mv	a5,a0
+    80000768:	fef42623          	sw	a5,-20(s0)
+    8000076c:	fec42783          	lw	a5,-20(s0)
+    80000770:	00078713          	mv	a4,a5
+    80000774:	100007b7          	lui	a5,0x10000
+    80000778:	00f707b3          	add	a5,a4,a5
+    8000077c:	00078513          	mv	a0,a5
+    80000780:	01813403          	ld	s0,24(sp)
+    80000784:	02010113          	addi	sp,sp,32
+    80000788:	00008067          	ret
 
-800006b0 <_ZN8platform5uart04putcEc>:
-            uint8_t rxnemp:1;
-            uint8_t unused:4;
+000000008000078c <_ZN8platform5uart08blocking4putcEc>:
             uint8_t txidle:1;
             uint8_t unused1:2;
         };
-        inline void putc(char c) {
-800006b0:	fd010113          	addi	sp,sp,-48
-800006b4:	02112623          	sw	ra,44(sp)
-800006b8:	02812423          	sw	s0,40(sp)
-800006bc:	03010413          	addi	s0,sp,48
-800006c0:	00050793          	mv	a5,a0
-800006c4:	fcf40fa3          	sb	a5,-33(s0)
-            while(!mmio<lsr>(reg(LSR)).txidle);
-800006c8:	00500513          	li	a0,5
-800006cc:	fb9ff0ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
-800006d0:	00050793          	mv	a5,a0
-800006d4:	fef42623          	sw	a5,-20(s0)
+        namespace blocking
+        {    
+            inline void putc(char c) {
+    8000078c:	fd010113          	addi	sp,sp,-48
+    80000790:	02113423          	sd	ra,40(sp)
+    80000794:	02813023          	sd	s0,32(sp)
+    80000798:	03010413          	addi	s0,sp,48
+    8000079c:	00050793          	mv	a5,a0
+    800007a0:	fcf40fa3          	sb	a5,-33(s0)
+                while(!mmio<lsr>(reg(LSR)).txidle);
+    800007a4:	00500513          	li	a0,5
+    800007a8:	fb1ff0ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    800007ac:	00050793          	mv	a5,a0
+    800007b0:	fef43423          	sd	a5,-24(s0)
     return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
-800006d8:	fec42783          	lw	a5,-20(s0)
-            while(!mmio<lsr>(reg(LSR)).txidle);
-800006dc:	0007c783          	lbu	a5,0(a5) # 10000000 <STACK_SIZE+0xffffc00>
-800006e0:	0207f793          	andi	a5,a5,32
-800006e4:	0ff7f793          	andi	a5,a5,255
-800006e8:	0017b793          	seqz	a5,a5
-800006ec:	0ff7f793          	andi	a5,a5,255
-800006f0:	00078463          	beqz	a5,800006f8 <_ZN8platform5uart04putcEc+0x48>
-800006f4:	fd5ff06f          	j	800006c8 <_ZN8platform5uart04putcEc+0x18>
-            mmio<char>(reg(THR))=c;
-800006f8:	00000513          	li	a0,0
-800006fc:	f89ff0ef          	jal	ra,80000684 <_ZN8platform5uart03regENS0_4regsE>
-80000700:	00050793          	mv	a5,a0
-80000704:	fef42423          	sw	a5,-24(s0)
+    800007b4:	fe843783          	ld	a5,-24(s0)
+                while(!mmio<lsr>(reg(LSR)).txidle);
+    800007b8:	0007c783          	lbu	a5,0(a5) # 10000000 <STACK_SIZE+0xffffc00>
+    800007bc:	0207f793          	andi	a5,a5,32
+    800007c0:	0ff7f793          	andi	a5,a5,255
+    800007c4:	0007879b          	sext.w	a5,a5
+    800007c8:	0017b793          	seqz	a5,a5
+    800007cc:	0ff7f793          	andi	a5,a5,255
+    800007d0:	00078463          	beqz	a5,800007d8 <_ZN8platform5uart08blocking4putcEc+0x4c>
+    800007d4:	fd1ff06f          	j	800007a4 <_ZN8platform5uart08blocking4putcEc+0x18>
+                mmio<char>(reg(THR))=c;
+    800007d8:	00000513          	li	a0,0
+    800007dc:	f7dff0ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    800007e0:	00050793          	mv	a5,a0
+    800007e4:	fef43023          	sd	a5,-32(s0)
     return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
-80000708:	fe842783          	lw	a5,-24(s0)
-            mmio<char>(reg(THR))=c;
-8000070c:	fdf44703          	lbu	a4,-33(s0)
-80000710:	00e78023          	sb	a4,0(a5)
-        }
-80000714:	00000013          	nop
-80000718:	02c12083          	lw	ra,44(sp)
-8000071c:	02812403          	lw	s0,40(sp)
-80000720:	03010113          	addi	sp,sp,48
-80000724:	00008067          	ret
+    800007e8:	fe043783          	ld	a5,-32(s0)
+                mmio<char>(reg(THR))=c;
+    800007ec:	fdf44703          	lbu	a4,-33(s0)
+    800007f0:	00e78023          	sb	a4,0(a5)
+            }
+    800007f4:	00000013          	nop
+    800007f8:	02813083          	ld	ra,40(sp)
+    800007fc:	02013403          	ld	s0,32(sp)
+    80000800:	03010113          	addi	sp,sp,48
+    80000804:	00008067          	ret
 
-80000728 <_ZN8platform5uart04putsEPKc>:
-        inline char& getc() {
-            while(mmio<lsr>(reg(LSR)).rxnemp);
-            return mmio<char>(reg(RHR));
-        }
-        inline void puts(const char *s){
-80000728:	fe010113          	addi	sp,sp,-32
-8000072c:	00112e23          	sw	ra,28(sp)
-80000730:	00812c23          	sw	s0,24(sp)
-80000734:	02010413          	addi	s0,sp,32
-80000738:	fea42623          	sw	a0,-20(s0)
-            while(*s)putc(*s++);
-8000073c:	fec42783          	lw	a5,-20(s0)
-80000740:	0007c783          	lbu	a5,0(a5)
-80000744:	02078063          	beqz	a5,80000764 <_ZN8platform5uart04putsEPKc+0x3c>
-80000748:	fec42783          	lw	a5,-20(s0)
-8000074c:	00178713          	addi	a4,a5,1
-80000750:	fee42623          	sw	a4,-20(s0)
-80000754:	0007c783          	lbu	a5,0(a5)
-80000758:	00078513          	mv	a0,a5
-8000075c:	f55ff0ef          	jal	ra,800006b0 <_ZN8platform5uart04putcEc>
-80000760:	fddff06f          	j	8000073c <_ZN8platform5uart04putsEPKc+0x14>
-        }
-80000764:	00000013          	nop
-80000768:	01c12083          	lw	ra,28(sp)
-8000076c:	01812403          	lw	s0,24(sp)
-80000770:	02010113          	addi	sp,sp,32
-80000774:	00008067          	ret
+0000000080000808 <_ZN8platform5uart08blocking4putsEPKc>:
+            inline char getc() {
+                while(mmio<lsr>(reg(LSR)).rxnemp);
+                return mmio<char>(reg(RHR));
+            }
+            inline void puts(const char *s){
+    80000808:	fe010113          	addi	sp,sp,-32
+    8000080c:	00113c23          	sd	ra,24(sp)
+    80000810:	00813823          	sd	s0,16(sp)
+    80000814:	02010413          	addi	s0,sp,32
+    80000818:	fea43423          	sd	a0,-24(s0)
+                while(*s)putc(*s++);
+    8000081c:	fe843783          	ld	a5,-24(s0)
+    80000820:	0007c783          	lbu	a5,0(a5)
+    80000824:	02078063          	beqz	a5,80000844 <_ZN8platform5uart08blocking4putsEPKc+0x3c>
+    80000828:	fe843783          	ld	a5,-24(s0)
+    8000082c:	00178713          	addi	a4,a5,1
+    80000830:	fee43423          	sd	a4,-24(s0)
+    80000834:	0007c783          	lbu	a5,0(a5)
+    80000838:	00078513          	mv	a0,a5
+    8000083c:	f51ff0ef          	jal	ra,8000078c <_ZN8platform5uart08blocking4putcEc>
+    80000840:	fddff06f          	j	8000081c <_ZN8platform5uart08blocking4putsEPKc+0x14>
+            }   
+    80000844:	00000013          	nop
+    80000848:	01813083          	ld	ra,24(sp)
+    8000084c:	01013403          	ld	s0,16(sp)
+    80000850:	02010113          	addi	sp,sp,32
+    80000854:	00008067          	ret
 
-80000778 <_ZN8platform4plic8enableOfEi>:
+0000000080000858 <_ZN8platform5uart011nonblocking4putcEc>:
+        } // namespace blocking
+        namespace nonblocking
+        {
+            inline bool putc(char c){
+    80000858:	fd010113          	addi	sp,sp,-48
+    8000085c:	02113423          	sd	ra,40(sp)
+    80000860:	02813023          	sd	s0,32(sp)
+    80000864:	03010413          	addi	s0,sp,48
+    80000868:	00050793          	mv	a5,a0
+    8000086c:	fcf40fa3          	sb	a5,-33(s0)
+                if(!mmio<lsr>(reg(LSR)).txidle)return false;
+    80000870:	00500513          	li	a0,5
+    80000874:	ee5ff0ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    80000878:	00050793          	mv	a5,a0
+    8000087c:	fef43423          	sd	a5,-24(s0)
+    return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
+    80000880:	fe843783          	ld	a5,-24(s0)
+                if(!mmio<lsr>(reg(LSR)).txidle)return false;
+    80000884:	0007c783          	lbu	a5,0(a5)
+    80000888:	0207f793          	andi	a5,a5,32
+    8000088c:	0ff7f793          	andi	a5,a5,255
+    80000890:	0007879b          	sext.w	a5,a5
+    80000894:	0017b793          	seqz	a5,a5
+    80000898:	0ff7f793          	andi	a5,a5,255
+    8000089c:	00078663          	beqz	a5,800008a8 <_ZN8platform5uart011nonblocking4putcEc+0x50>
+    800008a0:	00000793          	li	a5,0
+    800008a4:	0240006f          	j	800008c8 <_ZN8platform5uart011nonblocking4putcEc+0x70>
+                mmio<char>(reg(THR))=c;
+    800008a8:	00000513          	li	a0,0
+    800008ac:	eadff0ef          	jal	ra,80000758 <_ZN8platform5uart03regENS0_4regsE>
+    800008b0:	00050793          	mv	a5,a0
+    800008b4:	fef43023          	sd	a5,-32(s0)
+    return reinterpret_cast<T&>(*reinterpret_cast<T*>(addr));
+    800008b8:	fe043783          	ld	a5,-32(s0)
+                mmio<char>(reg(THR))=c;
+    800008bc:	fdf44703          	lbu	a4,-33(s0)
+    800008c0:	00e78023          	sb	a4,0(a5)
+                return true;
+    800008c4:	00100793          	li	a5,1
+            }
+    800008c8:	00078513          	mv	a0,a5
+    800008cc:	02813083          	ld	ra,40(sp)
+    800008d0:	02013403          	ld	s0,32(sp)
+    800008d4:	03010113          	addi	sp,sp,48
+    800008d8:	00008067          	ret
+
+00000000800008dc <_ZN8platform4plic8enableOfEi>:
             pending=base+0x1000,
             enable=base+0x2000,
             threshold=base+0x200000,
             claim=base+0x200004;
         constexpr xlen_t priorityOf(int id) {return priority+id*4;}
         constexpr xlen_t enableOf(int hart) { return enable+hart*0x80; }
-80000778:	fe010113          	addi	sp,sp,-32
-8000077c:	00812e23          	sw	s0,28(sp)
-80000780:	02010413          	addi	s0,sp,32
-80000784:	fea42623          	sw	a0,-20(s0)
-80000788:	fec42703          	lw	a4,-20(s0)
-8000078c:	001807b7          	lui	a5,0x180
-80000790:	04078793          	addi	a5,a5,64 # 180040 <STACK_SIZE+0x17fc40>
-80000794:	00f707b3          	add	a5,a4,a5
-80000798:	00779793          	slli	a5,a5,0x7
-8000079c:	00078513          	mv	a0,a5
-800007a0:	01c12403          	lw	s0,28(sp)
-800007a4:	02010113          	addi	sp,sp,32
-800007a8:	00008067          	ret
+    800008dc:	fe010113          	addi	sp,sp,-32
+    800008e0:	00813c23          	sd	s0,24(sp)
+    800008e4:	02010413          	addi	s0,sp,32
+    800008e8:	00050793          	mv	a5,a0
+    800008ec:	fef42623          	sw	a5,-20(s0)
+    800008f0:	fec42783          	lw	a5,-20(s0)
+    800008f4:	0077979b          	slliw	a5,a5,0x7
+    800008f8:	0007879b          	sext.w	a5,a5
+    800008fc:	00078713          	mv	a4,a5
+    80000900:	0c0027b7          	lui	a5,0xc002
+    80000904:	00f707b3          	add	a5,a4,a5
+    80000908:	00078513          	mv	a0,a5
+    8000090c:	01813403          	ld	s0,24(sp)
+    80000910:	02010113          	addi	sp,sp,32
+    80000914:	00008067          	ret
 
-800007ac <_ZN8platform4plic7claimOfEi>:
+0000000080000918 <_ZN8platform4plic11thresholdOfEi>:
         constexpr xlen_t thresholdOf(int hart) { return threshold+hart*0x1000; }
-        constexpr xlen_t claimOf(int hart) { return claim+hart*0x1000; }
-800007ac:	fe010113          	addi	sp,sp,-32
-800007b0:	00812e23          	sw	s0,28(sp)
-800007b4:	02010413          	addi	s0,sp,32
-800007b8:	fea42623          	sw	a0,-20(s0)
-800007bc:	fec42783          	lw	a5,-20(s0)
-800007c0:	00c79713          	slli	a4,a5,0xc
-800007c4:	0c2007b7          	lui	a5,0xc200
-800007c8:	00478793          	addi	a5,a5,4 # c200004 <STACK_SIZE+0xc1ffc04>
-800007cc:	00f707b3          	add	a5,a4,a5
-800007d0:	00078513          	mv	a0,a5
-800007d4:	01c12403          	lw	s0,28(sp)
-800007d8:	02010113          	addi	sp,sp,32
-800007dc:	00008067          	ret
+    80000918:	fe010113          	addi	sp,sp,-32
+    8000091c:	00813c23          	sd	s0,24(sp)
+    80000920:	02010413          	addi	s0,sp,32
+    80000924:	00050793          	mv	a5,a0
+    80000928:	fef42623          	sw	a5,-20(s0)
+    8000092c:	fec42783          	lw	a5,-20(s0)
+    80000930:	00c7979b          	slliw	a5,a5,0xc
+    80000934:	0007879b          	sext.w	a5,a5
+    80000938:	00078713          	mv	a4,a5
+    8000093c:	0c2007b7          	lui	a5,0xc200
+    80000940:	00f707b3          	add	a5,a4,a5
+    80000944:	00078513          	mv	a0,a5
+    80000948:	01813403          	ld	s0,24(sp)
+    8000094c:	02010113          	addi	sp,sp,32
+    80000950:	00008067          	ret
 
-800007e0 <_Z4Hartv>:
+0000000080000954 <_ZN8platform4plic7claimOfEi>:
+        constexpr xlen_t claimOf(int hart) { return claim+hart*0x1000; }
+    80000954:	fe010113          	addi	sp,sp,-32
+    80000958:	00813c23          	sd	s0,24(sp)
+    8000095c:	02010413          	addi	s0,sp,32
+    80000960:	00050793          	mv	a5,a0
+    80000964:	fef42623          	sw	a5,-20(s0)
+    80000968:	fec42783          	lw	a5,-20(s0)
+    8000096c:	00c7979b          	slliw	a5,a5,0xc
+    80000970:	0007879b          	sext.w	a5,a5
+    80000974:	00078713          	mv	a4,a5
+    80000978:	0c2007b7          	lui	a5,0xc200
+    8000097c:	00478793          	addi	a5,a5,4 # c200004 <STACK_SIZE+0xc1ffc04>
+    80000980:	00f707b3          	add	a5,a4,a5
+    80000984:	00078513          	mv	a0,a5
+    80000988:	01813403          	ld	s0,24(sp)
+    8000098c:	02010113          	addi	sp,sp,32
+    80000990:	00008067          	ret
+
+0000000080000994 <_Z4Hartv>:
 inline int Hart(){
-800007e0:	fe010113          	addi	sp,sp,-32
-800007e4:	00812e23          	sw	s0,28(sp)
-800007e8:	02010413          	addi	s0,sp,32
+    80000994:	fe010113          	addi	sp,sp,-32
+    80000998:	00813c23          	sd	s0,24(sp)
+    8000099c:	02010413          	addi	s0,sp,32
     int rt; csrRead(mhartid,rt);
-800007ec:	f14027f3          	csrr	a5,mhartid
-800007f0:	fef42623          	sw	a5,-20(s0)
+    800009a0:	f14027f3          	csrr	a5,mhartid
+    800009a4:	fef42623          	sw	a5,-20(s0)
     return rt;
-800007f4:	fec42783          	lw	a5,-20(s0)
+    800009a8:	fec42783          	lw	a5,-20(s0)
 }
-800007f8:	00078513          	mv	a0,a5
-800007fc:	01c12403          	lw	s0,28(sp)
-80000800:	02010113          	addi	sp,sp,32
-80000804:	00008067          	ret
+    800009ac:	00078513          	mv	a0,a5
+    800009b0:	01813403          	ld	s0,24(sp)
+    800009b4:	02010113          	addi	sp,sp,32
+    800009b8:	00008067          	ret
+
+00000000800009bc <_vsnprintf>:
+
+#include "platform.h"
+using namespace platform::uart0::blocking;
+extern "C"{
+static int _vsnprintf(char * out, size_t n, const char* s, va_list vl)
+{
+    800009bc:	f8010113          	addi	sp,sp,-128
+    800009c0:	06813c23          	sd	s0,120(sp)
+    800009c4:	08010413          	addi	s0,sp,128
+    800009c8:	f8a43c23          	sd	a0,-104(s0)
+    800009cc:	f8b43823          	sd	a1,-112(s0)
+    800009d0:	f8c43423          	sd	a2,-120(s0)
+    800009d4:	f8d43023          	sd	a3,-128(s0)
+	int format = 0;
+    800009d8:	fe042623          	sw	zero,-20(s0)
+	int longarg = 0;
+    800009dc:	fe042423          	sw	zero,-24(s0)
+	size_t pos = 0;
+    800009e0:	fe043023          	sd	zero,-32(s0)
+	for (; *s; s++) {
+    800009e4:	f8843783          	ld	a5,-120(s0)
+    800009e8:	0007c783          	lbu	a5,0(a5)
+    800009ec:	46078a63          	beqz	a5,80000e60 <_vsnprintf+0x4a4>
+		if (format) {
+    800009f0:	fec42783          	lw	a5,-20(s0)
+    800009f4:	0007879b          	sext.w	a5,a5
+    800009f8:	3e078c63          	beqz	a5,80000df0 <_vsnprintf+0x434>
+			switch(*s) {
+    800009fc:	f8843783          	ld	a5,-120(s0)
+    80000a00:	0007c783          	lbu	a5,0(a5)
+    80000a04:	0007879b          	sext.w	a5,a5
+    80000a08:	f9d7869b          	addiw	a3,a5,-99
+    80000a0c:	0006871b          	sext.w	a4,a3
+    80000a10:	01500793          	li	a5,21
+    80000a14:	42e7ec63          	bltu	a5,a4,80000e4c <_vsnprintf+0x490>
+    80000a18:	02069793          	slli	a5,a3,0x20
+    80000a1c:	0207d793          	srli	a5,a5,0x20
+    80000a20:	00279713          	slli	a4,a5,0x2
+    80000a24:	00000797          	auipc	a5,0x0
+    80000a28:	69c78793          	addi	a5,a5,1692 # 800010c0 <halt+0xa8>
+    80000a2c:	00f707b3          	add	a5,a4,a5
+    80000a30:	0007a783          	lw	a5,0(a5)
+    80000a34:	0007871b          	sext.w	a4,a5
+    80000a38:	00000797          	auipc	a5,0x0
+    80000a3c:	68878793          	addi	a5,a5,1672 # 800010c0 <halt+0xa8>
+    80000a40:	00f707b3          	add	a5,a4,a5
+    80000a44:	00078067          	jr	a5
+			case 'l': {
+				longarg = 1;
+    80000a48:	00100793          	li	a5,1
+    80000a4c:	fef42423          	sw	a5,-24(s0)
+				break;
+    80000a50:	4000006f          	j	80000e50 <_vsnprintf+0x494>
+			}
+			case 'p': {
+				longarg = 1;
+    80000a54:	00100793          	li	a5,1
+    80000a58:	fef42423          	sw	a5,-24(s0)
+				if (out && pos < n) {
+    80000a5c:	f9843783          	ld	a5,-104(s0)
+    80000a60:	02078263          	beqz	a5,80000a84 <_vsnprintf+0xc8>
+    80000a64:	fe043703          	ld	a4,-32(s0)
+    80000a68:	f9043783          	ld	a5,-112(s0)
+    80000a6c:	00f77c63          	bgeu	a4,a5,80000a84 <_vsnprintf+0xc8>
+					out[pos] = '0';
+    80000a70:	f9843703          	ld	a4,-104(s0)
+    80000a74:	fe043783          	ld	a5,-32(s0)
+    80000a78:	00f707b3          	add	a5,a4,a5
+    80000a7c:	03000713          	li	a4,48
+    80000a80:	00e78023          	sb	a4,0(a5)
+				}
+				pos++;
+    80000a84:	fe043783          	ld	a5,-32(s0)
+    80000a88:	00178793          	addi	a5,a5,1
+    80000a8c:	fef43023          	sd	a5,-32(s0)
+				if (out && pos < n) {
+    80000a90:	f9843783          	ld	a5,-104(s0)
+    80000a94:	02078263          	beqz	a5,80000ab8 <_vsnprintf+0xfc>
+    80000a98:	fe043703          	ld	a4,-32(s0)
+    80000a9c:	f9043783          	ld	a5,-112(s0)
+    80000aa0:	00f77c63          	bgeu	a4,a5,80000ab8 <_vsnprintf+0xfc>
+					out[pos] = 'x';
+    80000aa4:	f9843703          	ld	a4,-104(s0)
+    80000aa8:	fe043783          	ld	a5,-32(s0)
+    80000aac:	00f707b3          	add	a5,a4,a5
+    80000ab0:	07800713          	li	a4,120
+    80000ab4:	00e78023          	sb	a4,0(a5)
+				}
+				pos++;
+    80000ab8:	fe043783          	ld	a5,-32(s0)
+    80000abc:	00178793          	addi	a5,a5,1
+    80000ac0:	fef43023          	sd	a5,-32(s0)
+			}
+			case 'x': {
+				long num = longarg ? va_arg(vl, long) : va_arg(vl, int);
+    80000ac4:	fe842783          	lw	a5,-24(s0)
+    80000ac8:	0007879b          	sext.w	a5,a5
+    80000acc:	00078c63          	beqz	a5,80000ae4 <_vsnprintf+0x128>
+    80000ad0:	f8043783          	ld	a5,-128(s0)
+    80000ad4:	00878713          	addi	a4,a5,8
+    80000ad8:	f8e43023          	sd	a4,-128(s0)
+    80000adc:	0007b783          	ld	a5,0(a5)
+    80000ae0:	0140006f          	j	80000af4 <_vsnprintf+0x138>
+    80000ae4:	f8043783          	ld	a5,-128(s0)
+    80000ae8:	00878713          	addi	a4,a5,8
+    80000aec:	f8e43023          	sd	a4,-128(s0)
+    80000af0:	0007a783          	lw	a5,0(a5)
+    80000af4:	faf43423          	sd	a5,-88(s0)
+				int hexdigits = 2*(longarg ? sizeof(long) : sizeof(int))-1;
+    80000af8:	fe842783          	lw	a5,-24(s0)
+    80000afc:	0007879b          	sext.w	a5,a5
+    80000b00:	00078663          	beqz	a5,80000b0c <_vsnprintf+0x150>
+    80000b04:	00f00793          	li	a5,15
+    80000b08:	0080006f          	j	80000b10 <_vsnprintf+0x154>
+    80000b0c:	00700793          	li	a5,7
+    80000b10:	faf42223          	sw	a5,-92(s0)
+				for(int i = hexdigits; i >= 0; i--) {
+    80000b14:	fa442783          	lw	a5,-92(s0)
+    80000b18:	fcf42e23          	sw	a5,-36(s0)
+    80000b1c:	fdc42783          	lw	a5,-36(s0)
+    80000b20:	0007879b          	sext.w	a5,a5
+    80000b24:	0807cc63          	bltz	a5,80000bbc <_vsnprintf+0x200>
+					int d = (num >> (4*i)) & 0xF;
+    80000b28:	fdc42783          	lw	a5,-36(s0)
+    80000b2c:	0027979b          	slliw	a5,a5,0x2
+    80000b30:	0007879b          	sext.w	a5,a5
+    80000b34:	fa843703          	ld	a4,-88(s0)
+    80000b38:	40f757b3          	sra	a5,a4,a5
+    80000b3c:	0007879b          	sext.w	a5,a5
+    80000b40:	00f7f793          	andi	a5,a5,15
+    80000b44:	faf42023          	sw	a5,-96(s0)
+					if (out && pos < n) {
+    80000b48:	f9843783          	ld	a5,-104(s0)
+    80000b4c:	04078a63          	beqz	a5,80000ba0 <_vsnprintf+0x1e4>
+    80000b50:	fe043703          	ld	a4,-32(s0)
+    80000b54:	f9043783          	ld	a5,-112(s0)
+    80000b58:	04f77463          	bgeu	a4,a5,80000ba0 <_vsnprintf+0x1e4>
+						out[pos] = (d < 10 ? '0'+d : 'a'+d-10);
+    80000b5c:	fa042783          	lw	a5,-96(s0)
+    80000b60:	0007871b          	sext.w	a4,a5
+    80000b64:	00900793          	li	a5,9
+    80000b68:	00e7cc63          	blt	a5,a4,80000b80 <_vsnprintf+0x1c4>
+    80000b6c:	fa042783          	lw	a5,-96(s0)
+    80000b70:	0ff7f793          	andi	a5,a5,255
+    80000b74:	0307879b          	addiw	a5,a5,48
+    80000b78:	0ff7f793          	andi	a5,a5,255
+    80000b7c:	0140006f          	j	80000b90 <_vsnprintf+0x1d4>
+    80000b80:	fa042783          	lw	a5,-96(s0)
+    80000b84:	0ff7f793          	andi	a5,a5,255
+    80000b88:	0577879b          	addiw	a5,a5,87
+    80000b8c:	0ff7f793          	andi	a5,a5,255
+    80000b90:	f9843683          	ld	a3,-104(s0)
+    80000b94:	fe043703          	ld	a4,-32(s0)
+    80000b98:	00e68733          	add	a4,a3,a4
+    80000b9c:	00f70023          	sb	a5,0(a4)
+					}
+					pos++;
+    80000ba0:	fe043783          	ld	a5,-32(s0)
+    80000ba4:	00178793          	addi	a5,a5,1
+    80000ba8:	fef43023          	sd	a5,-32(s0)
+				for(int i = hexdigits; i >= 0; i--) {
+    80000bac:	fdc42783          	lw	a5,-36(s0)
+    80000bb0:	fff7879b          	addiw	a5,a5,-1
+    80000bb4:	fcf42e23          	sw	a5,-36(s0)
+    80000bb8:	f65ff06f          	j	80000b1c <_vsnprintf+0x160>
+				}
+				longarg = 0;
+    80000bbc:	fe042423          	sw	zero,-24(s0)
+				format = 0;
+    80000bc0:	fe042623          	sw	zero,-20(s0)
+				break;
+    80000bc4:	28c0006f          	j	80000e50 <_vsnprintf+0x494>
+			}
+			case 'd': {
+				long num = longarg ? va_arg(vl, long) : va_arg(vl, int);
+    80000bc8:	fe842783          	lw	a5,-24(s0)
+    80000bcc:	0007879b          	sext.w	a5,a5
+    80000bd0:	00078c63          	beqz	a5,80000be8 <_vsnprintf+0x22c>
+    80000bd4:	f8043783          	ld	a5,-128(s0)
+    80000bd8:	00878713          	addi	a4,a5,8
+    80000bdc:	f8e43023          	sd	a4,-128(s0)
+    80000be0:	0007b783          	ld	a5,0(a5)
+    80000be4:	0140006f          	j	80000bf8 <_vsnprintf+0x23c>
+    80000be8:	f8043783          	ld	a5,-128(s0)
+    80000bec:	00878713          	addi	a4,a5,8
+    80000bf0:	f8e43023          	sd	a4,-128(s0)
+    80000bf4:	0007a783          	lw	a5,0(a5)
+    80000bf8:	fcf43823          	sd	a5,-48(s0)
+				if (num < 0) {
+    80000bfc:	fd043783          	ld	a5,-48(s0)
+    80000c00:	0407d263          	bgez	a5,80000c44 <_vsnprintf+0x288>
+					num = -num;
+    80000c04:	fd043783          	ld	a5,-48(s0)
+    80000c08:	40f007b3          	neg	a5,a5
+    80000c0c:	fcf43823          	sd	a5,-48(s0)
+					if (out && pos < n) {
+    80000c10:	f9843783          	ld	a5,-104(s0)
+    80000c14:	02078263          	beqz	a5,80000c38 <_vsnprintf+0x27c>
+    80000c18:	fe043703          	ld	a4,-32(s0)
+    80000c1c:	f9043783          	ld	a5,-112(s0)
+    80000c20:	00f77c63          	bgeu	a4,a5,80000c38 <_vsnprintf+0x27c>
+						out[pos] = '-';
+    80000c24:	f9843703          	ld	a4,-104(s0)
+    80000c28:	fe043783          	ld	a5,-32(s0)
+    80000c2c:	00f707b3          	add	a5,a4,a5
+    80000c30:	02d00713          	li	a4,45
+    80000c34:	00e78023          	sb	a4,0(a5)
+					}
+					pos++;
+    80000c38:	fe043783          	ld	a5,-32(s0)
+    80000c3c:	00178793          	addi	a5,a5,1
+    80000c40:	fef43023          	sd	a5,-32(s0)
+				}
+				long digits = 1;
+    80000c44:	00100793          	li	a5,1
+    80000c48:	fcf43423          	sd	a5,-56(s0)
+				for (long nn = num; nn /= 10; digits++);
+    80000c4c:	fd043783          	ld	a5,-48(s0)
+    80000c50:	fcf43023          	sd	a5,-64(s0)
+    80000c54:	fc043703          	ld	a4,-64(s0)
+    80000c58:	00a00793          	li	a5,10
+    80000c5c:	02f747b3          	div	a5,a4,a5
+    80000c60:	fcf43023          	sd	a5,-64(s0)
+    80000c64:	fc043783          	ld	a5,-64(s0)
+    80000c68:	00f037b3          	snez	a5,a5
+    80000c6c:	0ff7f793          	andi	a5,a5,255
+    80000c70:	00078a63          	beqz	a5,80000c84 <_vsnprintf+0x2c8>
+    80000c74:	fc843783          	ld	a5,-56(s0)
+    80000c78:	00178793          	addi	a5,a5,1
+    80000c7c:	fcf43423          	sd	a5,-56(s0)
+    80000c80:	fd5ff06f          	j	80000c54 <_vsnprintf+0x298>
+				for (int i = digits-1; i >= 0; i--) {
+    80000c84:	fc843783          	ld	a5,-56(s0)
+    80000c88:	0007879b          	sext.w	a5,a5
+    80000c8c:	fff7879b          	addiw	a5,a5,-1
+    80000c90:	0007879b          	sext.w	a5,a5
+    80000c94:	faf42e23          	sw	a5,-68(s0)
+    80000c98:	fbc42783          	lw	a5,-68(s0)
+    80000c9c:	0007879b          	sext.w	a5,a5
+    80000ca0:	0607c863          	bltz	a5,80000d10 <_vsnprintf+0x354>
+					if (out && pos + i < n) {
+    80000ca4:	f9843783          	ld	a5,-104(s0)
+    80000ca8:	04078463          	beqz	a5,80000cf0 <_vsnprintf+0x334>
+    80000cac:	fbc42703          	lw	a4,-68(s0)
+    80000cb0:	fe043783          	ld	a5,-32(s0)
+    80000cb4:	00f707b3          	add	a5,a4,a5
+    80000cb8:	f9043703          	ld	a4,-112(s0)
+    80000cbc:	02e7fa63          	bgeu	a5,a4,80000cf0 <_vsnprintf+0x334>
+						out[pos + i] = '0' + (num % 10);
+    80000cc0:	fd043703          	ld	a4,-48(s0)
+    80000cc4:	00a00793          	li	a5,10
+    80000cc8:	02f767b3          	rem	a5,a4,a5
+    80000ccc:	0ff7f713          	andi	a4,a5,255
+    80000cd0:	fbc42683          	lw	a3,-68(s0)
+    80000cd4:	fe043783          	ld	a5,-32(s0)
+    80000cd8:	00f687b3          	add	a5,a3,a5
+    80000cdc:	f9843683          	ld	a3,-104(s0)
+    80000ce0:	00f687b3          	add	a5,a3,a5
+    80000ce4:	0307071b          	addiw	a4,a4,48
+    80000ce8:	0ff77713          	andi	a4,a4,255
+    80000cec:	00e78023          	sb	a4,0(a5)
+					}
+					num /= 10;
+    80000cf0:	fd043703          	ld	a4,-48(s0)
+    80000cf4:	00a00793          	li	a5,10
+    80000cf8:	02f747b3          	div	a5,a4,a5
+    80000cfc:	fcf43823          	sd	a5,-48(s0)
+				for (int i = digits-1; i >= 0; i--) {
+    80000d00:	fbc42783          	lw	a5,-68(s0)
+    80000d04:	fff7879b          	addiw	a5,a5,-1
+    80000d08:	faf42e23          	sw	a5,-68(s0)
+    80000d0c:	f8dff06f          	j	80000c98 <_vsnprintf+0x2dc>
+				}
+				pos += digits;
+    80000d10:	fc843783          	ld	a5,-56(s0)
+    80000d14:	fe043703          	ld	a4,-32(s0)
+    80000d18:	00f707b3          	add	a5,a4,a5
+    80000d1c:	fef43023          	sd	a5,-32(s0)
+				longarg = 0;
+    80000d20:	fe042423          	sw	zero,-24(s0)
+				format = 0;
+    80000d24:	fe042623          	sw	zero,-20(s0)
+				break;
+    80000d28:	1280006f          	j	80000e50 <_vsnprintf+0x494>
+			}
+			case 's': {
+				const char* s2 = va_arg(vl, const char*);
+    80000d2c:	f8043783          	ld	a5,-128(s0)
+    80000d30:	00878713          	addi	a4,a5,8
+    80000d34:	f8e43023          	sd	a4,-128(s0)
+    80000d38:	0007b783          	ld	a5,0(a5)
+    80000d3c:	faf43823          	sd	a5,-80(s0)
+				while (*s2) {
+    80000d40:	fb043783          	ld	a5,-80(s0)
+    80000d44:	0007c783          	lbu	a5,0(a5)
+    80000d48:	04078663          	beqz	a5,80000d94 <_vsnprintf+0x3d8>
+					if (out && pos < n) {
+    80000d4c:	f9843783          	ld	a5,-104(s0)
+    80000d50:	02078463          	beqz	a5,80000d78 <_vsnprintf+0x3bc>
+    80000d54:	fe043703          	ld	a4,-32(s0)
+    80000d58:	f9043783          	ld	a5,-112(s0)
+    80000d5c:	00f77e63          	bgeu	a4,a5,80000d78 <_vsnprintf+0x3bc>
+						out[pos] = *s2;
+    80000d60:	f9843703          	ld	a4,-104(s0)
+    80000d64:	fe043783          	ld	a5,-32(s0)
+    80000d68:	00f707b3          	add	a5,a4,a5
+    80000d6c:	fb043703          	ld	a4,-80(s0)
+    80000d70:	00074703          	lbu	a4,0(a4)
+    80000d74:	00e78023          	sb	a4,0(a5)
+					}
+					pos++;
+    80000d78:	fe043783          	ld	a5,-32(s0)
+    80000d7c:	00178793          	addi	a5,a5,1
+    80000d80:	fef43023          	sd	a5,-32(s0)
+					s2++;
+    80000d84:	fb043783          	ld	a5,-80(s0)
+    80000d88:	00178793          	addi	a5,a5,1
+    80000d8c:	faf43823          	sd	a5,-80(s0)
+				while (*s2) {
+    80000d90:	fb1ff06f          	j	80000d40 <_vsnprintf+0x384>
+				}
+				longarg = 0;
+    80000d94:	fe042423          	sw	zero,-24(s0)
+				format = 0;
+    80000d98:	fe042623          	sw	zero,-20(s0)
+				break;
+    80000d9c:	0b40006f          	j	80000e50 <_vsnprintf+0x494>
+			}
+			case 'c': {
+				if (out && pos < n) {
+    80000da0:	f9843783          	ld	a5,-104(s0)
+    80000da4:	02078a63          	beqz	a5,80000dd8 <_vsnprintf+0x41c>
+    80000da8:	fe043703          	ld	a4,-32(s0)
+    80000dac:	f9043783          	ld	a5,-112(s0)
+    80000db0:	02f77463          	bgeu	a4,a5,80000dd8 <_vsnprintf+0x41c>
+					out[pos] = (char)va_arg(vl,int);
+    80000db4:	f8043783          	ld	a5,-128(s0)
+    80000db8:	00878713          	addi	a4,a5,8
+    80000dbc:	f8e43023          	sd	a4,-128(s0)
+    80000dc0:	0007a683          	lw	a3,0(a5)
+    80000dc4:	f9843703          	ld	a4,-104(s0)
+    80000dc8:	fe043783          	ld	a5,-32(s0)
+    80000dcc:	00f707b3          	add	a5,a4,a5
+    80000dd0:	0ff6f713          	andi	a4,a3,255
+    80000dd4:	00e78023          	sb	a4,0(a5)
+				}
+				pos++;
+    80000dd8:	fe043783          	ld	a5,-32(s0)
+    80000ddc:	00178793          	addi	a5,a5,1
+    80000de0:	fef43023          	sd	a5,-32(s0)
+				longarg = 0;
+    80000de4:	fe042423          	sw	zero,-24(s0)
+				format = 0;
+    80000de8:	fe042623          	sw	zero,-20(s0)
+				break;
+    80000dec:	0640006f          	j	80000e50 <_vsnprintf+0x494>
+			}
+			default:
+				break;
+			}
+		} else if (*s == '%') {
+    80000df0:	f8843783          	ld	a5,-120(s0)
+    80000df4:	0007c783          	lbu	a5,0(a5)
+    80000df8:	00078713          	mv	a4,a5
+    80000dfc:	02500793          	li	a5,37
+    80000e00:	00f71863          	bne	a4,a5,80000e10 <_vsnprintf+0x454>
+			format = 1;
+    80000e04:	00100793          	li	a5,1
+    80000e08:	fef42623          	sw	a5,-20(s0)
+    80000e0c:	0440006f          	j	80000e50 <_vsnprintf+0x494>
+		} else {
+			if (out && pos < n) {
+    80000e10:	f9843783          	ld	a5,-104(s0)
+    80000e14:	02078463          	beqz	a5,80000e3c <_vsnprintf+0x480>
+    80000e18:	fe043703          	ld	a4,-32(s0)
+    80000e1c:	f9043783          	ld	a5,-112(s0)
+    80000e20:	00f77e63          	bgeu	a4,a5,80000e3c <_vsnprintf+0x480>
+				out[pos] = *s;
+    80000e24:	f9843703          	ld	a4,-104(s0)
+    80000e28:	fe043783          	ld	a5,-32(s0)
+    80000e2c:	00f707b3          	add	a5,a4,a5
+    80000e30:	f8843703          	ld	a4,-120(s0)
+    80000e34:	00074703          	lbu	a4,0(a4)
+    80000e38:	00e78023          	sb	a4,0(a5)
+			}
+			pos++;
+    80000e3c:	fe043783          	ld	a5,-32(s0)
+    80000e40:	00178793          	addi	a5,a5,1
+    80000e44:	fef43023          	sd	a5,-32(s0)
+    80000e48:	0080006f          	j	80000e50 <_vsnprintf+0x494>
+				break;
+    80000e4c:	00000013          	nop
+	for (; *s; s++) {
+    80000e50:	f8843783          	ld	a5,-120(s0)
+    80000e54:	00178793          	addi	a5,a5,1
+    80000e58:	f8f43423          	sd	a5,-120(s0)
+    80000e5c:	b89ff06f          	j	800009e4 <_vsnprintf+0x28>
+		}
+    	}
+	if (out && pos < n) {
+    80000e60:	f9843783          	ld	a5,-104(s0)
+    80000e64:	02078263          	beqz	a5,80000e88 <_vsnprintf+0x4cc>
+    80000e68:	fe043703          	ld	a4,-32(s0)
+    80000e6c:	f9043783          	ld	a5,-112(s0)
+    80000e70:	00f77c63          	bgeu	a4,a5,80000e88 <_vsnprintf+0x4cc>
+		out[pos] = 0;
+    80000e74:	f9843703          	ld	a4,-104(s0)
+    80000e78:	fe043783          	ld	a5,-32(s0)
+    80000e7c:	00f707b3          	add	a5,a4,a5
+    80000e80:	00078023          	sb	zero,0(a5)
+    80000e84:	0280006f          	j	80000eac <_vsnprintf+0x4f0>
+	} else if (out && n) {
+    80000e88:	f9843783          	ld	a5,-104(s0)
+    80000e8c:	02078063          	beqz	a5,80000eac <_vsnprintf+0x4f0>
+    80000e90:	f9043783          	ld	a5,-112(s0)
+    80000e94:	00078c63          	beqz	a5,80000eac <_vsnprintf+0x4f0>
+		out[n-1] = 0;
+    80000e98:	f9043783          	ld	a5,-112(s0)
+    80000e9c:	fff78793          	addi	a5,a5,-1
+    80000ea0:	f9843703          	ld	a4,-104(s0)
+    80000ea4:	00f707b3          	add	a5,a4,a5
+    80000ea8:	00078023          	sb	zero,0(a5)
+	}
+	return pos;
+    80000eac:	fe043783          	ld	a5,-32(s0)
+    80000eb0:	0007879b          	sext.w	a5,a5
+}
+    80000eb4:	00078513          	mv	a0,a5
+    80000eb8:	07813403          	ld	s0,120(sp)
+    80000ebc:	08010113          	addi	sp,sp,128
+    80000ec0:	00008067          	ret
+
+0000000080000ec4 <_vprintf>:
+
+static char out_buf[1000]; // buffer for _vprintf()
+
+static int _vprintf(const char* s, va_list vl)
+{
+    80000ec4:	fd010113          	addi	sp,sp,-48
+    80000ec8:	02113423          	sd	ra,40(sp)
+    80000ecc:	02813023          	sd	s0,32(sp)
+    80000ed0:	03010413          	addi	s0,sp,48
+    80000ed4:	fca43c23          	sd	a0,-40(s0)
+    80000ed8:	fcb43823          	sd	a1,-48(s0)
+	int res = _vsnprintf(NULL, -1, s, vl);
+    80000edc:	fd043683          	ld	a3,-48(s0)
+    80000ee0:	fd843603          	ld	a2,-40(s0)
+    80000ee4:	fff00593          	li	a1,-1
+    80000ee8:	00000513          	li	a0,0
+    80000eec:	ad1ff0ef          	jal	ra,800009bc <_vsnprintf>
+    80000ef0:	00050793          	mv	a5,a0
+    80000ef4:	fef42623          	sw	a5,-20(s0)
+	if (res+1 >= sizeof(out_buf)) {
+    80000ef8:	fec42783          	lw	a5,-20(s0)
+    80000efc:	0017879b          	addiw	a5,a5,1
+    80000f00:	0007879b          	sext.w	a5,a5
+    80000f04:	00078713          	mv	a4,a5
+    80000f08:	3e700793          	li	a5,999
+    80000f0c:	00e7fa63          	bgeu	a5,a4,80000f20 <_vprintf+0x5c>
+		puts("error: output string size overflow\n");
+    80000f10:	00000517          	auipc	a0,0x0
+    80000f14:	20850513          	addi	a0,a0,520 # 80001118 <halt+0x100>
+    80000f18:	8f1ff0ef          	jal	ra,80000808 <_ZN8platform5uart08blocking4putsEPKc>
+		while(1) {}
+    80000f1c:	0000006f          	j	80000f1c <_vprintf+0x58>
+	}
+	_vsnprintf(out_buf, res + 1, s, vl);
+    80000f20:	fec42783          	lw	a5,-20(s0)
+    80000f24:	0017879b          	addiw	a5,a5,1
+    80000f28:	0007879b          	sext.w	a5,a5
+    80000f2c:	fd043683          	ld	a3,-48(s0)
+    80000f30:	fd843603          	ld	a2,-40(s0)
+    80000f34:	00078593          	mv	a1,a5
+    80000f38:	00003517          	auipc	a0,0x3
+    80000f3c:	0c850513          	addi	a0,a0,200 # 80004000 <_ZL7out_buf>
+    80000f40:	a7dff0ef          	jal	ra,800009bc <_vsnprintf>
+	puts(out_buf);
+    80000f44:	00003517          	auipc	a0,0x3
+    80000f48:	0bc50513          	addi	a0,a0,188 # 80004000 <_ZL7out_buf>
+    80000f4c:	8bdff0ef          	jal	ra,80000808 <_ZN8platform5uart08blocking4putsEPKc>
+	return res;
+    80000f50:	fec42783          	lw	a5,-20(s0)
+}
+    80000f54:	00078513          	mv	a0,a5
+    80000f58:	02813083          	ld	ra,40(sp)
+    80000f5c:	02013403          	ld	s0,32(sp)
+    80000f60:	03010113          	addi	sp,sp,48
+    80000f64:	00008067          	ret
+
+0000000080000f68 <printf>:
+
+int printf(const char* s, ...)
+{
+    80000f68:	f9010113          	addi	sp,sp,-112
+    80000f6c:	02113423          	sd	ra,40(sp)
+    80000f70:	02813023          	sd	s0,32(sp)
+    80000f74:	03010413          	addi	s0,sp,48
+    80000f78:	fca43c23          	sd	a0,-40(s0)
+    80000f7c:	00b43423          	sd	a1,8(s0)
+    80000f80:	00c43823          	sd	a2,16(s0)
+    80000f84:	00d43c23          	sd	a3,24(s0)
+    80000f88:	02e43023          	sd	a4,32(s0)
+    80000f8c:	02f43423          	sd	a5,40(s0)
+    80000f90:	03043823          	sd	a6,48(s0)
+    80000f94:	03143c23          	sd	a7,56(s0)
+	int res = 0;
+    80000f98:	fe042623          	sw	zero,-20(s0)
+	va_list vl;
+	va_start(vl, s);
+    80000f9c:	04040793          	addi	a5,s0,64
+    80000fa0:	fcf43823          	sd	a5,-48(s0)
+    80000fa4:	fd043783          	ld	a5,-48(s0)
+    80000fa8:	fc878793          	addi	a5,a5,-56
+    80000fac:	fef43023          	sd	a5,-32(s0)
+	res = _vprintf(s, vl);
+    80000fb0:	fe043783          	ld	a5,-32(s0)
+    80000fb4:	00078593          	mv	a1,a5
+    80000fb8:	fd843503          	ld	a0,-40(s0)
+    80000fbc:	f09ff0ef          	jal	ra,80000ec4 <_vprintf>
+    80000fc0:	00050793          	mv	a5,a0
+    80000fc4:	fef42623          	sw	a5,-20(s0)
+	va_end(vl);
+	return res;
+    80000fc8:	fec42783          	lw	a5,-20(s0)
+}
+    80000fcc:	00078513          	mv	a0,a5
+    80000fd0:	02813083          	ld	ra,40(sp)
+    80000fd4:	02013403          	ld	s0,32(sp)
+    80000fd8:	07010113          	addi	sp,sp,112
+    80000fdc:	00008067          	ret
+
+0000000080000fe0 <panic>:
+
+void panic(char *s)
+{
+    80000fe0:	fe010113          	addi	sp,sp,-32
+    80000fe4:	00113c23          	sd	ra,24(sp)
+    80000fe8:	00813823          	sd	s0,16(sp)
+    80000fec:	02010413          	addi	s0,sp,32
+    80000ff0:	fea43423          	sd	a0,-24(s0)
+	printf("panic: ");
+    80000ff4:	00000517          	auipc	a0,0x0
+    80000ff8:	14c50513          	addi	a0,a0,332 # 80001140 <halt+0x128>
+    80000ffc:	f6dff0ef          	jal	ra,80000f68 <printf>
+	printf(s);
+    80001000:	fe843503          	ld	a0,-24(s0)
+    80001004:	f65ff0ef          	jal	ra,80000f68 <printf>
+	printf("\n");
+    80001008:	00000517          	auipc	a0,0x0
+    8000100c:	14050513          	addi	a0,a0,320 # 80001148 <halt+0x130>
+    80001010:	f59ff0ef          	jal	ra,80000f68 <printf>
+	while(1){};
+    80001014:	0000006f          	j	80001014 <panic+0x34>
+
+0000000080001018 <halt>:
+}
+void halt(){
+    80001018:	ff010113          	addi	sp,sp,-16
+    8000101c:	00813423          	sd	s0,8(sp)
+    80001020:	01010413          	addi	s0,sp,16
+	while(1)asm("wfi");
+    80001024:	10500073          	wfi
+    80001028:	ffdff06f          	j	80001024 <halt+0xc>

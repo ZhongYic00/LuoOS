@@ -1,7 +1,10 @@
 
 #include "platform.h"
-using namespace platform::uart0;
+#include "klib.hh"
+
 extern "C"{
+void (*puts)(const char *s);
+
 static int _vsnprintf(char * out, size_t n, const char* s, va_list vl)
 {
 	int format = 0;
@@ -135,6 +138,6 @@ void panic(char *s)
 	while(1){};
 }
 void halt(){
-	while(1);
+	while(1)asm("wfi");
 }
 }

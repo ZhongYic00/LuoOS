@@ -18,6 +18,7 @@ namespace csr
         };
         enum exceptions{
             breakpoint=3,
+            storeAccessFault=7,
             uecall=8,
             secall=9,
         };

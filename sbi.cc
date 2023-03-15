@@ -1,6 +1,6 @@
 #include "types.h"
 #include "platform.h"
-#include "klib.h"
+#include "klib.hh"
 #include "rvcsr.h"
 
 #define REPFIELD(name,bits) int u##name:bits; int s##name:bits; int wpri##name:bits; int m##name:bits;
@@ -68,68 +68,93 @@ void plicComplete(int irq){
 
 void externalInterruptHandler(){
     int irq=plicClaim();
+    // printf("externalInterruptHandler(irq=%d)\n",irq);
+    static int levelcnt=0;
+    levelcnt++;
     if(irq==platform::uart0::irq){
         using namespace platform::uart0;
+        int cnt=0;
         while(mmio<volatile lsr>(reg(LSR)).rxnemp){
-            mmio<volatile uint8_t>(reg(THR))=mmio<volatile uint8_t>(reg(RHR));
+            char c=mmio<volatile uint8_t>(reg(RHR));
+            printf("%c",c);
+            cnt++;
         }
+        // for(char c;mmio<volatile lsr>(reg(LSR)).txidle && (c=IO::next())>0;)mmio<volatile uint8_t>(reg(THR))=c;
+        if(cnt)printf("&%d|%d^",cnt,levelcnt);
     }
     plicComplete(irq);
+    levelcnt--;
+    // printf("externalInterruptHandler over");
 }
 extern "C" __attribute__((interrupt("machine"))) void mtraphandler(){
-    // saveContext();
     ptr_t mepc; csrRead(mepc,mepc);
     xlen_t mcause; csrRead(mcause,mcause);
-    printf("mtraphandler cause=%d mepc=%lx\n",mcause,mepc);
+    // printf("mtraphandler cause=[%d]%d mepc=%lx\n",isInterrupt(mcause),mcause<<1>>1,mepc);
 
     if(isInterrupt(mcause)){
-        switch(mcause){
+        switch(mcause<<1>>1){
             using namespace csr::mcause;
-            case usi: break;
-            case ssi: break;
-            case hsi: break;
-            case msi: break;
+            // case usi: break;
+            // case ssi: break;
+            // case hsi: break;
+            // case msi: break;
 
-            case uti: break;
-            case sti: break;
-            case hti: break;
-            case mti: break;
+            // case uti: break;
+            // case sti: break;
+            // case hti: break;
+            // case mti: break;
 
-            case uei: break;
-            case sei: break;
-            case hei: break;
-            case mei: externalInterruptHandler();
+            // case uei: break;
+            // case sei: break;
+            // case hei: break;
+            case mei: externalInterruptHandler();break;
+            default:
+                halt();
         }
     } else {
         switch(mcause){
             using namespace csr::mcause;
             case uecall:break;
             case secall:break;
+            case storeAccessFault:break;
             default:
-                platform::uart0::puts("exception\n");
-                break;
+                printf("exception\n");
+                halt();
         }
         csrWrite(mepc,mepc+4);
     }
-    // restoreContext();
-    // ExecInst(mret);
+    // printf("mtraphandler over\n");
+}
+void uartIntTest(){
+    using namespace platform::uart0::nonblocking;
+    for(int i=1024;i;i--)putc('_');
+    // 0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg
 }
 void uartInit(){
     using namespace platform::uart0;
-    mmio<uint8_t>(reg(IER))=0x00;
+    auto &ier=mmio<volatile uint8_t>(reg(IER));
+    ier=0x00;
     puts("Hello Uart\n");
-    
+    auto &lcr=mmio<volatile uint8_t>(reg(LCR));
+    lcr=lcr|(1<<7);
+    mmio<volatile uint8_t>(reg(DLL))=0x03;
+    mmio<volatile uint8_t>(reg(DLM))=0x00;
+    lcr=3;
+    mmio<volatile uint8_t>(reg(FCR))=0x7|(0x3<<6);
+    ier=0x03;
+    // puts=IO::_nonblockingputs;
 }
 void plicInit(){
     // int hart=Hart();
+    using namespace platform::plic;
     int hart=0;
-    xlen_t addr=platform::plic::priorityOf(platform::uart0::irq);
+    xlen_t addr=priorityOf(platform::uart0::irq);
     mmio<word_t>(addr)=1;
-    mmio<word_t>(platform::plic::enableOf(hart))=1<<platform::uart0::irq;
+    mmio<word_t>(enableOf(hart))=1<<platform::uart0::irq;
+    mmio<word_t>(thresholdOf(hart))=0;
     uartInit();
 }
 void mtrap_test(){
-    // ExecInst(ecall);
     *(int *)0x00000000 = 100;
     for(int k=2;k;k--);
     return;
@@ -140,18 +165,17 @@ extern "C" void sbi_init(){
 // "csrw pmpcfg0, %0\n\t"
 // : : "r" (0xf), "r" (0x3fffffffffffffull) :);
     // csrWritei(mtvec,mtraphandler);
-    using platform::uart0::puts;
-    uartInit();
-    // plicInit();
-    platform::uart0::puts("here\n");
+    // using platform::uart0::blocking::puts;
+    // uartInit();
+    puts=IO::_blockingputs;
+    plicInit();
+    puts("plic init over\n");
 
-    // csrSet(mie,BIT(csr::mie::msie));
-    // csrSet(mstatus,BIT(csr::mstatus::mie));
-    // MIEnable();
-    // puts("here2\n");
     {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtraphandler));}
+    csrSet(mie,BIT(csr::mie::meie));
+    csrSet(mstatus,BIT(csr::mstatus::mie));
+    // puts("here2\n");
     mtrap_test();
-    // csrWrite(mepc,mtrap_test);
-	// ExecInst(mret);
-    puts("here3");
+    puts("mtrap test over");
+    uartIntTest();
 }

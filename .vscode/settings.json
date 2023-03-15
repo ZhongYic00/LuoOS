@@ -1,6 +1,18 @@
 {
     "files.associations": {
         "typeinfo": "cpp",
-        "platform.h": "c"
+        "platform.h": "c",
+        "cstdio": "cpp",
+        "array": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "utility": "cpp",
+        "*.tcc": "cpp",
+        "deque": "cpp",
+        "list": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "vector": "cpp"
     }
 }

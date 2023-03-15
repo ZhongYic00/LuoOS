@@ -35,19 +35,6 @@ _start:
 park:
 	wfi
 	j	park
-trapvector:
-    csrrw	t6, mscratch, t6
-    # call mtraphandler
-    csrr t6,mepc
-    addi t6,t6,4
-    csrw mepc,t6
-    csrr t6,mscratch
-    mret
-mtraptest1:
-    li t0,0
-    sw t0,0(t0)
-endless:
-    j endless
 
 .data
 stacks:
