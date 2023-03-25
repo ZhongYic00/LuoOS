@@ -81,6 +81,14 @@ namespace platform{
         constexpr xlen_t thresholdOf(int hart) { return threshold+hart*0x1000; }
         constexpr xlen_t claimOf(int hart) { return claim+hart*0x1000; }
     } // namespace plic
+    namespace clint
+    {
+        constexpr auto base=0x2000000l,
+            mtime=base+0xbff8,
+            mtimecmp=base+0x4000
+            ;
+        constexpr xlen_t mtimecmpOf(int hart) { return mtimecmp+hart*0x8; }
+    } // namespace clint
     
 }
 

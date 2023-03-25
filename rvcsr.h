@@ -1,4 +1,19 @@
+#ifndef RVCSR_H
+#define RVCSR_H
+
+#include "types.h"
+
 #define REPFIELD(name) u##name, s##name,h##name,m##name,
+#define BIT(x) (1ll<<x)
+#define csrRead(reg, val) {asm volatile ("csrr %0, " #reg :"=r"(val):); }
+#define csrWrite(reg, val) {asm volatile ("csrw "#reg", %0" :: "r"(val)); }
+#define csrWritei(reg, val) {asm volatile ("csrw "#reg", %0" :: "i"(val)); }
+#define csrSet(reg, val) {asm volatile ("csrs "#reg", %0" :: "r"(val)); }
+#define csrSeti(reg, val) {asm volatile ("csrs "#reg", %0" :: "i"(val)); }
+#define csrClear(reg, val) {asm volatile ("csrc "#reg", %0" :: "r"(val)); }
+#define csrRW(val0,reg,val1) {asm volatile ("csrrw %0, "#reg", %1" :"=r"(val0):"r"(val1));}
+#define csrSwap(csr,gpr) {__asm__("csrrw "#gpr","#csr","#gpr);}
+#define ExecInst(inst) {asm volatile (#inst ::);}
 
 namespace csr
 {
@@ -10,6 +25,15 @@ namespace csr
             REPFIELD(eie)
         };
     } // namespace mie
+    namespace mip
+    {
+        enum fields{
+            REPFIELD(sip)
+            REPFIELD(tip)
+            REPFIELD(eip)
+        };
+    } // namespace mip
+    
     namespace mcause{
         enum interrupts{
             REPFIELD(si)
@@ -22,10 +46,19 @@ namespace csr
             uecall=8,
             secall=9,
         };
+        constexpr bool isInterrupt(xlen_t mcause){return (mcause>>63)&1;}
     }
     namespace mstatus{
         enum fields{
             REPFIELD(ie)
+            REPFIELD(pie)
+            spp,mpp=11,
         };
     }
+    inline int hart(){
+        int rt; csrRead(mhartid,rt);
+        return rt;
+    }
 } // namespace csr
+
+#endif

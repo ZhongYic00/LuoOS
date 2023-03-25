@@ -28,6 +28,7 @@ struct ringbuf
   }
 };
 static ringbuf<char> buf;
+
 class IO{
 public:
   inline static void _blockingputs(const char *s){
@@ -47,6 +48,9 @@ public:
     char c=buf.get();buf.pop();return c;
   }
 };
+#define saveContext() __asm__("sd x1,0(t6)\n sd x2,8(t6)\n sd x3,16(t6)\n sd x4,24(t6)\n sd x5,32(t6)\n sd x6,40(t6)\n sd x7,48(t6)\n sd x8,56(t6)\n sd x9,64(t6)\n sd x10,72(t6)\n sd x11,80(t6)\n sd x12,88(t6)\n sd x13,96(t6)\n sd x14,104(t6)\n sd x15,112(t6)\n sd x16,120(t6)\n sd x17,128(t6)\n sd x18,136(t6)\n sd x19,144(t6)\n sd x20,152(t6)\n sd x21,160(t6)\n sd x22,168(t6)\n sd x23,176(t6)\n sd x24,184(t6)\n sd x25,192(t6)\n sd x26,200(t6)\n sd x27,208(t6)\n sd x28,216(t6)\n sd x29,224(t6)\n sd x30,232(t6)\n")
+#define restoreContext() __asm__("ld x1,0(t6)\n ld x2,8(t6)\n ld x3,16(t6)\n ld x4,24(t6)\n ld x5,32(t6)\n ld x6,40(t6)\n ld x7,48(t6)\n ld x8,56(t6)\n ld x9,64(t6)\n ld x10,72(t6)\n ld x11,80(t6)\n ld x12,88(t6)\n ld x13,96(t6)\n ld x14,104(t6)\n ld x15,112(t6)\n ld x16,120(t6)\n ld x17,128(t6)\n ld x18,136(t6)\n ld x19,144(t6)\n ld x20,152(t6)\n ld x21,160(t6)\n ld x22,168(t6)\n ld x23,176(t6)\n ld x24,184(t6)\n ld x25,192(t6)\n ld x26,200(t6)\n ld x27,208(t6)\n ld x28,216(t6)\n ld x29,224(t6)\n ld x30,232(t6)\n")
+
 extern "C" {
 #define STDIO 1
 
