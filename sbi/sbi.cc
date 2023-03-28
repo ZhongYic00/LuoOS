@@ -1,9 +1,8 @@
-#include "types.h"
-#include "platform.h"
-#include "klib.hh"
-#include "kernel.hh"
-#include "rvcsr.h"
-#include "sbi.hh"
+#include "../include/sbi.hh"
+#include "../include/platform.h"
+#include "../include/klib.hh"
+#include "../include/kernel.hh"
+#include "../include/rvcsr.hh"
 
 
 #define TIMER_INTERVAL 5000000
@@ -169,6 +168,6 @@ extern "C" void sbi_init(){
     csrSet(medeleg,BIT(csr::mcause::uecall));
     csrSet(mie,BIT(csr::mie::mtie));
     csrSet(mstatus,1l<<csr::mstatus::mpp);
-    csrWrite(mepc,start_kernel);
+    csrWrite(mepc,0x80200000l);
     ExecInst(mret);
 }

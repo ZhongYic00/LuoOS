@@ -30,7 +30,7 @@ _start:
     # j mtraptest1
     # j park
 
-	j	start_kernel		# hart 0 jump to c
+	# j	start_kernel		# hart 0 jump to c
 
 park:
 	wfi
@@ -39,5 +39,3 @@ park:
 .data
 stacks:
 	.skip	STACK_SIZE * MAXNUM_CPU # allocate space for all the harts stacks
-
-	.end				# End of file

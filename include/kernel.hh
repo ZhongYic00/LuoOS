@@ -1,5 +1,5 @@
 #include "types.h"
-#include "rvcsr.h"
+#include "rvcsr.hh"
 
 extern "C" void start_kernel();
 namespace sys

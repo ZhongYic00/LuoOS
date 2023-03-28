@@ -55,6 +55,14 @@ namespace csr
             spp,mpp=11,
         };
     }
+    struct satp{
+        xlen_t ppn:44;
+        xlen_t asid:16;
+        xlen_t mode:4;
+        inline xlen_t value(){
+            return *reinterpret_cast<xlen_t*>(this);
+        }
+    };
     inline int hart(){
         int rt; csrRead(mhartid,rt);
         return rt;

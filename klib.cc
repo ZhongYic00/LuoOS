@@ -1,6 +1,6 @@
 
-#include "platform.h"
-#include "klib.hh"
+#include "include/platform.h"
+#include "include/klib.hh"
 
 extern "C"{
 void (*puts)(const char *s);

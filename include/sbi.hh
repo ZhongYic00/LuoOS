@@ -1,4 +1,4 @@
-#include "rvcsr.h"
+#include "rvcsr.hh"
 
 namespace sbi
 {

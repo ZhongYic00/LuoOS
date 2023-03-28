@@ -1,45 +1,26 @@
 include common.mk
 
-SRCS_ASM = \
-	start.S \
-
-SRCS_C = \
-	$(shell find -name "*.cc")
-$(info SRCS_C=${SRCS_C})
-
-OBJS = $(SRCS_ASM:.S=.o)
-OBJS += $(SRCS_C:.c=.o)
-
 .DEFAULT_GOAL := all
-all: os.elf
+all: kernel/os.elf sbi/sbi.elf
 
 # start.o must be the first in dependency!
-os.elf: ${OBJS}
-	${CC} ${CFLAGS} -T os.ld -o os.elf $^
-	# ${OBJCOPY} -O binary os.elf os.bin
-
-%.o : %.c
-	${CC} ${CFLAGS} -c -o $@ $<
-
-%.o : %.S
-	${CC} ${CFLAGS} -c -o $@ $<
 
 run: all
 	@${QEMU} -M ? | grep virt >/dev/null || exit
 	@echo "Press Ctrl-A and then X to exit QEMU"
 	@echo "------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel os.elf
+	@${QEMU} ${QFLAGS} -kernel kernel/os.elf
 
 .PHONY : debug
 debug: all
 	@echo "Press Ctrl-C and then input 'quit' to exit GDB and QEMU"
 	@echo "-------------------------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel os.elf -s -S &
-	@${GDB} os.elf -q -x gdbinit && killall ${QEMU}
+	@${QEMU} ${QFLAGS} -kernel kernel/os.elf -s -S &
+	@${GDB} kernel/os.elf -q -x gdbinit && killall ${QEMU}
 
 .PHONY : code
 code: all
-	@${OBJDUMP} -S os.elf > os-elf.txt
+	@${OBJDUMP} -S -D os.elf > os-elf.txt
 	@less os-elf.txt
 
 .PHONY : clean
