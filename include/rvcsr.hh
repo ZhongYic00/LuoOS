@@ -1,10 +1,9 @@
 #ifndef RVCSR_H
 #define RVCSR_H
 
-#include "types.h"
+#include "common.h"
 
 #define REPFIELD(name) u##name, s##name,h##name,m##name,
-#define BIT(x) (1ll<<x)
 #define csrRead(reg, val) {asm volatile ("csrr %0, " #reg :"=r"(val):); }
 #define csrWrite(reg, val) {asm volatile ("csrw "#reg", %0" :: "r"(val)); }
 #define csrWritei(reg, val) {asm volatile ("csrw "#reg", %0" :: "i"(val)); }

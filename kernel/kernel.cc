@@ -1,16 +1,18 @@
-#include "../include/klib.hh"
-#include "../include/rvcsr.hh"
-#include "../include/sbi.hh"
-#include "../include/kernel.hh"
-#include "../include/vm.hh"
+#include "klib.hh"
+#include "rvcsr.hh"
+#include "sbi.hh"
+#include "kernel.hh"
+#include "vm.hh"
+#include "alloc.hh"
 #define TIMER_INTERVAL 5000000
 
 static sys::context ctx;
 static hook_t hooks[10];
+using vm::pgtbl_t,vm::PageTable;
 __attribute__((section("pagetable")))
-xlen_t kernelPageTableRootPage[4096];
-using vm::pgtbl_t;
-pgtbl_t kernelPageTableRoot=reinterpret_cast<pgtbl_t>(kernelPageTableRootPage);
+vm::PageTableEntry kernelPageTableRoot[vm::pageEntriesPerPage];
+
+PageTable kernelPageTable(kernelPageTableRoot);
 
 void timerInterruptHandler(){
     int hart=sbi::readHartId();
@@ -103,13 +105,9 @@ static void memInit(){
     csr::satp satp;
     satp.mode=8;
     satp.asid=0;
-    satp.ppn=reinterpret_cast<xlen_t>(kernelPageTableRoot)>>12;
-    kernelPageTableRoot[0].ppn1=0x0;
-    kernelPageTableRoot[0].perm=0xcf;
-    kernelPageTableRoot[1].ppn1=0x100;
-    kernelPageTableRoot[1].perm=0xcf;
-    kernelPageTableRoot[2].ppn2=0x1;
-    kernelPageTableRoot[2].perm=0xcf;
+    satp.ppn=vm::addr2pn((xlen_t)kernelPageTableRoot);
+    new ((void*)&kernelPageTable) PageTable(kernelPageTableRoot);
+    kernelPageTable.createMapping(0,vm::addr2pn(0x00000000),3*0x40000,0xcf);
     csrWrite(satp,satp.value());
     ExecInst(sfence.vma);
 

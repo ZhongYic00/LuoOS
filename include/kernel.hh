@@ -1,4 +1,4 @@
-#include "types.h"
+#include "common.h"
 #include "rvcsr.hh"
 
 extern "C" void start_kernel();

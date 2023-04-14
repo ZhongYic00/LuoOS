@@ -1,6 +1,6 @@
 #ifndef __PLATFORM_H__
 #define __PLATFORM_H__
-#include "types.h"
+#include "common.h"
 /*
  * QEMU RISC-V Virt machine with 16550a UART and VirtIO MMIO
  */
