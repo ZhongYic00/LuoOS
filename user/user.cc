@@ -1,4 +1,4 @@
-#include "../include/kernel.hh"
+#include "kernel.hh"
 
 void program0(){
     while(true){

@@ -47,7 +47,7 @@ ENTRY( _start )
  */
 MEMORY
 {
-	ram   (wxa!ri) : ORIGIN = 0x80200000, LENGTH = 128M
+	ram   (wxa!ri) : ORIGIN = 0x80200000, LENGTH = 64M-0x200000
 }
 
 /*
@@ -99,6 +99,7 @@ SECTIONS
 	} >ram
 
 	.rodata : {
+		. = ALIGN(4k);
 		PROVIDE(_rodata_start = .);
 		*(.rodata .rodata.*)
 		PROVIDE(_rodata_end = .);
@@ -132,11 +133,13 @@ SECTIONS
 		 * In most cases, common symbols in input files will be placed
 		 * in the ‘.bss’ section in the output file.
 		 */
+		. = ALIGN(4k);
 		PROVIDE(_bss_start = .);
 		*(.sbss .sbss.*)
 		*(.bss .bss.*)
 		*(COMMON)
 		PROVIDE(_bss_end = .);
+		. = ALIGN(4096);
 	} >ram
 
 	PROVIDE(_memory_start = ORIGIN(ram));
@@ -144,6 +147,8 @@ SECTIONS
 
 	PROVIDE(_heap_start = _bss_end);
 	PROVIDE(_heap_size = _memory_end - _heap_start);
+	PROVIDE(_frames_start = .);
+	PROVIDE(_frames_end = _memory_end);
 
 	. = 0xffffffff80200000;
 	.stub :{

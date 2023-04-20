@@ -11,6 +11,13 @@ namespace vm
     typedef PageTableEntry* pgtbl_t;
     typedef xlen_t PageNum;
     typedef uint8_t perm_t;
+    typedef klib::pair<xlen_t,xlen_t> segment_t;
+    // struct segment_t:public klib::pair<xlen_t,xlen_t>{
+    //     segment_t(xlen_t start,xlen_t end):pair({start,end}){}
+    //     segment_t(){}
+    //     inline xlen_t size(){return second-first;}
+    // };
+
     inline xlen_t pn2addr(xlen_t pn){ return pn<<12; }
     inline xlen_t addr2pn(xlen_t addr){ return addr>>12; }
     union PageTableEntry{
@@ -32,8 +39,12 @@ namespace vm
             xlen_t _rsw:2;
             xlen_t ppn:44;
         }raw;
-        enum fields{
-            v,r,w,x,u,g,a,d,
+        enum fieldOffsets{
+            vOff,rOff,wOff,xOff,uOff,gOff,aOff,dOff,
+        };
+        enum fieldMasks{
+            #define Off2Mask(field) field=1<<fieldOffsets::field##Off
+            Off2Mask(v),Off2Mask(r),Off2Mask(w),Off2Mask(x),Off2Mask(u),Off2Mask(g),Off2Mask(a),Off2Mask(d)
         };
         inline bool isValid(){ return fields.v; }
         inline void setValid(){ fields.v=1; }
@@ -71,9 +82,10 @@ namespace vm
         inline void createMapping(PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm){
             createMapping(root,vpn,ppn,pages,perm);
         }
-        void print(pgtbl_t table,xlen_t vpnBase=0,xlen_t entrySize=1l<<18);
+        void print(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize);
         inline void print(){
-            print(root);
+            printf("PageTable::print(root=%p)\n",root);
+            print(root,0l,1l<<18);
         }
     };
 } // namespace vm

@@ -25,7 +25,6 @@ utilsrcs = $(shell find utils/ -name "*.cc")
 src3party = $(shell find thirdparty/ -name "*.cc")
 ksrcs += $(utilsrcs) $(src3party)
 kobjs := $(patsubst %.%,$(objdir)/%.o,$(ksrcs))
-$(info ksrcs=$(ksrcs), kobjs=$(kobjs))
 
 $(objdir)/%.o : %.cc
 		@echo + CC $<
@@ -38,6 +37,7 @@ $(objdir)/%.o : %.S
 		@mkdir -p $(dir $@)
 		$(compile) -c -o $@ $<
 kernel/os.elf: $(kobjs)
+	$(info ksrcs=$(ksrcs), kobjs=$(kobjs))
 	@echo + CC $<
 	$(CC) $(CFLAGS) -T kernel/os.ld -o kernel/os.elf $^
 
@@ -64,3 +64,6 @@ code: all
 clean:
 	rm -rf *.o *.bin *.elf
 
+.PHONY : stats
+stats:
+	@echo $(shell find -regex ".*\.[h|c]+" |xargs cat | wc -l) lines

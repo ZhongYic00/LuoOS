@@ -92,7 +92,7 @@ extern "C" void mtraphandler(){
             case storeAccessFault:csrWrite(mepc,mepc+4);break;
             default:
                 csrWrite(mepc,mepc+4);
-                printf("exception%d\n",mcause);
+                printf("exception%d %p\n",mcause,mepc);
                 halt();
         }
     }

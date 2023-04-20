@@ -70,11 +70,6 @@ ptr_t HeapMgr::alligned_alloc(xlen_t size,xlen_t alignment){
 }
 void HeapMgr::free(ptr_t ptr){ tlsf_free(ptr); }
 
-
-uint8_t pool[0x2000];
-// HeapMgr initHeapMgr(&pool,2*vm::pageSize);
-HeapMgr *kHeapMgr=nullptr;
-
 PageMgr::PageMgr(PageNum start,PageNum end):start(start),end(end){
     DBG(
         printf("PageMgr(start=%lx,end=%lx)\n",start,end);
@@ -100,7 +95,7 @@ PageMgr::PageMgr(PageNum start,PageNum end):start(start),end(end){
 */
     rootOrder=klib::log2up(pages);
     buddyTreeSize=(1l<<rootOrder)*2-1;
-    DBG(printf("pages=%d order=%d rootOrder=%ld buddyTreeSize=%ld\n",pages,rootOrder,rootOrder,buddyTreeSize);)
+    // DBG(printf("pages=%d order=%d rootOrder=%ld buddyTreeSize=%ld\n",pages,rootOrder,rootOrder,buddyTreeSize);)
     buddyNodes=new uint8_t[buddyTreeSize];
     for(xlen_t i=1;i<buddyTreeSize;i++)buddyNodes[i]=0;
     {xlen_t base=start;
@@ -111,7 +106,7 @@ PageMgr::PageMgr(PageNum start,PageNum end):start(start),end(end){
         }
     }}
     DBG(
-        this->print();
+        // this->print();
         printf("PageMgr::PageMgr() over\n");
     )
 }

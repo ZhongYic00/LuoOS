@@ -1,5 +1,6 @@
 #include "vm.hh"
 #include "alloc.hh"
+#include "kernel.hh"
 
 using namespace vm;
 void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm,int level){
@@ -74,9 +75,9 @@ void PageTable::print(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
         auto &entry=table[i];
         if(entry.isValid()){
             if(entry.isLeaf()){
-                printf("%lx => %lx [%lx]\n",i*entrySize+vpnBase,entry.ppn(),entrySize);
+                printf("%lx => %lx [%lx]\n",(xlen_t)i*entrySize+vpnBase,entry.ppn(),entrySize);
             } else {
-                printf("%lx => PTNode@%lx\n",i*entrySize+vpnBase,entry.ppn());
+                printf("%lx => PTNode@%lx\n",(xlen_t)i*entrySize+vpnBase,entry.ppn());
                 print(entry.child(),i*entrySize+vpnBase,entrySize>>9);
             }
         }
@@ -84,5 +85,8 @@ void PageTable::print(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
 }
 pgtbl_t PageTable::createPTNode(){
     // return reinterpret_cast<pgtbl_t>(aligned_alloc(pageSize,pageSize));
-    return reinterpret_cast<pgtbl_t>(new PageTableNode);
+    // auto rt=reinterpret_cast<pgtbl_t>(new PageTableNode);
+    auto rt=reinterpret_cast<pgtbl_t>(vm::pn2addr(kernelPmgr->alloc(1)));
+    printf("createPTNode=0x%lx\n",rt);
+    return rt;
 }

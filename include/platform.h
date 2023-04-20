@@ -90,6 +90,13 @@ namespace platform{
         constexpr xlen_t mtimecmpOf(int hart) { return mtimecmp+hart*0x8; }
     } // namespace clint
     
+    namespace ram
+    {
+        constexpr auto start=0x80000000l,
+            size=128l*0x100000l,
+            end=start+size;
+    } // namespace ram
+    
 }
 
 #endif /* __PLATFORM_H__ */

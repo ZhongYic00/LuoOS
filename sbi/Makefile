@@ -4,8 +4,10 @@ SRCS_ASM = \
 	start.S \
 
 SRCS_C = \
-	$(shell find -name "*.cc") ../klib.cc
+	$(shell find -name "*.cc") ../utils/klib.cc
 $(info SRCS_C=${SRCS_C})
+
+CFLAGS += -I../include
 
 OBJS = $(SRCS_ASM:.S=.o)
 OBJS += $(SRCS_C:.c=.o)
