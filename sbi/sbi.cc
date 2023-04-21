@@ -62,6 +62,7 @@ static void secallHandler(){
 extern "C" void mtraphandler(){
     ptr_t mepc; csrRead(mepc,mepc);
     xlen_t mcause; csrRead(mcause,mcause);
+    xlen_t mtval; csrRead(mtval,mtval);
     // csr::currentMode();
     // printf("mtraphandler cause=[%d]%d mepc=%lx\n",isInterrupt(mcause),mcause<<1>>1,mepc);
 
@@ -91,16 +92,18 @@ extern "C" void mtraphandler(){
             case secall:secallHandler();csrWrite(mepc,mepc+4);break;
             case storeAccessFault:csrWrite(mepc,mepc+4);break;
             default:
+                printf("exception%d %p %p\n",mcause,mepc,mtval);
                 csrWrite(mepc,mepc+4);
-                printf("exception%d %p\n",mcause,mepc);
-                halt();
+                // halt();
         }
     }
     // printf("mtraphandler over\n");
 }
+xlen_t mstack;
 extern "C" __attribute__((naked)) void mtrapwrapper(){
     csrSwap(mscratch,t6);
     saveContext();
+    register xlen_t sp asm("sp")=mstack;
     mtraphandler();
     restoreContext();
     csrSwap(mscratch,t6);
@@ -152,6 +155,8 @@ extern "C" void sbi_init(){
 // "csrw pmpcfg0, %0\n\t"
 // : : "r" (0xf), "r" (0x3fffffffffffffull) :);
     // csrWritei(mtvec,mtraphandler);
+    register xlen_t sp asm("sp");
+    mstack=sp;
     puts=IO::_blockingputs;
     plicInit();
     puts("plic init over\n");

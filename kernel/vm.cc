@@ -1,6 +1,7 @@
 #include "vm.hh"
 #include "alloc.hh"
 #include "kernel.hh"
+#define DEBUG 1
 
 using namespace vm;
 void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm,int level){

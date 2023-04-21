@@ -61,6 +61,7 @@ namespace vm
     constexpr xlen_t pageSize=0x1000,
         pageEntriesPerPage=pageSize/sizeof(PageTableEntry);
     constexpr xlen_t vpnMask=0x1ff;
+    inline xlen_t bytes2pages(xlen_t bytes){ return bytes/pageSize+((bytes%pageSize)>0); }
     
     class alignas(pageSize) PageTableNode{
     private:
@@ -78,6 +79,7 @@ namespace vm
         inline PageTable(pgtbl_t root){
             this->root=root;
         }
+        inline ptr_t getRoot(){ return root; }
         void createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm,int level=2);
         inline void createMapping(PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm){
             createMapping(root,vpn,ppn,pages,perm);

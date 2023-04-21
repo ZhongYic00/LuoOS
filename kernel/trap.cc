@@ -22,7 +22,12 @@ void timerInterruptHandler(){
 int none(){
     return 0;
 }
-constexpr static syscall_t syscallPtrs[]={none,none};
+int testexit(){
+    return -1;
+}
+static syscall_t syscallPtrs[]={
+    none,testexit,
+};
 void uecallHandler(){
     register int ecallId asm("a7");
     xlen_t &rtval=ctx.x(10);
@@ -35,7 +40,7 @@ void uecallHandler(){
 extern "C" void straphandler(){
     ptr_t sepc; csrRead(sepc,sepc);
     xlen_t scause; csrRead(scause,scause);
-    // printf("straphandler cause=[%d]%d mepc=%lx\n",isInterrupt(mcause),mcause<<1>>1,mepc);
+    printf("straphandler cause=[%d]%d mepc=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc);
 
     if(csr::mcause::isInterrupt(scause)){
         switch(scause<<1>>1){
@@ -74,7 +79,14 @@ extern "C" void straphandler(){
 extern "C" __attribute__((naked)) void strapwrapper(){
     csrSwap(sscratch,t6);
     saveContext();
+    extern xlen_t kstack_end;
+    volatile register xlen_t sp asm("sp")=kstack_end;
+    csrRead(satp,usatp);
+    csrWrite(satp,ksatp);
+    ExecInst(sfence.vma);
     straphandler();
+    csrWrite(satp,usatp);
+    ExecInst(sfence.vma);
     restoreContext();
     csrSwap(sscratch,t6);
     ExecInst(sret);

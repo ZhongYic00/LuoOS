@@ -127,6 +127,15 @@ SECTIONS
 		*(pagetable)
 	} >ram
 
+	.kstack :{
+		. = ALIGN(4k);
+		. = . +4096;
+		PROVIDE(_kstack_start = .);
+		*(.kstack .kstack.*)
+		PROVIDE(_kstack_end = .);
+		. = . +4096;
+	} >ram
+
 	.bss :{
 		/*
 		 * https://sourceware.org/binutils/docs/ld/Input-Section-Common.html
@@ -138,6 +147,9 @@ SECTIONS
 		*(.sbss .sbss.*)
 		*(.bss .bss.*)
 		*(COMMON)
+		. = ALIGN(4k);
+		PROVIDE(_uimg_start = .);
+		*(uimg.data)
 		PROVIDE(_bss_end = .);
 		. = ALIGN(4096);
 	} >ram
@@ -149,6 +161,7 @@ SECTIONS
 	PROVIDE(_heap_size = _memory_end - _heap_start);
 	PROVIDE(_frames_start = .);
 	PROVIDE(_frames_end = _memory_end);
+	
 
 	. = 0xffffffff80200000;
 	.stub :{

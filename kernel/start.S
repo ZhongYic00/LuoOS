@@ -1,11 +1,13 @@
-.equ	STACK_SIZE, 1024
+#define	STACK_SIZE 4096
 #define MAXNUM_CPU 8
+# .extern kstack_end
 .text
 .global _start
 _start:
-    la sp,kstack + STACK_SIZE
+    la sp,kstack_start + STACK_SIZE
     call start_kernel
+    j halt
 
-.bss
-kstack:
-	.skip	STACK_SIZE * MAXNUM_CPU # allocate space for all the harts stacks
+.section .kstack
+kstack_start:
+    .skip STACK_SIZE * MAXNUM_CPU

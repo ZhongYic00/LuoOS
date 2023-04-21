@@ -159,7 +159,7 @@ using namespace vm;
 pgtbl_t root[pageEntriesPerPage];
 int main(){
     PageTable table(reinterpret_cast<pgtbl_t>(root));
-    table.createMapping(0x80200,0x80200,0x6);
+    table.createMapping(0x7fff0000,0x83ffd,0x1);
     // table.createMapping(0x80000,0x8e000,1);
     table.print();
     // table.createMapping(0x80000,0x8f000,0x800);

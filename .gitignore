@@ -1,1 +1,3 @@
 *.o
+os-elf.txt
+obj/*

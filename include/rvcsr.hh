@@ -52,6 +52,7 @@ namespace csr
             REPFIELD(ie)
             REPFIELD(pie)
             spp,mpp=11,
+            sum=18,
         };
     }
     struct satp{

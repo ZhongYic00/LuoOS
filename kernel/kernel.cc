@@ -4,7 +4,12 @@
 #include "kernel.hh"
 #include "vm.hh"
 #include "alloc.hh"
+#include "ld.hh"
+#include "sched.hh"
 
+xlen_t ksatp,usatp;
+extern char _kstack_end;
+xlen_t kstack_end=(xlen_t)&_kstack_end;
 kernel::Context ctx;
 kernel::KernelInfo kInfo={
     .segments={
@@ -36,6 +41,15 @@ static void stub(){
 }
 
 // __attribute__((section("init")))
+void kernel::createKernelMapping(PageTable &pageTable){
+    using perm=vm::PageTableEntry::fieldMasks;
+    { auto &seg=kInfo.segments.text;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::x);}
+    DBG(kernelPageTable->print();)
+    { auto &seg=kInfo.segments.rodata;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r);}
+    { auto &seg=kInfo.segments.kstack;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
+    { auto &seg=kInfo.segments.data;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
+    { auto &seg=kInfo.segments.bss;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
+}
 static void memInit(){
     csr::satp satp;
     satp.mode=8;
@@ -47,16 +61,13 @@ static void memInit(){
     kHeapMgr=new alloc::HeapMgrGrowable(*kHeapMgr,*kernelPmgr);
     // kernelPageTable->createMapping(0,vm::addr2pn(0x00000000),3*0x40000,0xcf); // naive direct mapping
     using perm=vm::PageTableEntry::fieldMasks;
-    { auto &seg=kInfo.segments.text; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::x);}
-    kernelPageTable->print();
-    { auto &seg=kInfo.segments.rodata; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r);}
-    { auto &seg=kInfo.segments.data; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
-    { auto &seg=kInfo.segments.bss; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
+    kernel::createKernelMapping(*kernelPageTable);
     { auto &seg=kInfo.segments.dev; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
     { auto &seg=kInfo.segments.frames; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
+    { auto seg=(vm::segment_t){0x84000000,0x84200000}; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
 
     kernelPageTable->print();
-    csrWrite(satp,satp.value());
+    csrWrite(satp,ksatp=satp.value());
     ExecInst(sfence.vma);
 
 }
@@ -66,9 +77,11 @@ static void infoInit(){
     extern char _data_start,_data_end;
     extern char _bss_start,_bss_end;
     extern char _frames_start,_frames_end;
+    extern char _kstack_start,_kstack_end;
     kInfo.segments.text={(xlen_t)&_text_start,(xlen_t)&_text_end};
     kInfo.segments.rodata={(xlen_t)&_rodata_start,(xlen_t)&_rodata_end};
     kInfo.segments.data={(xlen_t)&_data_start,(xlen_t)&_data_end};
+    kInfo.segments.kstack={(xlen_t)&_kstack_start,(xlen_t)&_kstack_end};
     kInfo.segments.bss={(xlen_t)&_bss_start,(xlen_t)&_bss_end};
     kInfo.segments.frames={(xlen_t)&_frames_start,(xlen_t)&_frames_end};
     for(int i=0;i<sizeof(kInfo.segments)/sizeof(kInfo.segments.bss);i++){
@@ -76,25 +89,37 @@ static void infoInit(){
     }
 }
 
+extern void schedule();
 extern void program0();
 extern "C" void strapwrapper();
 extern "C" //__attribute__((section("init")))
 void start_kernel(){
+    register ptr_t sp asm("sp");
+    ctx.stack=sp;
     puts=IO::_blockingputs;
     puts("\n\n>>>Hello RVOS<<<\n\n");
     infoInit();
     memInit();
     csrWrite(sscratch,ctx.gpr);
     csrWrite(stvec,strapwrapper);
+    csrSet(sstatus,BIT(csr::mstatus::sum));
     csrSet(sstatus,BIT(csr::mstatus::sie));
     csrSet(sie,BIT(csr::mie::ssie));
-    timerInit();
     // halt();
     // while(true);
     for(int i=0;i<10;i++)
         printf("%d:Hello RVOS!\n",i);
+    extern char _uimg_start;
+    auto uproc=sched::createProcess();
+    uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->pagetable);
+    timerInit();
     csrClear(sstatus,1l<<csr::mstatus::spp);
-    halt();
-    // csrWrite(sepc,program0);
-    // ExecInst(sret);
+    schedule();
+    volatile register ptr_t t6 asm("t6")=ctx.gpr;
+    csrWrite(satp,usatp);
+    ExecInst(sfence.vma);
+    restoreContext();
+    csrSwap(sscratch,t6);
+    ExecInst(sret);
+    // halt();
 }

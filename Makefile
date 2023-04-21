@@ -13,7 +13,8 @@ $(depdir):
 depflags = -MMD -MP -MF $(depdir)/$*.d
 depfiles := $(patsubst %.c,$(depdir)/%.d,$(ksrcs))
 
-CFLAGS += -Iinclude/ -O0
+UCFLAGS = $(CFLAGS) -T user/user.ld
+CFLAGS += -Iinclude/ -O0 -g
 compile = $(CC) $(depflags) $(CFLAGS)
 
 $(depfiles):
@@ -36,28 +37,39 @@ $(objdir)/%.o : %.S
 		@mkdir -p $(dir $(depdir)/$*.d)
 		@mkdir -p $(dir $@)
 		$(compile) -c -o $@ $<
-kernel/os.elf: $(kobjs)
+uimg = $(objdir)/user/uimg.o
+kernel/os.elf: $(kobjs) $(uimg)
 	$(info ksrcs=$(ksrcs), kobjs=$(kobjs))
 	@echo + CC $<
 	$(CC) $(CFLAGS) -T kernel/os.ld -o kernel/os.elf $^
 
+usersrcs = $(shell find user/ -name "*.cc")
+userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))
+$(objdir)/user/%.elf : user/%.cc
+	@echo +CC $<
+	@mkdir -p $(dir $@)
+	$(CC) $(UCFLAGS) -o $@ $<
+uprogs: $(userprogs)
+$(uimg): $(userprogs)
+	$(OBJCOPY) -I binary -O elf64-littleriscv --binary-architecture riscv --prefix-sections=uimg $< $@
 
 run: all
 	@${QEMU} -M ? | grep virt >/dev/null || exit
 	@echo "Press Ctrl-A and then X to exit QEMU"
 	@echo "------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel kernel/os.elf
+	@${QEMU} ${QFLAGS} -kernel kernel/os.elf 2>log
 
 .PHONY : debug
 debug: all
 	@echo "Press Ctrl-C and then input 'quit' to exit GDB and QEMU"
 	@echo "-------------------------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel kernel/os.elf -s -S &
+	@${QEMU} ${QFLAGS} -kernel kernel/os.elf -s -S 2> log &
 	@${GDB} kernel/os.elf -q -x gdbinit && killall ${QEMU}
 
 .PHONY : code
 code: all
-	@${OBJDUMP} -S -D kernel/os.elf > os-elf.txt
+	@${READELF} -a kernel/os.elf > os-elf.txt
+	@${OBJDUMP} -S -D kernel/os.elf >> os-elf.txt
 	@less os-elf.txt
 
 .PHONY : clean

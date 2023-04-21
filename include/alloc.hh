@@ -4,7 +4,7 @@
 #include "common.h"
 #include "klib.h"
 #include "vm.hh"
-#define DEBUG 1
+// #define DEBUG 1
 namespace alloc
 {
     using vm::PageNum;
