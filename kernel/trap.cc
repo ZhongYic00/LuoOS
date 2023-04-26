@@ -30,7 +30,7 @@ static syscall_t syscallPtrs[]={
 };
 void uecallHandler(){
     register int ecallId asm("a7");
-    xlen_t &rtval=ctx.x(10);
+    xlen_t &rtval=kLocObjs.ctx.x(10);
     printf("uecall [%d]\n",ecallId);
     using namespace sys;
     if(ecallId<nSyscalls)rtval=syscallPtrs[ecallId]();

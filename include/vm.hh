@@ -89,6 +89,7 @@ namespace vm
             printf("PageTable::print(root=%p)\n",root);
             print(root,0l,1l<<18);
         }
+        static xlen_t toSATP(PageTable &table);
     };
 } // namespace vm
 #endif

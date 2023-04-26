@@ -6,11 +6,13 @@
 #include "alloc.hh"
 #include "ld.hh"
 #include "sched.hh"
+#include "proc.hh"
 
 xlen_t ksatp,usatp;
 extern char _kstack_end;
 xlen_t kstack_end=(xlen_t)&_kstack_end;
-kernel::Context ctx;
+kernel::KernelGlobalObjs kGlobObjs;
+kernel::KernelLocalObjs kLocObjs;
 kernel::KernelInfo kInfo={
     .segments={
         .dev=(vm::segment_t){0x0,0x40000000}
@@ -95,6 +97,7 @@ extern "C" void strapwrapper();
 extern "C" //__attribute__((section("init")))
 void start_kernel(){
     register ptr_t sp asm("sp");
+    auto &ctx=kLocObjs.ctx;
     ctx.stack=sp;
     puts=IO::_blockingputs;
     puts("\n\n>>>Hello RVOS<<<\n\n");
@@ -110,8 +113,9 @@ void start_kernel(){
     for(int i=0;i<10;i++)
         printf("%d:Hello RVOS!\n",i);
     extern char _uimg_start;
-    auto uproc=sched::createProcess();
+    auto uproc=proc::createProcess();
     uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->pagetable);
+    kGlobObjs.scheduler.add(uproc->defaultTask());
     timerInit();
     csrClear(sstatus,1l<<csr::mstatus::spp);
     schedule();

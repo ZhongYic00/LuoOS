@@ -5,6 +5,8 @@
 #include "rvcsr.hh"
 #include "vm.hh"
 #include "alloc.hh"
+#include "sched.hh"
+#include "proc.hh"
 
 extern "C" void start_kernel();
 namespace sys
@@ -39,13 +41,6 @@ namespace sys
     
 } // namespace sy
 namespace kernel{
-    struct Context
-    {
-        xlen_t gpr[30];
-        constexpr xlen_t& x(int r){return gpr[r-1];}
-        ptr_t stack;
-        xlen_t pc;
-    };
     constexpr int timerInterval=5000000;
 
     struct KernelInfo{
@@ -67,11 +62,20 @@ namespace kernel{
         OBJBUF(alloc::PageMgr,kPageMgr);
         OBJBUF(vm::PageTable,kPageTable);
     };
+    struct KernelGlobalObjs{
+        sched::Scheduler scheduler;
+    };
+    struct KernelLocalObjs{
+        proc::Context ctx;
+    };
+    
     void createKernelMapping(vm::PageTable &pageTable);
     
 }
-extern kernel::Context ctx;
+
 extern alloc::PageMgr *kernelPmgr;
 extern xlen_t ksatp,usatp;
+extern kernel::KernelGlobalObjs kGlobObjs;
+extern kernel::KernelLocalObjs kLocObjs;
 
 #endif

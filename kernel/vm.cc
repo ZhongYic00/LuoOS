@@ -1,6 +1,7 @@
 #include "vm.hh"
 #include "alloc.hh"
 #include "kernel.hh"
+#include "rvcsr.hh"
 #define DEBUG 1
 
 using namespace vm;
@@ -90,4 +91,11 @@ pgtbl_t PageTable::createPTNode(){
     auto rt=reinterpret_cast<pgtbl_t>(vm::pn2addr(kernelPmgr->alloc(1)));
     printf("createPTNode=0x%lx\n",rt);
     return rt;
+}
+xlen_t PageTable::toSATP(PageTable &table){
+    csr::satp satp;
+    satp.mode=8;
+    satp.asid=0;
+    satp.ppn=vm::addr2pn((xlen_t)(table.getRoot()));
+    return satp.value();
 }
