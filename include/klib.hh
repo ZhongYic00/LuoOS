@@ -29,20 +29,20 @@ struct ringbuf
 	T buff[128];
 	size_t head,tail;
 	FORCEDINLINE size_t next(size_t cur){return (cur+1)%buffsize;}
-	void put(T d){
+	inline void put(T d){
 		buff[tail]=d;
 		tail=next(tail);
 	}
-	void pop(){
+	inline void pop(){
 		head=next(head);
 	}
-	T get(){
+	inline T get(){
 		return buff[head];
 	}
-	bool empty(){
+	inline bool empty(){
 		return head==tail;
 	}
-  bool full(){
+  inline bool full(){
     return next(tail)==head;
   }
 };

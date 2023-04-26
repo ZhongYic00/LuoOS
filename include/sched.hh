@@ -17,7 +17,8 @@ namespace sched
     };
     using klib::list;
     class Scheduler{
-        list<Scheduable*> pool;
+        list<Scheduable*> ready;
+        list<Scheduable*> pending;
         klib::ListNode<Scheduable*> *cur;
     public:
         Scheduable *next();

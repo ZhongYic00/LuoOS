@@ -25,8 +25,9 @@ ksrcs = kernel/start.S\
 utilsrcs = $(shell find utils/ -name "*.cc")
 src3party = $(shell find thirdparty/ -name "*.cc")
 ksrcs += $(utilsrcs) $(src3party)
-kobjs0 = $(patsubst %.cc,$(objdir)/%.o,$(ksrcs))
-kobjs = $(patsubst %.S,$(objdir)/%.o,$(kobjs0))
+kobjs0 = $(patsubst %.S,$(objdir)/%.o,$(ksrcs))
+# kobjs1 = $(patsubst %.c,$(objdir)/%.o,$(kobjs0))
+kobjs = $(patsubst %.cc,$(objdir)/%.o,$(kobjs0))
 $(info ksrcs=$(ksrcs), kobjs=$(kobjs))
 
 $(objdir)/%.o : %.cc

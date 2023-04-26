@@ -11,10 +11,10 @@ void schedule(){
     reinterpret_cast<proc::Task*>(cur)->switchTo();
 }
 Scheduable* sched::Scheduler::next(){
-    if(cur==pool.tail||cur==nullptr)cur=pool.head;
+    if(cur==ready.tail||cur==nullptr)cur=ready.head;
     else cur=cur->iter.next;
     return cur->data;
 }
 void sched::Scheduler::add(Scheduable *task){
-    pool.push_back(task);
+    ready.push_back(task);
 }
