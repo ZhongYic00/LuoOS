@@ -56,7 +56,7 @@ struct ListNode{
   }iter;
   ListNode(const T& data){ this->data=data;this->iter.next=nullptr; }
 };
-template<typename T>
+template<typename T,bool LOOPBACK=false>
 struct list{
   typedef ListNode<T>* listndptr;
   listndptr head;
@@ -96,6 +96,56 @@ struct list{
     head=head->iter.next;
     delete head;
     return rt;
+  }
+  class iterator{
+    listndptr ptr;
+    list<T,LOOPBACK> *parent;
+  public:
+      iterator(listndptr p,list<T,LOOPBACK> *parent):ptr(p),parent(parent){}
+      T& operator*() const {
+          return ptr->data;
+      }
+      T* operator->() const {
+          return &(ptr->data);
+      }
+      iterator& operator++() {
+        if(LOOPBACK&&ptr==parent->tail)
+          ptr=parent->head;
+        else
+          ptr=ptr->iter.next;
+        return *this;
+      }
+      iterator operator++(int) {
+          iterator temp(*this);
+          if(LOOPBACK&&ptr==parent->tail)
+            ptr=parent->head;
+          else
+            ptr=ptr->iter.next;
+          return temp;
+      }
+
+      // iterator operator+(size_t n) const {
+      //     listndptr temp=ptr;
+      //     while(n-- && temp!=nullptr)temp=temp->iter.next;
+      //     return iterator(temp);
+      // }
+      // iterator& operator+=(size_t n) {
+      //     while(n-- && ptr!=nullptr)ptr=ptr->iter.next;
+      //     return *this;
+      // }
+      bool operator==(const iterator& other) const {
+          return ptr == other.ptr;
+      }
+      bool operator!=(const iterator& other) const {
+          return ptr != other.ptr;
+      }
+
+    };
+  iterator begin() {
+      return iterator(head,this);
+  }
+  iterator end() {
+      return iterator(tail,this);
   }
   inline bool empty(){
     return head==nullptr;

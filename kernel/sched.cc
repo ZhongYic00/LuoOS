@@ -7,14 +7,15 @@ using namespace sched;
 
 void schedule(){
     printf("scheduling\n");
-    auto cur=kGlobObjs.scheduler.next();
-    reinterpret_cast<proc::Task*>(cur)->switchTo();
+    auto curtask=reinterpret_cast<proc::Task*>(kGlobObjs.scheduler.next());
+    curtask->switchTo();
 }
 Scheduable* sched::Scheduler::next(){
-    if(cur==ready.tail||cur==nullptr)cur=ready.head;
-    else cur=cur->iter.next;
-    return cur->data;
+    return *(++cur);
 }
 void sched::Scheduler::add(Scheduable *task){
     ready.push_back(task);
+    cur=ready.begin();
+}
+Scheduler::Scheduler():cur(ready.begin()){
 }

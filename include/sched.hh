@@ -17,12 +17,12 @@ namespace sched
     };
     using klib::list;
     class Scheduler{
-        list<Scheduable*> ready;
+        list<Scheduable*,true> ready;
         list<Scheduable*> pending;
-        klib::ListNode<Scheduable*> *cur;
+        klib::list<Scheduable*,true>::iterator cur;
     public:
         Scheduable *next();
-        // Scheduler();
+        Scheduler();
         void add(Scheduable *elem);
     };
 } // namespace sched
