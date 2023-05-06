@@ -4,7 +4,7 @@ SRCS_ASM = \
 	start.S \
 
 SRCS_C = \
-	$(shell find -name "*.cc") ../utils/klib.cc
+	$(shell find -name "*.cc") ../utils/klibc.cc
 $(info SRCS_C=${SRCS_C})
 
 CFLAGS += -I../include -g

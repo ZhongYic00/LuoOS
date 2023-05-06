@@ -174,5 +174,6 @@ extern "C" void sbi_init(){
     csrSet(mie,BIT(csr::mie::mtie));
     csrSet(mstatus,1l<<csr::mstatus::mpp);
     csrWrite(mepc,0x80200000l);
+    csrSet(mstatus,BIT(csr::mstatus::mpie));
     ExecInst(mret);
 }
