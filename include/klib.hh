@@ -4,13 +4,14 @@
 #include "common.h"
 #include "platform.h"
 #include "klib.h"
+#include "safestl.hh"
 
 namespace klib
 {
   template<typename T>
   inline T min(T a,T b){ return a<b?a:b; }
   template<typename T>
-  inline T max(T a,T b){ return a>b?a:b; }
+  inline T max(T a,T b){ return (a>b?a:b); }
   inline int log2up(xlen_t a){
     int i=0,r=0;
     for(i=0;a>1;a>>=1,i++)r|=a&1;
