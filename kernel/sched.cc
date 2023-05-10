@@ -20,3 +20,7 @@ void sched::Scheduler::add(Scheduable *task){
 }
 Scheduler::Scheduler():cur(ready.begin()){
 }
+void Scheduler::sleep(Scheduable *task){
+    ready.remove(task);
+    pending.push_back(task);
+}

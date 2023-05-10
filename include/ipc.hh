@@ -1,18 +1,17 @@
 #ifndef IPC_HH__
 #define IPC_HH__
 #include "common.h"
+#include "klib.hh"
 // #include "proc.hh"
 namespace proc{
-    struct Process;
+    struct Task;
 }
 
-extern int sleep();
 namespace pipe{
-    using proc::Process;
+    using proc::Task;
     struct Pipe{
         klib::ringbuf<uint8_t> buff;
-        klib::list<Process*> readers;
-        Process* writer;
+        klib::list<Task*> waiting;
         inline void write(klib::ByteArray bytes){
             // TODO parallelize, copy avai bytes at once
             for(auto b:bytes){
@@ -28,11 +27,8 @@ namespace pipe{
             klib::ByteArray buff(0);
             return buff;
         }
-        inline void wakeup(){
-            // for(auto reader:readers){
-            //     // kGlobObjs.scheduler.wakeup(reader);
-            // }
-        }
+        void wakeup();
+        void sleep();
     };
 }
 #endif

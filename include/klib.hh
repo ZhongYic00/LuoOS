@@ -151,6 +151,16 @@ struct list{
   inline bool empty(){
     return head==nullptr;
   }
+  inline void remove(const T &data){
+    // iterator prev;
+    // for(auto i:*this){
+    //   if(*i==data){
+    //     prev.ptr->iter.next=i.ptr->iter.next;
+    //     delete i->ptr;
+    //   }
+    //   prev=i;
+    // }
+  }
   inline void print(void (*printhook)(const T&)){
     printf("{head=0x%lx, tail=0x%lx} [\t",head,tail);
     for(listndptr cur=head;cur;cur=cur->iter.next)

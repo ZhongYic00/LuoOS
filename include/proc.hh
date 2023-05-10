@@ -18,9 +18,11 @@ namespace proc
         xlen_t gpr[30];
         constexpr inline xlen_t& x(int r){return gpr[r-1];}
         inline xlen_t& sp(){return x(2);}
+        xlen_t pc;
+    };
+    struct KContext:public Context{
         ptr_t kstack;
         xlen_t satp;
-        xlen_t pc;
     };
 
     struct Task;
@@ -44,14 +46,20 @@ namespace proc
         inline void addTask(Task* task){ tasks.push_back(task); }
     };
     struct Task:public Scheduable{ // a.k.a. kthread
+        enum class Priv:bool{
+            User,Kernel
+        };
         Context ctx;
+        KContext kctx;
         const tid_t proc;
+        Priv lastpriv;
         Process *getProcess();
         inline Task(tid_t tid,prior_t pri,tid_t proc,xlen_t stack):Scheduable(tid,pri),proc(proc){
             ctx.x(2)=stack; //x2, sp
-            ctx.satp=getProcess()->satp();
+            kctx.satp=getProcess()->satp();
         }
         void switchTo();
+        void sleep();
     };
     class TaskManager{
         constexpr static int ntasks=128;

@@ -41,12 +41,13 @@ int yield(){
     schedule();
 }
 #define sys_yield() yield()
-int sleep(){
-    // register xlen_t sp asm("sp");
-    // register xlen_t t6 asm("t6")=sp;
-    // kHartObjs.curtask;
-    // saveContext();
+int syssleep(){
+    auto &cur=kHartObjs.curtask;
+    cur->sleep();
+    saveContextTo(cur->kctx.gpr);
     sys_yield();
+}
+int sysresume(){
 }
 static syscall_t syscallPtrs[sys::nSyscalls]={
     none,testexit,yield
@@ -101,7 +102,7 @@ extern "C" void straphandler(){
     }
     // printf("mtraphandler over\n");
 }
-__attribute__((naked))
+__attribute__((always_inline))
 void _strapenter(){
     csrSwap(sscratch,t6);
     saveContext();
@@ -112,23 +113,14 @@ void _strapenter(){
 }
 __attribute__((naked))
 void _strapexit(){
-    csrWrite(satp,kHartObjs.curtask->ctx.satp);
+    csrWrite(satp,kHartObjs.curtask->kctx.satp);
     ExecInst(sfence.vma);
     restoreContext();
     csrSwap(sscratch,t6);
     ExecInst(sret);
 }
 extern "C" __attribute__((naked)) void strapwrapper(){
-    csrSwap(sscratch,t6);
-    saveContext();
-    extern xlen_t kstack_end;
-    volatile register xlen_t sp asm("sp")=kstack_end;
-    csrWrite(satp,kGlobObjs.ksatp);
-    ExecInst(sfence.vma);
+    _strapenter();
     straphandler();
-    csrWrite(satp,kHartObjs.curtask->ctx.satp);
-    ExecInst(sfence.vma);
-    restoreContext();
-    csrSwap(sscratch,t6);
-    ExecInst(sret);
+    _strapexit();
 }

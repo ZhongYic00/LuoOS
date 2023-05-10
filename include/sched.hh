@@ -26,6 +26,7 @@ namespace sched
         Scheduler();
         void add(Scheduable *elem);
         void wakeup(Scheduable *elem);
+        void sleep(Scheduable *elem);
     };
 } // namespace sched
 

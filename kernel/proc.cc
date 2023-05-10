@@ -24,7 +24,7 @@ xlen_t Process::newKstack(){
 Task* Process::newTask(){
     auto thrd=kGlobObjs.taskMgr.alloc(0,this->pid(),proc::UserStack);
     thrd->ctx.sp()=newUstack();
-    thrd->ctx.kstack=(ptr_t)newKstack();
+    thrd->kctx.kstack=(ptr_t)newKstack();
     addTask(thrd);
 }
 
@@ -45,11 +45,12 @@ void Task::switchTo(){
     csrWrite(sepc,ctx.pc);
     auto proc=getProcess();
     // task->getProcess()->pagetable.print();
-    // csrWrite(satp,satp.value());
-    // ExecInst(sfence.vma);
-    // validate();
-    // restoreContext();
-    // ExecInst(sret);
+}
+void Task::sleep(){
+    kGlobObjs.scheduler.sleep(this);
+    lastpriv=Priv::Kernel;
+    // register xlen_t sp asm("sp");
+    // saveContextTo(kctx.gpr);
 }
 
 Task* TaskManager::alloc(prior_t prior,tid_t prnt,xlen_t stack){
