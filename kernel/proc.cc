@@ -41,9 +41,17 @@ void validate(){
 void Task::switchTo(){
     // task->ctx.pc=0x80200000l;
     kHartObjs.curtask=this;
-    csrWrite(sscratch,ctx.gpr);
-    csrWrite(sepc,ctx.pc);
-    auto proc=getProcess();
+    if(lastpriv==Priv::User){
+        csrWrite(sscratch,ctx.gpr);
+        csrWrite(sepc,ctx.pc);
+        auto proc=getProcess();
+    } else {
+        csrWrite(satp,kctx.satp);
+        ExecInst(sfence.vma);
+        register ptr_t t6 asm("t6")=kctx.gpr;
+        restoreContext();
+        ExecInst(ret);
+    }
     // task->getProcess()->pagetable.print();
 }
 void Task::sleep(){
@@ -65,6 +73,8 @@ Process* proc::createProcess(){
     auto pgtbl=reinterpret_cast<vm::pgtbl_t>(vm::pn2addr(kernelPmgr->alloc(1)));
     auto proc=kGlobObjs.procMgr.alloc(0,0,pgtbl);
     proc->newTask();
+    proc->files[0]=new fs::File;
+    proc->files[0]->type=fs::File::pipe;
     printf("proc created. pid=%d\n",proc->id);
     return proc;
 }

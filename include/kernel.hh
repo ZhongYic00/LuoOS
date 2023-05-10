@@ -14,7 +14,11 @@ namespace sys
     enum syscalls{
         none,
         testexit,
-        yield,
+        testyield,
+        testwrite,
+        read=63,
+        write=64,
+        yield=124,
         getpid=172,
         getppid=173,
         nSyscalls,
@@ -38,8 +42,14 @@ namespace sys
         register int a0 asm("a0");
         return a0;
     }
-    inline int syscall1(int id,int arg0){
+    inline int syscall1(int id,xlen_t arg0){
         return syscall6(id,arg0,0,0,0,0,0);
+    }
+    inline int syscall2(int id,xlen_t arg0,xlen_t arg1){
+        return syscall6(id,arg0,arg1,0,0,0,0);
+    }
+    inline int syscall3(int id,xlen_t arg0,xlen_t arg1,xlen_t arg2){
+        return syscall6(id,arg0,arg1,arg2,0,0,0);
     }
     
 } // namespace sy

@@ -4,6 +4,7 @@ int main(){
     while(true)
     {
         int i=10;
+        sys::syscall3(sys::syscalls::testwrite,0,0,0);
         while(i--){
             sys::syscall(0);
         }

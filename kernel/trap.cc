@@ -41,16 +41,18 @@ int yield(){
     schedule();
 }
 #define sys_yield() yield()
+__attribute__((naked))
+void sleepSave(ptr_t gpr){
+    saveContextTo(gpr);
+    sys_yield();
+}
 int syssleep(){
     auto &cur=kHartObjs.curtask;
     cur->sleep();
-    saveContextTo(cur->kctx.gpr);
-    sys_yield();
-}
-int sysresume(){
+    sleepSave(cur->kctx.gpr);
 }
 static syscall_t syscallPtrs[sys::nSyscalls]={
-    none,testexit,yield
+    none,testexit,yield,write
 };
 void uecallHandler(){
     register int ecallId asm("a7");

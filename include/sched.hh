@@ -30,5 +30,6 @@ namespace sched
     };
 } // namespace sched
 
+extern void schedule();
 
 #endif

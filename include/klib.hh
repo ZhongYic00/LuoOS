@@ -173,7 +173,7 @@ struct list{
   struct ArrayBuff{
     size_t len;
     T *buff;
-    ArrayBuff(size_t len){buff=new T[len];}
+    ArrayBuff(size_t len):len(len){buff=new T[len];}
     class iterator{
       T* ptr;
     public:
