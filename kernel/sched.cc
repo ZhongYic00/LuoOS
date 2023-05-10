@@ -8,6 +8,7 @@ using namespace sched;
 void schedule(){
     printf("scheduling\n");
     auto curtask=reinterpret_cast<proc::Task*>(kGlobObjs.scheduler.next());
+    printf("current task=%d\n",curtask->id);
     curtask->switchTo();
 }
 Scheduable* sched::Scheduler::next(){

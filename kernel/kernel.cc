@@ -8,11 +8,10 @@
 #include "sched.hh"
 #include "proc.hh"
 
-xlen_t ksatp,usatp;
 extern char _kstack_end;
 xlen_t kstack_end=(xlen_t)&_kstack_end;
 kernel::KernelGlobalObjs kGlobObjs;
-kernel::KernelLocalObjs kLocObjs;
+kernel::KernelHartObjs kHartObjs;
 kernel::KernelInfo kInfo={
     .segments={
         .dev=(vm::segment_t){0x0,0x40000000}
@@ -69,7 +68,7 @@ static void memInit(){
     { auto seg=(vm::segment_t){0x84000000,0x84200000}; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
 
     kernelPageTable->print();
-    csrWrite(satp,ksatp=satp.value());
+    csrWrite(satp,kGlobObjs.ksatp=satp.value());
     ExecInst(sfence.vma);
 
 }
@@ -94,16 +93,17 @@ static void infoInit(){
 extern void schedule();
 extern void program0();
 extern "C" void strapwrapper();
+extern void _strapexit();
 extern "C" //__attribute__((section("init")))
 void start_kernel(){
     register ptr_t sp asm("sp");
-    auto &ctx=kLocObjs.ctx;
-    ctx.stack=sp;
+    // auto &ctx=kHartObjs.curtask->ctx; //TODO fixbug
+    // ctx.kstack=sp;
     puts=IO::_blockingputs;
     puts("\n\n>>>Hello RVOS<<<\n\n");
     infoInit();
     memInit();
-    csrWrite(sscratch,ctx.gpr);
+    // csrWrite(sscratch,ctx.gpr);
     csrWrite(stvec,strapwrapper);
     csrSet(sstatus,BIT(csr::mstatus::sum));
     csrSet(sstatus,BIT(csr::mstatus::sie));
@@ -116,14 +116,14 @@ void start_kernel(){
     auto uproc=proc::createProcess();
     uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->pagetable);
     kGlobObjs.scheduler.add(uproc->defaultTask());
+    uproc=proc::createProcess();
+    uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->pagetable);
+    kGlobObjs.scheduler.add(uproc->defaultTask());
     timerInit();
     csrClear(sstatus,1l<<csr::mstatus::spp);
+    csrSet(sstatus,BIT(csr::mstatus::spie));
     schedule();
-    volatile register ptr_t t6 asm("t6")=ctx.gpr;
-    csrWrite(satp,usatp);
-    ExecInst(sfence.vma);
-    restoreContext();
-    csrSwap(sscratch,t6);
-    ExecInst(sret);
+    volatile register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
+    _strapexit();
     // halt();
 }

@@ -14,6 +14,9 @@ namespace sys
     enum syscalls{
         none,
         testexit,
+        yield,
+        getpid=172,
+        getppid=173,
         nSyscalls,
     };
     static inline xlen_t syscall6(xlen_t id, xlen_t arg0, xlen_t arg1, xlen_t arg2, xlen_t arg3, xlen_t arg4, xlen_t arg5){
@@ -64,18 +67,27 @@ namespace kernel{
     };
     struct KernelGlobalObjs{
         sched::Scheduler scheduler;
+        proc::TaskManager taskMgr;
+        proc::ProcManager procMgr;
+        xlen_t ksatp;
     };
-    struct KernelLocalObjs{
-        proc::Context ctx;
+    // struct KernelTaskObjs{
+    //     proc::Context ctx;
+    //     sched::tid_t curTid,curPid;
+    // };
+    typedef proc::Task KernelTaskObjs;
+    struct KernelHartObjs{
+        KernelTaskObjs *curtask;
     };
+    
     
     void createKernelMapping(vm::PageTable &pageTable);
     
 }
 
 extern alloc::PageMgr *kernelPmgr;
-extern xlen_t ksatp,usatp;
 extern kernel::KernelGlobalObjs kGlobObjs;
-extern kernel::KernelLocalObjs kLocObjs;
+extern kernel::KernelHartObjs kHartObjs;
+extern kernel::KernelInfo kInfo;
 
 #endif

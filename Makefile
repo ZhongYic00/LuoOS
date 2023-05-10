@@ -60,13 +60,13 @@ run: all
 	@${QEMU} -M ? | grep virt >/dev/null || exit
 	@echo "Press Ctrl-A and then X to exit QEMU"
 	@echo "------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel kernel/os.elf 2>log
+	@${QEMU} ${QFLAGS} -kernel kernel/os.elf 2>obj/log
 
 .PHONY : debug
 debug: all
 	@echo "Press Ctrl-C and then input 'quit' to exit GDB and QEMU"
 	@echo "-------------------------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel kernel/os.elf -s -S 2> log &
+	@${QEMU} ${QFLAGS} -kernel kernel/os.elf -s -S 2> obj/log &
 	@${GDB} kernel/os.elf -q -x gdbinit && killall ${QEMU}
 
 .PHONY : code

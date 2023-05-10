@@ -91,5 +91,10 @@ namespace vm
         }
         static xlen_t toSATP(PageTable &table);
     };
+
+    inline klib::ByteArray copyin(xlen_t addr,size_t len){
+        klib::ByteArray buff(len);
+        return buff;
+    }
 } // namespace vm
 #endif

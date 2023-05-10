@@ -8,9 +8,10 @@ namespace sched
         Init,Ready,Running,Pending,Exit,
     };
     typedef int tid_t;
+    typedef tid_t pid_t;
     typedef short prior_t;
     struct Scheduable{
-        tid_t id;
+        const tid_t id;
         prior_t prior;
         State state;
         Scheduable(tid_t id,prior_t prior):id(id),prior(prior),state(Init){}
@@ -24,6 +25,7 @@ namespace sched
         Scheduable *next();
         Scheduler();
         void add(Scheduable *elem);
+        void wakeup(Scheduable *elem);
     };
 } // namespace sched
 
