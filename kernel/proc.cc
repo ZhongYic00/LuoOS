@@ -5,7 +5,7 @@
 using namespace proc;
 
 #define DEBUG 1
-Process::Process(tid_t pid,prior_t prior,tid_t parent,vm::pgtbl_t pgtbl):Scheduable(pid,prior),parent(parent),pagetable(pgtbl){
+Process::Process(tid_t pid,prior_t prior,tid_t parent):Scheduable(pid,prior),parent(parent),pagetable(){
     kernel::createKernelMapping(pagetable);
 }
 xlen_t Process::newUstack(){
@@ -67,9 +67,9 @@ Task* TaskManager::alloc(prior_t prior,tid_t prnt,xlen_t stack){
     ++tidCnt;
     return tasklist[tidCnt]=new Task(tidCnt,prior,prnt,stack);
 }
-Process *ProcManager::alloc(prior_t prior,tid_t prnt,vm::pgtbl_t pgtbl){
+Process *ProcManager::alloc(prior_t prior,tid_t prnt){
     ++pidCnt;
-    return proclist[pidCnt]=new Process(pidCnt,prior,prnt,pgtbl);
+    return proclist[pidCnt]=new Process(pidCnt,prior,prnt);
 }
 void Process::print(){
     printf("Process[%d]\n",pid());
@@ -77,8 +77,7 @@ void Process::print(){
     printf("===========");
 }
 Process* proc::createProcess(){
-    auto pgtbl=reinterpret_cast<vm::pgtbl_t>(vm::pn2addr(kernelPmgr->alloc(1)));
-    auto proc=kGlobObjs.procMgr.alloc(0,0,pgtbl);
+    auto proc=kGlobObjs.procMgr.alloc(0,0);
     proc->newTask();
     proc->files[0]=new fs::File;
     proc->files[0]->type=fs::File::stdout;
@@ -87,3 +86,7 @@ Process* proc::createProcess(){
     return proc;
 }
 Process* Task::getProcess(){ return kGlobObjs.procMgr[proc]; }
+void proc::clone(Task *task){
+    auto proc=task->getProcess();
+    auto newproc=kGlobObjs.procMgr.alloc(proc->priority(),proc->pid());
+}

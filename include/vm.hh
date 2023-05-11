@@ -76,8 +76,11 @@ namespace vm
     class PageTable{
     private:
         pgtbl_t root;
-        pgtbl_t createPTNode();
+        static pgtbl_t createPTNode();
     public:
+        inline PageTable(){
+            this->root=createPTNode();
+        }
         inline PageTable(pgtbl_t root){
             this->root=root;
         }

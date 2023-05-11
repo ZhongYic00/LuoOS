@@ -34,9 +34,10 @@ namespace proc
         PageTable pagetable;
         klib::list<Task*> tasks;
         File* files[3];
-        Process(tid_t pid,prior_t prior,tid_t parent,vm::pgtbl_t pgtbl);
+        Process(tid_t pid,prior_t prior,tid_t parent);
         inline Task* defaultTask(){ return tasks.head->data; }
         inline tid_t pid(){return id;}
+        inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vm::PageTable::toSATP(pagetable);}
         inline File *ofile(int fd){return files[fd];}
         Task* newTask();
@@ -75,12 +76,13 @@ namespace proc
         int pidCnt;
         Process *proclist[nprocs];
     public:
-        Process *alloc(prior_t prior,tid_t prnt,vm::pgtbl_t pgtbl);
+        Process *alloc(prior_t prior,tid_t prnt);
         void free(Process*);
         inline Process* operator[](tid_t pid){return proclist[pid];}
     };
     Process* createProcess();
     Process* createKProcess();
+    void clone(Task* task);
 } // namespace proc
 
 #endif
