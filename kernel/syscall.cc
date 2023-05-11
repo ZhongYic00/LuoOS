@@ -27,6 +27,7 @@ namespace syscall
     }
     void yield(){
         auto &cur=kHartObjs.curtask;
+        cur->lastpriv=proc::Task::Priv::Kernel;
         sleepSave(cur->kctx.gpr);
     }
     int sysyield(){

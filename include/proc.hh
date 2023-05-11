@@ -40,6 +40,7 @@ namespace proc
         inline xlen_t satp(){return vm::PageTable::toSATP(pagetable);}
         inline File *ofile(int fd){return files[fd];}
         Task* newTask();
+        void print();
     private:
         xlen_t newUstack();
         xlen_t newKstack();

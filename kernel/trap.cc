@@ -28,6 +28,7 @@ void uecallHandler(){
     using namespace sys;
     if(ecallId<nSyscalls)rtval=syscallPtrs[ecallId]();
     else rtval=1;
+    printf("uecall exit(id=%d,rtval=%d)\n",ecallId,rtval);
 }
 
 extern "C" void straphandler(){
@@ -75,7 +76,9 @@ void _strapenter(){
     csrSwap(sscratch,t6);
     saveContext();
     extern xlen_t kstack_end;
-    volatile register xlen_t sp asm("sp")=kstack_end;
+    volatile register ptr_t sp asm("sp");
+    // sp=(ptr_t)kstack_end;
+    sp=kHartObjs.curtask->kctx.kstack;
     csrWrite(satp,kGlobObjs.ksatp);
     ExecInst(sfence.vma);
 }

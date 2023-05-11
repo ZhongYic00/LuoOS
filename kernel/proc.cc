@@ -4,9 +4,9 @@
 
 using namespace proc;
 
+#define DEBUG 1
 Process::Process(tid_t pid,prior_t prior,tid_t parent,vm::pgtbl_t pgtbl):Scheduable(pid,prior),parent(parent),pagetable(pgtbl){
     kernel::createKernelMapping(pagetable);
-    DBG(pagetable.print();)
 }
 xlen_t Process::newUstack(){
     auto ustack=UserStack;
@@ -15,10 +15,11 @@ xlen_t Process::newUstack(){
     return ustack;
 }
 xlen_t Process::newKstack(){
-    auto kstack=kInfo.segments.kstack.second;
+    auto kstackv=kInfo.segments.kstack.second;
+    xlen_t kstackppn;
     using perm=vm::PageTableEntry::fieldMasks;
-    pagetable.createMapping(vm::addr2pn(kstack),kernelPmgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
-    return kstack;
+    pagetable.createMapping(vm::addr2pn(kstackv),kstackppn=kernelPmgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
+    return vm::pn2addr(kstackppn+1)-1;
 }
 
 Task* Process::newTask(){
@@ -48,8 +49,8 @@ void Task::switchTo(){
         auto proc=getProcess();
     } else {
         lastpriv=Priv::User;
-        csrWrite(satp,kctx.satp);
-        ExecInst(sfence.vma);
+        // csrWrite(satp,kctx.satp);
+        // ExecInst(sfence.vma);
         register ptr_t t6 asm("t6")=kctx.gpr;
         restoreContext();
         ExecInst(ret);
@@ -58,7 +59,6 @@ void Task::switchTo(){
 }
 void Task::sleep(){
     kGlobObjs.scheduler.sleep(this);
-    lastpriv=Priv::Kernel;
     // register xlen_t sp asm("sp");
     // saveContextTo(kctx.gpr);
 }
@@ -71,12 +71,18 @@ Process *ProcManager::alloc(prior_t prior,tid_t prnt,vm::pgtbl_t pgtbl){
     ++pidCnt;
     return proclist[pidCnt]=new Process(pidCnt,prior,prnt,pgtbl);
 }
+void Process::print(){
+    printf("Process[%d]\n",pid());
+    pagetable.print();
+    printf("===========");
+}
 Process* proc::createProcess(){
     auto pgtbl=reinterpret_cast<vm::pgtbl_t>(vm::pn2addr(kernelPmgr->alloc(1)));
     auto proc=kGlobObjs.procMgr.alloc(0,0,pgtbl);
     proc->newTask();
     proc->files[0]=new fs::File;
     proc->files[0]->type=fs::File::pipe;
+    DBG(proc->print();)
     printf("proc created. pid=%d\n",proc->id);
     return proc;
 }
