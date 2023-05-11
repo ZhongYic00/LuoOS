@@ -7,14 +7,11 @@ namespace sched
     enum State:short{
         Init,Ready,Running,Pending,Exit,
     };
-    typedef int tid_t;
-    typedef tid_t pid_t;
     typedef short prior_t;
     struct Scheduable{
-        const tid_t id;
         prior_t prior;
         State state;
-        Scheduable(tid_t id,prior_t prior):id(id),prior(prior),state(Init){}
+        Scheduable(prior_t prior):prior(prior),state(Init){}
     };
     using klib::list;
     class Scheduler{

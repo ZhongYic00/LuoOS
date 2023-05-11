@@ -5,11 +5,12 @@
 using namespace proc;
 
 #define DEBUG 1
-Process::Process(tid_t pid,prior_t prior,tid_t parent):Scheduable(pid,prior),parent(parent),pagetable(){
+Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),pagetable(){
     kernel::createKernelMapping(pagetable);
 }
+Process::Process(prior_t prior,tid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
-    auto ustack=UserStack;
+    auto ustack=UserStackDefault;
     using perm=vm::PageTableEntry::fieldMasks;
     pagetable.createMapping(vm::addr2pn(ustack),kernelPmgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
     return ustack;
@@ -23,10 +24,15 @@ xlen_t Process::newKstack(){
 }
 
 Task* Process::newTask(){
-    auto thrd=kGlobObjs.taskMgr.alloc(0,this->pid(),proc::UserStack);
+    // auto thrd=kGlobObjs.taskMgr.alloc(0,this->pid(),proc::UserStackDefault);
+    auto thrd=new (kGlobObjs.taskMgr) Task(0,this->pid(),proc::UserStackDefault);
     thrd->ctx.sp()=newUstack();
     thrd->kctx.kstack=(ptr_t)newKstack();
     addTask(thrd);
+}
+
+Task* Process::newTask(const Task &other){
+    auto thrd=new (kGlobObjs.taskMgr) Task(other,this->pid());
 }
 
 void validate(){
@@ -62,22 +68,14 @@ void Task::sleep(){
     // register xlen_t sp asm("sp");
     // saveContextTo(kctx.gpr);
 }
-
-Task* TaskManager::alloc(prior_t prior,tid_t prnt,xlen_t stack){
-    ++tidCnt;
-    return tasklist[tidCnt]=new Task(tidCnt,prior,prnt,stack);
-}
-Process *ProcManager::alloc(prior_t prior,tid_t prnt){
-    ++pidCnt;
-    return proclist[pidCnt]=new Process(pidCnt,prior,prnt);
-}
 void Process::print(){
     printf("Process[%d]\n",pid());
     pagetable.print();
     printf("===========");
 }
 Process* proc::createProcess(){
-    auto proc=kGlobObjs.procMgr.alloc(0,0);
+    // auto proc=kGlobObjs.procMgr.alloc(0,0);
+    auto proc=new (kGlobObjs.procMgr) Process(0,0);
     proc->newTask();
     proc->files[0]=new fs::File;
     proc->files[0]->type=fs::File::stdout;
@@ -88,5 +86,11 @@ Process* proc::createProcess(){
 Process* Task::getProcess(){ return kGlobObjs.procMgr[proc]; }
 void proc::clone(Task *task){
     auto proc=task->getProcess();
-    auto newproc=kGlobObjs.procMgr.alloc(proc->priority(),proc->pid());
+    // auto newproc=kGlobObjs.procMgr.alloc(*proc);
+    // auto newproc=new (kGlobObjs.procMgr) Process(*proc);
+    // newproc->newTask();
+}
+
+Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),pagetable(other.vmos){
+
 }

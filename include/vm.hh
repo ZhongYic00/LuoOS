@@ -73,6 +73,19 @@ namespace vm
             memset(page,0,sizeof(page));
         }
     };
+
+    typedef klib::pair<klib::pair<PageNum,PageNum>,PageNum> PageMapping;
+    class VMO{
+    public:
+        enum class CloneType:uint8_t{
+            clone,alloc,
+        };
+        perm_t perm;
+        PageMapping mapping;
+        const CloneType cloneType;
+    private:
+    };
+
     class PageTable{
     private:
         pgtbl_t root;
@@ -84,10 +97,20 @@ namespace vm
         inline PageTable(pgtbl_t root){
             this->root=root;
         }
+        inline PageTable(klib::list<VMO> vmos){
+            for(auto vmo:vmos){
+                if(vmo.cloneType==VMO::CloneType::clone){
+                    createMapping(vmo.mapping,vmo.perm);
+                }
+            }
+        }
         inline ptr_t getRoot(){ return root; }
         void createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm,int level=2);
         inline void createMapping(PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm){
             createMapping(root,vpn,ppn,pages,perm);
+        }
+        inline void createMapping(const PageMapping &mapping,perm_t perm){
+            createMapping(mapping.first.first,mapping.first.second,mapping.second,perm);            
         }
         PageNum trans(PageNum vpn);
         inline xlen_t transaddr(xlen_t addr){
