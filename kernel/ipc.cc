@@ -1,14 +1,14 @@
 #include "ipc.hh"
 #include "kernel.hh"
-
-extern int syssleep();
+namespace syscall{
+extern int sleep();
+}
 namespace pipe
 {
 
     void Pipe::sleep(){
         waiting.push_back(kHartObjs.curtask);
-        // kHartObjs.curtask.sleep();
-        syssleep();
+        syscall::sleep();
     }
     void Pipe::wakeup(){
         for(auto task:waiting){

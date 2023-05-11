@@ -9,6 +9,9 @@
 #include "proc.hh"
 
 extern "C" void start_kernel();
+namespace syscall{
+    void init();
+}
 namespace sys
 {
     enum syscalls{
@@ -21,7 +24,11 @@ namespace sys
         yield=124,
         getpid=172,
         getppid=173,
+        clone=220,
         nSyscalls,
+    };
+    enum statcode{
+        ok
     };
     static inline xlen_t syscall6(xlen_t id, xlen_t arg0, xlen_t arg1, xlen_t arg2, xlen_t arg3, xlen_t arg4, xlen_t arg5){
         register xlen_t a0 asm("a0") = arg0;

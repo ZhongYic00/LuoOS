@@ -103,6 +103,7 @@ void start_kernel(){
     puts("\n\n>>>Hello RVOS<<<\n\n");
     infoInit();
     memInit();
+    syscall::init();
     // csrWrite(sscratch,ctx.gpr);
     csrWrite(stvec,strapwrapper);
     csrSet(sstatus,BIT(csr::mstatus::sum));

@@ -38,6 +38,7 @@ void validate(){
     // csrClear(sstatus,BIT(csr::mstatus::sum));
 }
 
+extern void _strapexit();
 void Task::switchTo(){
     // task->ctx.pc=0x80200000l;
     kHartObjs.curtask=this;
@@ -46,6 +47,7 @@ void Task::switchTo(){
         csrWrite(sepc,ctx.pc);
         auto proc=getProcess();
     } else {
+        lastpriv=Priv::User;
         csrWrite(satp,kctx.satp);
         ExecInst(sfence.vma);
         register ptr_t t6 asm("t6")=kctx.gpr;

@@ -19,41 +19,7 @@ void timerInterruptHandler(){
     for(auto hook: hooks)if(hook)hook();
     sbi::resetXTIE();
 }
-int none(){
-    return 0;
-}
-int testexit(){
-    static bool b=false;
-    if(b)return 1;
-    return -1;
-}
-int getPid(){
-    return kHartObjs.curtask->getProcess()->pid();
-}
-int write(){
-    auto &ctx=kHartObjs.curtask->ctx;
-    int fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
-    auto file=kHartObjs.curtask->getProcess()->ofile(fd);
-    file->write(uva,len);
-}
-int yield(){
-    printf("syscall yield\n");
-    schedule();
-}
-#define sys_yield() yield()
-__attribute__((naked))
-void sleepSave(ptr_t gpr){
-    saveContextTo(gpr);
-    sys_yield();
-}
-int syssleep(){
-    auto &cur=kHartObjs.curtask;
-    cur->sleep();
-    sleepSave(cur->kctx.gpr);
-}
-static syscall_t syscallPtrs[sys::nSyscalls]={
-    none,testexit,yield,write
-};
+extern syscall_t syscallPtrs[];
 void uecallHandler(){
     register int ecallId asm("a7");
     xlen_t &rtval=kHartObjs.curtask->ctx.x(10);
@@ -117,6 +83,7 @@ __attribute__((naked))
 void _strapexit(){
     csrWrite(satp,kHartObjs.curtask->kctx.satp);
     ExecInst(sfence.vma);
+    register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
     restoreContext();
     csrSwap(sscratch,t6);
     ExecInst(sret);
