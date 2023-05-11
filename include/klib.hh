@@ -174,6 +174,9 @@ struct list{
     size_t len;
     T *buff;
     ArrayBuff(size_t len):len(len){buff=new T[len];}
+    ArrayBuff(T* addr,size_t len):ArrayBuff(len){
+        memcpy(buff,addr,len*sizeof(T));
+    }
     class iterator{
       T* ptr;
     public:
@@ -228,6 +231,7 @@ struct list{
     };
     iterator begin(){return iterator(buff);}
     iterator end(){return iterator(buff+len);}
+    const char* c_str(){return reinterpret_cast<char*>(buff);}
   };
   typedef ArrayBuff<uint8_t> ByteArray;
 } // namespace klib

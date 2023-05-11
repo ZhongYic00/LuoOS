@@ -61,6 +61,8 @@ namespace vm
     constexpr xlen_t pageSize=0x1000,
         pageEntriesPerPage=pageSize/sizeof(PageTableEntry);
     constexpr xlen_t vpnMask=0x1ff;
+    constexpr xlen_t vaddrOffsetMask=pageSize-1;
+    inline xlen_t addr2offset(xlen_t addr){ return addr&(vaddrOffsetMask); }
     inline xlen_t bytes2pages(xlen_t bytes){ return bytes/pageSize+((bytes%pageSize)>0); }
     
     class alignas(pageSize) PageTableNode{
@@ -84,17 +86,22 @@ namespace vm
         inline void createMapping(PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm){
             createMapping(root,vpn,ppn,pages,perm);
         }
+        PageNum trans(PageNum vpn);
+        inline xlen_t transaddr(xlen_t addr){
+            return pn2addr(trans(addr2pn(addr)))+addr2offset(addr);
+        }
         void print(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize);
         inline void print(){
             printf("PageTable::print(root=%p)\n",root);
             print(root,0l,1l<<18);
         }
         static xlen_t toSATP(PageTable &table);
+        inline klib::ByteArray copyin(xlen_t addr,size_t len){
+            xlen_t paddr=transaddr(addr);
+            klib::ByteArray buff((uint8_t*)paddr,len);
+            return buff;
+        }
     };
 
-    inline klib::ByteArray copyin(xlen_t addr,size_t len){
-        klib::ByteArray buff(len);
-        return buff;
-    }
 } // namespace vm
 #endif

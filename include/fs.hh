@@ -7,7 +7,8 @@
 namespace fs{
     struct File{
         enum FileType{
-            none,pipe,entry,dev
+            none,pipe,entry,dev,
+            stdin,stdout,stderr
         };
         FileType type;
         union Data

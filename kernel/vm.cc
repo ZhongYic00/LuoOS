@@ -5,6 +5,17 @@
 #define DEBUG 1
 
 using namespace vm;
+PageNum PageTable::trans(PageNum vpn){
+    xlen_t bigPageSize=1l<<(9*2);
+    for(pgtbl_t table=root;;bigPageSize>>=9){
+        PageTableEntry &entry=table[(vpn/bigPageSize)&vpnMask];
+        assert(entry.isValid());
+        if(entry.isLeaf())
+            return entry.ppn()+(vpn&(bigPageSize-1));
+        else
+            table=entry.child();
+    }
+}
 void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm,int level){
     xlen_t bigPageSize=1l<<(9*level);
     xlen_t unaligned=vpn&(bigPageSize-1);

@@ -21,7 +21,7 @@
 #else
 
 #if defined(__cplusplus)
-#include "klib.hh"
+// #include "klib.hh"
 #endif
 
 extern "C" {

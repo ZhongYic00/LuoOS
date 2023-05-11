@@ -70,7 +70,8 @@
         "algorithm": "cpp",
         "any": "cpp",
         "memory_resource": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "regex": "cpp"
     },
     "C_Cpp.intelliSenseEngineFallback": "enabled"
 }

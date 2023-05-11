@@ -80,6 +80,7 @@ namespace proc
         inline Process* operator[](tid_t pid){return proclist[pid];}
     };
     Process* createProcess();
+    Process* createKProcess();
 } // namespace proc
 
 #endif
