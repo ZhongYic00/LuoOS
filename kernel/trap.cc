@@ -67,7 +67,7 @@ void uecallHandler(){
 extern "C" void straphandler(){
     ptr_t sepc; csrRead(sepc,sepc);
     xlen_t scause; csrRead(scause,scause);
-    printf("straphandler cause=[%d]%d mepc=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc);
+    printf("straphandler cause=[%d]%d sepc=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc);
     kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
 
     if(csr::mcause::isInterrupt(scause)){
