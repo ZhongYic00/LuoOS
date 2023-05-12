@@ -2,20 +2,21 @@ include common.mk
 
 .DEFAULT_GOAL := all
 
-SBI: sbi/sbi.elf;
-OS: kernel/os.elf;
-all:  OS SBI
 
 objdir := obj
 depdir := $(objdir)/.deps
 $(depdir):
 	@mkdir -p $@
 depflags = -MMD -MP -MF $(depdir)/$*.d
+OS := $(objdir)/os.elf
 
 UCFLAGS = $(CFLAGS) -T user/user.ld
 CFLAGS += -Iinclude/ -O0 -g
 compile = $(CC) $(depflags) $(CFLAGS)
 
+SBI: sbi/sbi.elf;
+OS: $(OS);
+all:  OS SBI
 
 ksrcs = kernel/start.S\
 	$(shell find kernel/ -name "*.cc")
@@ -42,10 +43,10 @@ $(objdir)/%.o : %.S
 		@mkdir -p $(dir $@)
 		$(compile) -c -o $@ $<
 uimg = $(objdir)/user/uimg.o
-kernel/os.elf: $(kobjs) $(uimg)
+$(OS): $(kobjs) $(uimg)
 	$(info ksrcs=$(ksrcs), kobjs=$(kobjs))
 	@echo + CC $<
-	$(CC) $(CFLAGS) -T kernel/os.ld -o kernel/os.elf $^
+	$(CC) $(CFLAGS) -T kernel/os.ld -o $(OS) $^
 
 usersrcs = $(shell find user/ -name "*.cc")
 userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))
@@ -63,19 +64,19 @@ run: all
 	@${QEMU} -M ? | grep virt >/dev/null || exit
 	@echo "Press Ctrl-A and then X to exit QEMU"
 	@echo "------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel kernel/os.elf ${TEXTMODE} 2> obj/log
+	@${QEMU} ${QFLAGS} -kernel $(OS) ${TEXTMODE} 2> obj/log
 
 .PHONY : debug
 debug: all
 	@echo "Press Ctrl-C and then input 'quit' to exit GDB and QEMU"
 	@echo "-------------------------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel kernel/os.elf -s -S ${TEXTMODE} 2> obj/log &
-	@${GDB} kernel/os.elf -q -x gdbinit && killall ${QEMU}
+	@${QEMU} ${QFLAGS} -kernel $(OS) -s -S ${TEXTMODE} 2> obj/log &
+	@${GDB} $(OS) -q -x gdbinit && killall ${QEMU}
 
 .PHONY : code
 code: all
-	@${READELF} -a kernel/os.elf > os-elf.txt
-	@${OBJDUMP} -S -D kernel/os.elf >> os-elf.txt
+	@${READELF} -a $(OS) > os-elf.txt
+	@${OBJDUMP} -S -D $(OS) >> os-elf.txt
 	@less os-elf.txt
 
 .PHONY : clean
