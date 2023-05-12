@@ -63,6 +63,9 @@ struct list{
   listndptr head;
   listndptr tail;
   inline list(){ head=tail=nullptr; }
+  inline list(const std::initializer_list<T> &il):list(){
+    for(const auto &i:il)push_back(i);
+  }
   static inline void insertAfter(listndptr cur,listndptr nd){
     nd->iter.next=cur->iter.next;
     cur->iter.next=nd;
