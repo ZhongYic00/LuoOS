@@ -11,14 +11,11 @@ depdir := $(objdir)/.deps
 $(depdir):
 	@mkdir -p $@
 depflags = -MMD -MP -MF $(depdir)/$*.d
-depfiles := $(patsubst %.c,$(depdir)/%.d,$(ksrcs))
 
 UCFLAGS = $(CFLAGS) -T user/user.ld
 CFLAGS += -Iinclude/ -O0 -g
 compile = $(CC) $(depflags) $(CFLAGS)
 
-$(depfiles):
-include $(wildcard $(depfiles))
 
 ksrcs = kernel/start.S\
 	$(shell find kernel/ -name "*.cc")
@@ -28,7 +25,11 @@ ksrcs += $(utilsrcs) $(src3party)
 kobjs0 = $(patsubst %.S,$(objdir)/%.o,$(ksrcs))
 # kobjs1 = $(patsubst %.c,$(objdir)/%.o,$(kobjs0))
 kobjs = $(patsubst %.cc,$(objdir)/%.o,$(kobjs0))
-$(info ksrcs=$(ksrcs), kobjs=$(kobjs))
+
+depfiles := $(patsubst $(objdir)/%.o,$(depdir)/%.d,$(kobjs))
+$(depfiles):
+include $(wildcard $(depfiles))
+$(info ksrcs=$(ksrcs), kobjs=$(kobjs), depfils=$(depfiles))
 
 $(objdir)/%.o : %.cc
 		@echo + CC $<
@@ -79,6 +80,7 @@ code: all
 
 .PHONY : clean
 clean:
+	rm -rf obj/*
 	rm -rf *.o *.bin *.elf
 
 .PHONY : stats
