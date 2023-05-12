@@ -2,7 +2,7 @@
 // #include <array>
 #include <atomic>
 // #include <bitset>
-// #include <initializer_list>
+#include <initializer_list>
 // #include <iterator>
 #include <limits>
 #include <optional>
