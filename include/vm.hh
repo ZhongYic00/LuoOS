@@ -80,9 +80,10 @@ namespace vm
         enum class CloneType:uint8_t{
             clone,alloc,
         };
-        perm_t perm;
-        PageMapping mapping;
+        const perm_t perm;
         const CloneType cloneType;
+        const PageMapping mapping;
+        VMO(const PageMapping &mapping,perm_t perm,CloneType cloneType=CloneType::clone):mapping(mapping),perm(perm),cloneType(cloneType){}
     private:
     };
 
@@ -91,16 +92,17 @@ namespace vm
         pgtbl_t root;
         static pgtbl_t createPTNode();
     public:
-        inline PageTable(){
-            this->root=createPTNode();
+        inline PageTable(pgtbl_t root=nullptr){
+            if(root==nullptr)this->root=createPTNode();
+            else this->root=root;
         }
-        inline PageTable(pgtbl_t root){
-            this->root=root;
-        }
-        inline PageTable(klib::list<VMO> vmos){
+        inline PageTable(std::initializer_list<VMO> vmos,pgtbl_t root=nullptr):PageTable(root){
             for(auto vmo:vmos){
-                if(vmo.cloneType==VMO::CloneType::clone){
-                    createMapping(vmo.mapping,vmo.perm);
+                switch(vmo.cloneType){
+                    case VMO::CloneType::clone:
+                        createMapping(vmo.mapping,vmo.perm); break;
+                    default:
+                        ;
                 }
             }
         }
@@ -110,8 +112,9 @@ namespace vm
             createMapping(root,vpn,ppn,pages,perm);
         }
         inline void createMapping(const PageMapping &mapping,perm_t perm){
-            createMapping(mapping.first.first,mapping.first.second,mapping.second,perm);            
+            createMapping(mapping.first.first,mapping.first.second,mapping.second,perm);
         }
+        inline void createMapping(const VMO &vmo){createMapping(vmo.mapping,vmo.perm);}
         PageNum trans(PageNum vpn);
         inline xlen_t transaddr(xlen_t addr){
             return pn2addr(trans(addr2pn(addr)))+addr2offset(addr);
@@ -122,11 +125,35 @@ namespace vm
             print(root,0l,1l<<18);
         }
         static xlen_t toSATP(PageTable &table);
+    };
+    class VMAR{
+    public:
+        // @todo check initialize order
+        inline VMAR(const std::initializer_list<VMO> &vmos,pgtbl_t root=nullptr):vmos(vmos),pagetable(vmos,root){}
+        inline void alloc(PageNum vpn,PageNum pages,perm_t perm){
+            PageNum ppn=0l;
+            VMO vmo((PageMapping){{vpn,ppn},pages},perm);
+            vmos.push_back(vmo);
+            pagetable.createMapping(vmo);
+        }
+        inline void map(const VMO& vmo){
+            vmos.push_back(vmo);
+            pagetable.createMapping(vmo);
+        }
+        inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm){map(VMO({{vpn,ppn},pages},perm));}
+        inline void unmap();
+        inline xlen_t satp(){return PageTable::toSATP(pagetable);}
         inline klib::ByteArray copyin(xlen_t addr,size_t len){
-            xlen_t paddr=transaddr(addr);
+            xlen_t paddr=pagetable.transaddr(addr);
             klib::ByteArray buff((uint8_t*)paddr,len);
             return buff;
         }
+        inline void print(){
+            pagetable.print();
+        }
+    private:
+        klib::list<VMO> vmos;
+        PageTable pagetable;
     };
 
 } // namespace vm

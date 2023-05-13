@@ -55,10 +55,14 @@ struct ListNode{
     ListNode *prev;
     ListNode *next;
   }iter;
-  ListNode(const T& data){ this->data=data;this->iter.next=nullptr; }
+  ListNode(const T& data):data(data){this->iter.next=nullptr; }
 };
+
+template<typename T>
+class Seq{};
+
 template<typename T,bool LOOPBACK=false>
-struct list{
+struct list:public Seq<T>{
   typedef ListNode<T>* listndptr;
   listndptr head;
   listndptr tail;

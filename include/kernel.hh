@@ -80,9 +80,12 @@ namespace kernel{
         #define OBJBUF(type,name) uint8_t name##Buf[sizeof(type)]
         OBJBUF(alloc::HeapMgr,kHeapMgr);
         OBJBUF(alloc::PageMgr,kPageMgr);
-        OBJBUF(vm::PageTable,kPageTable);
+        OBJBUF(vm::VMAR,kVMAR);
     };
     struct KernelGlobalObjs{
+        vm::VMAR *vmar;
+        alloc::PageMgr *pageMgr;
+        alloc::HeapMgr *heapMgr;
         sched::Scheduler scheduler;
         proc::TaskManager taskMgr;
         proc::ProcManager procMgr;
@@ -98,11 +101,10 @@ namespace kernel{
     };
     
     
-    void createKernelMapping(vm::PageTable &pageTable);
+    void createKernelMapping(vm::VMAR &vmar);
     
 }
 
-extern alloc::PageMgr *kernelPmgr;
 extern kernel::KernelGlobalObjs kGlobObjs;
 extern kernel::KernelHartObjs kHartObjs;
 extern kernel::KernelInfo kInfo;

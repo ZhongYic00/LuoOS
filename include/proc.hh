@@ -11,7 +11,7 @@ namespace proc
     using vm::PageTable;
     using sched::Scheduable;
     using sched::prior_t;
-    using vm::PageTable;
+    using vm::VMAR;
 
     struct Context
     {
@@ -32,19 +32,18 @@ namespace proc
     struct Process:public IdManagable,public Scheduable{
         using File=fs::File;
         tid_t parent;
-        PageTable pagetable;
+        VMAR vmar;
         klib::list<Task*> tasks;
         File* files[3];
-        klib::list<vm::VMO> vmos;
 
-        Process(const Process &other)=delete;
         Process(prior_t prior,tid_t parent);
         Process(tid_t pid,prior_t prior,tid_t parent);
         Process(const Process &other,tid_t pid);
+        inline Process(const Process &other):Process(other,id){}
         inline Task* defaultTask(){ return tasks.head->data; }
         inline tid_t pid(){return id;}
         inline prior_t priority(){return prior;}
-        inline xlen_t satp(){return vm::PageTable::toSATP(pagetable);}
+        inline xlen_t satp(){return vmar.satp();}
         inline File *ofile(int fd){return files[fd];}
         Task* newTask();
         Task* newTask(const Task &other);

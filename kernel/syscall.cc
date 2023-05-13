@@ -45,7 +45,8 @@ namespace syscall
         return statcode::ok;
     }
     int clone(){
-
+        auto &ctx=kHartObjs.curtask->ctx;
+        proc::clone(kHartObjs.curtask);
     }
     void init(){
         using sys::syscalls;

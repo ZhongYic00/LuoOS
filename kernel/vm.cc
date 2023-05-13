@@ -16,11 +16,15 @@ PageNum PageTable::trans(PageNum vpn){
             table=entry.child();
     }
 }
-void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm,int level){
+#define DBG_ENTRY DBG(\
+            entry.print();\
+            assert(entry.isValid());\
+        )
+void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,const perm_t perm,int level){
     xlen_t bigPageSize=1l<<(9*level);
     xlen_t unaligned=vpn&(bigPageSize-1);
     DBG(
-        printf("createMapping(table,vpn=0x%lx,ppn=0x%lx,pages=0x%lx,level=%d)\n",vpn,ppn,pages,level);
+        printf("createMapping(table,vpn=0x%lx,ppn=0x%lx,pages=0x%lx,perm=%x,level=%d)\n",vpn,ppn,pages,perm,level);
         printf("bigPageSize=%lx,unaligned=%lx\n",bigPageSize,unaligned);
     )
     // align vpn to boundary
@@ -41,7 +45,7 @@ void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages
             }
             entry.setValid();entry.raw.ppn=addr2pn(reinterpret_cast<xlen_t>(subTable));
         }
-        DBG(entry.print();)
+        DBG_ENTRY
         DBG(printf("subtable=%lx\n",subTable);)
         createMapping(subTable,vpn,ppn,partial,perm,level-1); // actual create mapping
         vpn+=partial,ppn+=partial,pages-=partial;
@@ -54,7 +58,7 @@ void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages
         entry.setValid();
         entry.raw.perm=perm;
         entry.raw.ppn=ppn;
-        DBG(entry.print();)
+        DBG_ENTRY;
 
         vpn+=bigPageSize;
         ppn+=bigPageSize;
@@ -78,7 +82,7 @@ void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages
             }
             entry.setValid();entry.raw.ppn=addr2pn(reinterpret_cast<xlen_t>(subTable));
         }
-        DBG(entry.print();)
+        DBG_ENTRY
         createMapping(subTable,vpn,ppn,pages,perm,level-1);
     }
 }
@@ -99,7 +103,7 @@ void PageTable::print(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
 pgtbl_t PageTable::createPTNode(){
     // return reinterpret_cast<pgtbl_t>(aligned_alloc(pageSize,pageSize));
     // auto rt=reinterpret_cast<pgtbl_t>(new PageTableNode);
-    auto rt=reinterpret_cast<pgtbl_t>(vm::pn2addr(kernelPmgr->alloc(1)));
+    auto rt=reinterpret_cast<pgtbl_t>(vm::pn2addr(kGlobObjs.pageMgr->alloc(1)));
     printf("createPTNode=0x%lx\n",rt);
     return rt;
 }

@@ -21,11 +21,7 @@ using vm::pgtbl_t,vm::PageTable;
 __attribute__((section("pagetable")))
 vm::PageTableEntry kernelPageTableRoot[vm::pageEntriesPerPage];
 kernel::KernelObjectsBuf kObjsBuf;
-alloc::PageMgr *kernelPmgr=(alloc::PageMgr*)kObjsBuf.kPageMgrBuf;
-alloc::HeapMgr *kHeapMgr=(alloc::HeapMgr*)kObjsBuf.kHeapMgrBuf;
 uint8_t pool[32*vm::pageSize];
-
-PageTable *kernelPageTable=(vm::PageTable*)kObjsBuf.kPageTableBuf;
 
 static void timerInit(){
     int hart=sbi::readHartId();
@@ -42,32 +38,35 @@ static void stub(){
 }
 
 // __attribute__((section("init")))
-void kernel::createKernelMapping(PageTable &pageTable){
+void kernel::createKernelMapping( vm::VMAR &vmar){
     using perm=vm::PageTableEntry::fieldMasks;
-    { auto &seg=kInfo.segments.text;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::x);}
-    DBG(kernelPageTable->print();)
-    { auto &seg=kInfo.segments.rodata;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r);}
-    { auto &seg=kInfo.segments.kstack;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
-    { auto &seg=kInfo.segments.data;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
-    { auto &seg=kInfo.segments.bss;pageTable.createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
+    { auto &seg=kInfo.segments.text;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::x);}
+    DBG(vmar.print();)
+    { auto &seg=kInfo.segments.rodata;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r);}
+    { auto &seg=kInfo.segments.kstack;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
+    { auto &seg=kInfo.segments.data;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
+    { auto &seg=kInfo.segments.bss;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
 }
 static void memInit(){
     csr::satp satp;
     satp.mode=8;
     satp.asid=0;
     satp.ppn=vm::addr2pn((xlen_t)kernelPageTableRoot);
-    new ((void*)&kObjsBuf.kPageTableBuf) PageTable(kernelPageTableRoot);
+    kGlobObjs.pageMgr=(alloc::PageMgr*)kObjsBuf.kPageMgrBuf;
+    kGlobObjs.heapMgr=(alloc::HeapMgr*)kObjsBuf.kHeapMgrBuf;
+    kGlobObjs.vmar=(vm::VMAR*)kObjsBuf.kVMARBuf;
     new ((void*)&kObjsBuf.kHeapMgrBuf) alloc::HeapMgr(pool,sizeof(pool));
     new ((void*)&kObjsBuf.kPageMgrBuf) alloc::PageMgr(vm::addr2pn(kInfo.segments.frames.first),vm::addr2pn(kInfo.segments.frames.second));
-    kHeapMgr=new alloc::HeapMgrGrowable(*kHeapMgr,*kernelPmgr);
-    // kernelPageTable->createMapping(0,vm::addr2pn(0x00000000),3*0x40000,0xcf); // naive direct mapping
+    kGlobObjs.heapMgr=new alloc::HeapMgrGrowable(*kGlobObjs.heapMgr,*kGlobObjs.pageMgr);
+    new ((void*)&kObjsBuf.kVMARBuf) vm::VMAR({},kernelPageTableRoot);
+    // kGlobObjs.vmar->map(0,vm::addr2pn(0x00000000),3*0x40000,0xcf); // naive direct mapping
     using perm=vm::PageTableEntry::fieldMasks;
-    kernel::createKernelMapping(*kernelPageTable);
-    { auto &seg=kInfo.segments.dev; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
-    { auto &seg=kInfo.segments.frames; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
-    { auto seg=(vm::segment_t){0x84000000,0x84200000}; kernelPageTable->createMapping(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
+    kernel::createKernelMapping(*kGlobObjs.vmar);
+    { auto &seg=kInfo.segments.dev; kGlobObjs.vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
+    { auto &seg=kInfo.segments.frames; kGlobObjs.vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
+    { auto seg=(vm::segment_t){0x84000000,0x84200000}; kGlobObjs.vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
 
-    kernelPageTable->print();
+    kGlobObjs.vmar->print();
     csrWrite(satp,kGlobObjs.ksatp=satp.value());
     ExecInst(sfence.vma);
 
@@ -115,10 +114,10 @@ void start_kernel(){
         printf("%d:Hello RVOS!\n",i);
     extern char _uimg_start;
     auto uproc=proc::createProcess();
-    uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->pagetable);
+    uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
     kGlobObjs.scheduler.add(uproc->defaultTask());
     uproc=proc::createProcess();
-    uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->pagetable);
+    uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
     kGlobObjs.scheduler.add(uproc->defaultTask());
     timerInit();
     csrClear(sstatus,1l<<csr::mstatus::spp);

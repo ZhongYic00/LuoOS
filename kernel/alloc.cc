@@ -1,5 +1,6 @@
 #include "alloc.hh"
 #include "thirdparty/tlsf.h"
+#include "kernel.hh"
 
 
 using namespace alloc;
@@ -154,4 +155,23 @@ PageNum PageMgr::free(PageNum ppn,int order){
     }
     buddyNodes[0]=klib::max(buddyNodes[lsub(0)],buddyNodes[rsub(0)]);
     // DBG(this->print();)
+}
+
+void* operator new(size_t size,ptr_t ptr){ // placement new
+    return ptr;
+}
+void* operator new(size_t size){
+    return kGlobObjs.heapMgr->alloc(size);
+}
+void* operator new[](size_t size){
+    return kGlobObjs.heapMgr->alloc(size);
+}
+void operator delete(void* ptr){
+    kGlobObjs.heapMgr->free(ptr);
+}
+void operator delete(void* ptr,xlen_t unknown){
+    kGlobObjs.heapMgr->free(ptr);
+}
+void operator delete[](void* ptr){
+    kGlobObjs.heapMgr->free(ptr);
 }

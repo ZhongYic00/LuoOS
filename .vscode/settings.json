@@ -71,7 +71,10 @@
         "any": "cpp",
         "memory_resource": "cpp",
         "variant": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "bit": "cpp",
+        "map": "cpp",
+        "set": "cpp"
     },
     "C_Cpp.intelliSenseEngineFallback": "enabled"
 }

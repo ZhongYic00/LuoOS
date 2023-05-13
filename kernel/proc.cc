@@ -5,21 +5,21 @@
 using namespace proc;
 
 #define DEBUG 1
-Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),pagetable(){
-    kernel::createKernelMapping(pagetable);
+Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
+    kernel::createKernelMapping(vmar);
 }
 Process::Process(prior_t prior,tid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
     auto ustack=UserStackDefault;
     using perm=vm::PageTableEntry::fieldMasks;
-    pagetable.createMapping(vm::addr2pn(ustack),kernelPmgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
+    vmar.map(vm::addr2pn(ustack),kGlobObjs.pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
     return ustack;
 }
 xlen_t Process::newKstack(){
     auto kstackv=kInfo.segments.kstack.second;
     xlen_t kstackppn;
     using perm=vm::PageTableEntry::fieldMasks;
-    pagetable.createMapping(vm::addr2pn(kstackv),kstackppn=kernelPmgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
+    vmar.map(vm::addr2pn(kstackv),kstackppn=kGlobObjs.pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
     return vm::pn2addr(kstackppn+1)-1;
 }
 
@@ -61,7 +61,7 @@ void Task::switchTo(){
         restoreContext();
         ExecInst(ret);
     }
-    // task->getProcess()->pagetable.print();
+    // task->getProcess()->vmar.print();
 }
 void Task::sleep(){
     kGlobObjs.scheduler.sleep(this);
@@ -70,7 +70,7 @@ void Task::sleep(){
 }
 void Process::print(){
     printf("Process[%d]\n",pid());
-    pagetable.print();
+    vmar.print();
     printf("===========");
 }
 Process* proc::createProcess(){
@@ -87,10 +87,10 @@ Process* Task::getProcess(){ return kGlobObjs.procMgr[proc]; }
 void proc::clone(Task *task){
     auto proc=task->getProcess();
     // auto newproc=kGlobObjs.procMgr.alloc(*proc);
-    // auto newproc=new (kGlobObjs.procMgr) Process(*proc);
+    auto newproc=new (kGlobObjs.procMgr) Process(*proc);
     // newproc->newTask();
 }
 
-Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),pagetable(other.vmos){
+Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar){
 
 }

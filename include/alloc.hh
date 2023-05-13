@@ -73,24 +73,11 @@ namespace alloc
         ~HeapMgrGrowable();
     };
 } // namespace alloc
-extern alloc::HeapMgr *kHeapMgr;
-inline void* operator new(size_t size,ptr_t ptr){ // placement new
-    return ptr;
-}
-inline void* operator new(size_t size){
-    return kHeapMgr->alloc(size);
-}
-inline void* operator new[](size_t size){
-    return kHeapMgr->alloc(size);
-}
-inline void operator delete(void* ptr){
-    kHeapMgr->free(ptr);
-}
-inline void operator delete(void* ptr,xlen_t unknown){
-    kHeapMgr->free(ptr);
-}
-inline void operator delete[](void* ptr){
-    kHeapMgr->free(ptr);
-}
+void* operator new(size_t size,ptr_t ptr);
+void* operator new(size_t size);
+void* operator new[](size_t size);
+void operator delete(void* ptr);
+void operator delete(void* ptr,xlen_t unknown);
+void operator delete[](void* ptr);
 
 #endif
