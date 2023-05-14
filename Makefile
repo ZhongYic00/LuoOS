@@ -14,9 +14,9 @@ UCFLAGS = $(CFLAGS) -T user/user.ld
 CFLAGS += -Iinclude/ -O0 -g
 compile = $(CC) $(depflags) $(CFLAGS)
 
-SBI: sbi/sbi.elf;
+# SBI: sbi/sbi.elf;
 OS: $(OS);
-all:  OS SBI
+all:  OS #SBI
 
 ksrcs = kernel/start.S\
 	$(shell find kernel/ -name "*.cc")

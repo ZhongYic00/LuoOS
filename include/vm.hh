@@ -130,6 +130,7 @@ namespace vm
     public:
         // @todo check initialize order
         inline VMAR(const std::initializer_list<VMO> &vmos,pgtbl_t root=nullptr):vmos(vmos),pagetable(vmos,root){}
+        inline VMAR(const VMAR &other):vmos(other.vmos),pagetable(){}
         inline void alloc(PageNum vpn,PageNum pages,perm_t perm){
             PageNum ppn=0l;
             VMO vmo((PageMapping){{vpn,ppn},pages},perm);
