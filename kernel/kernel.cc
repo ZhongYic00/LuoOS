@@ -23,11 +23,14 @@ vm::PageTableEntry kernelPageTableRoot[vm::pageEntriesPerPage];
 kernel::KernelObjectsBuf kObjsBuf;
 uint8_t pool[32*vm::pageSize];
 
+void nextTimeout(){
+    xlen_t time;
+    csrRead(time,time);
+    sbi_set_timer(time+kernel::timerInterval);
+}
 static void timerInit(){
-    int hart=sbi::readHartId();
-    printf("hart=%d\n",hart);
-    mmio<xlen_t>(platform::clint::mtimecmpOf(hart))=mmio<xlen_t>(platform::clint::mtime)+kernel::timerInterval;
     csrSet(sie,BIT(csr::mie::stie));
+    nextTimeout();
 }
 
 __attribute__((nacked, section("stub")))
@@ -94,12 +97,14 @@ extern void program0();
 extern "C" void strapwrapper();
 extern void _strapexit();
 extern "C" //__attribute__((section("init")))
-void start_kernel(){
+void start_kernel(int hartid){
+    register int tp asm("tp")=hartid;
     register ptr_t sp asm("sp");
     // auto &ctx=kHartObjs.curtask->ctx; //TODO fixbug
     // ctx.kstack=sp;
     puts=IO::_blockingputs;
     puts("\n\n>>>Hello RVOS<<<\n\n");
+    sbi_init();
     infoInit();
     memInit();
     syscall::init();

@@ -8,7 +8,7 @@
 #include "sched.hh"
 #include "proc.hh"
 
-extern "C" void start_kernel();
+extern "C" void start_kernel(int hartid);
 namespace syscall{
     void init();
 }
@@ -99,8 +99,7 @@ namespace kernel{
     struct KernelHartObjs{
         KernelTaskObjs *curtask;
     };
-    
-    
+    inline int readHartId(){register int hartid asm("t0"); return hartid;}
     void createKernelMapping(vm::VMAR &vmar);
     
 }

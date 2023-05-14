@@ -7,17 +7,9 @@
 extern void schedule();
 static hook_t hooks[10]={schedule};
 
+extern void nextTimeout();
 void timerInterruptHandler(){
-    int hart=sbi::readHartId();
-    static int cnt=0;
-    xlen_t time;
-    csrRead(time,time);
-    auto mtime=mmio<volatile xlen_t>(platform::clint::mtime);
-    volatile xlen_t& mtimecmp=mmio<volatile xlen_t>(platform::clint::mtimecmpOf(hart));
-    printf("S-Mode timer Interrupt[%d]::%ld %ld<%ld\n",cnt++,time,mtimecmp,mtime);
-    mtimecmp+=kernel::timerInterval;
-    for(auto hook: hooks)if(hook)hook();
-    sbi::resetXTIE();
+    nextTimeout();
 }
 extern syscall_t syscallPtrs[];
 void uecallHandler(){
