@@ -82,7 +82,7 @@ namespace syscall
         f->in = in;
         return fd;
     }
-    int sysclose(){
+    int close(){
         auto &ctx = kHartObjs.curtask->ctx;
         int fd = ctx.x(10);
 
@@ -143,11 +143,11 @@ namespace syscall
         // syscallPtrs[SYS_getdents64] = sys_getdents64;
         // syscallPtrs[SYS_lseek] = sys_lseek;
         // syscallPtrs[SYS_read] = sys_read;
+        syscallPtrs[syscalls::openat] = openAt;
+        syscallPtrs[syscalls::close] = syscall::close;
         syscallPtrs[syscalls::write] = write;
         syscallPtrs[syscalls::yield] = sysyield;
         syscallPtrs[syscalls::getpid] = getPid;
         syscallPtrs[syscalls::clone] = clone;
-        syscallPtrs[syscalls::openat] = openAt;
-        syscallPtrs[syscalls::close] = sysclose;
     }
 } // namespace syscall

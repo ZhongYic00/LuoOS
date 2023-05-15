@@ -19,19 +19,18 @@ namespace sys
         testexit,
         testyield,
         testwrite,
+        openat=56,
+        close=57,
         read=63,
         write=64,
         yield=124,
         getpid=172,
         getppid=173,
         clone=220,
-        // 不知道系统调用号怎么确定的?
-        openat=330,
-        close=331,
         nSyscalls,
     };
     enum statcode{
-        ok, err
+        ok=0, err=-1
     };
     static inline xlen_t syscall6(xlen_t id, xlen_t arg0, xlen_t arg1, xlen_t arg2, xlen_t arg3, xlen_t arg4, xlen_t arg5){
         register xlen_t a0 asm("a0") = arg0;
