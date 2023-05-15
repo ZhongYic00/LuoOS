@@ -49,7 +49,7 @@ namespace proc
         Task* newTask();
         Task* newTask(const Task &other);
         void print();
-        int fdAlloc(File *file);
+        int fdAlloc(File *file, int newfd=-1);
     private:
         xlen_t newUstack();
         xlen_t newKstack();

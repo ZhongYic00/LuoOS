@@ -53,11 +53,12 @@ namespace syscall
         int dirfd = ctx.x(10);
         const char *path = (const char*)ctx.x(11);
         int flags = ctx.x(12);
-        word_t mode = ctx.x(13); // word_t应该实际为mode_t等定义
+        mode_t mode = ctx.x(13); // uint32
 
         int fd;
         fs::File *f;
         fs::INode *in;
+        auto curproc = kHartObjs.curtask->getProcess();
 
         /*
             inode相关操作
@@ -68,7 +69,7 @@ namespace syscall
         //
 
         f = new fs::File;
-        fd = kHartObjs.curtask->getProcess()->fdAlloc(f);
+        fd = curproc->fdAlloc(f);
         if(fd < 0){
             return statcode::err;
         }
@@ -80,6 +81,7 @@ namespace syscall
             f->type = fs::File::inode;
         }
         f->in = in;
+
         return fd;
     }
     int close(){
@@ -87,11 +89,12 @@ namespace syscall
         int fd = ctx.x(10);
 
         fs::File *f;
-
+        auto curproc = kHartObjs.curtask->getProcess();
+        // 判断fd范围也许可以写成宏……
         if((fd<0) || (fd>proc::MaxOpenFile)){
             return statcode::err;
         }
-        f = kHartObjs.curtask->getProcess()->files[fd];
+        f = curproc->ofile(fd);
         if(f == nullptr){
             return statcode::err;
         }
@@ -99,6 +102,43 @@ namespace syscall
         f->fileClose();
         f = nullptr;
         return statcode::ok;
+    }
+    int dupArgsIn(int fd, int newfd=-1){
+        fs::File *f;
+        auto curproc = kHartObjs.curtask->getProcess();
+        // 判断fd范围也许可以写成宏……
+        if((fd<0) || (fd>proc::MaxOpenFile)){
+            return statcode::err;
+        }
+        
+        f = curproc->ofile(fd);
+        if(f == nullptr){
+            return statcode::err;
+        }
+        // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
+        newfd = curproc->fdAlloc(f, newfd);
+        if(newfd < 0){
+            return statcode::err;
+        }
+
+        return newfd;
+    }
+    int dup(){
+        auto &ctx = kHartObjs.curtask->ctx;
+        int fd = ctx.x(10);
+
+        return dupArgsIn(fd);
+    }
+    int dup3(){
+        auto &ctx = kHartObjs.curtask->ctx;
+        int fd = ctx.x(10);
+        int newfd = ctx.x(11);
+        // 判断fd范围也许可以写成宏……
+        if((newfd<0) || (newfd>proc::MaxOpenFile)){
+            return statcode::err;
+        }
+
+        return dupArgsIn(fd, newfd);
     }
     void init(){
         using sys::syscalls;
@@ -143,11 +183,13 @@ namespace syscall
         // syscallPtrs[SYS_getdents64] = sys_getdents64;
         // syscallPtrs[SYS_lseek] = sys_lseek;
         // syscallPtrs[SYS_read] = sys_read;
-        syscallPtrs[syscalls::openat] = openAt;
+        syscallPtrs[syscalls::dup] = syscall::dup;
+        syscallPtrs[syscalls::dup3] = syscall::dup3;
+        syscallPtrs[syscalls::openat] = syscall::openAt;
         syscallPtrs[syscalls::close] = syscall::close;
-        syscallPtrs[syscalls::write] = write;
-        syscallPtrs[syscalls::yield] = sysyield;
-        syscallPtrs[syscalls::getpid] = getPid;
-        syscallPtrs[syscalls::clone] = clone;
+        syscallPtrs[syscalls::write] = syscall::write;
+        syscallPtrs[syscalls::yield] = syscall::sysyield;
+        syscallPtrs[syscalls::getpid] = syscall::getPid;
+        syscallPtrs[syscalls::clone] = syscall::clone;
     }
 } // namespace syscall

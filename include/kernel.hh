@@ -19,6 +19,8 @@ namespace sys
         testexit,
         testyield,
         testwrite,
+        dup=23,
+        dup3=24,
         openat=56,
         close=57,
         read=63,
