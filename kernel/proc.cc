@@ -94,3 +94,13 @@ void proc::clone(Task *task){
 Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar){
 
 }
+
+int Process::fdAlloc(File *file){
+    for(int fd = 0; fd < MaxOpenFile; ++fd){
+        if(files[fd] == nullptr){
+            files[fd] = file;
+            return fd;
+        }
+    }
+    return -1;  // 返回错误码
+}

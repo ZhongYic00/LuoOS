@@ -48,6 +48,58 @@ namespace syscall
         auto &ctx=kHartObjs.curtask->ctx;
         proc::clone(kHartObjs.curtask);
     }
+    int openAt(){
+        auto &ctx = kHartObjs.curtask->ctx;
+        int dirfd = ctx.x(10);
+        const char *path = (const char*)ctx.x(11);
+        int flags = ctx.x(12);
+        word_t mode = ctx.x(13); // word_t应该实际为mode_t等定义
+
+        int fd;
+        fs::File *f;
+        fs::INode *in;
+
+        /*
+            inode相关操作
+        */
+        // 测试用
+        in = new fs::INode;
+        in->type = fs::INode::file;
+        //
+
+        f = new fs::File;
+        fd = kHartObjs.curtask->getProcess()->fdAlloc(f);
+        if(fd < 0){
+            return statcode::err;
+        }
+
+        if(in->type == fs::INode::dev){
+            f->type = fs::File::dev;
+        }
+        else{
+            f->type = fs::File::inode;
+        }
+        f->in = in;
+        return fd;
+    }
+    int sysclose(){
+        auto &ctx = kHartObjs.curtask->ctx;
+        int fd = ctx.x(10);
+
+        fs::File *f;
+
+        if((fd<0) || (fd>proc::MaxOpenFile)){
+            return statcode::err;
+        }
+        f = kHartObjs.curtask->getProcess()->files[fd];
+        if(f == nullptr){
+            return statcode::err;
+        }
+
+        f->fileClose();
+        f = nullptr;
+        return statcode::ok;
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -95,5 +147,7 @@ namespace syscall
         syscallPtrs[syscalls::yield] = sysyield;
         syscallPtrs[syscalls::getpid] = getPid;
         syscallPtrs[syscalls::clone] = clone;
+        syscallPtrs[syscalls::openat] = openAt;
+        syscallPtrs[syscalls::close] = sysclose;
     }
 } // namespace syscall
