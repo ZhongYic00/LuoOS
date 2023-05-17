@@ -60,7 +60,7 @@ struct ListNode{
 
 template<typename T>
 class Seq{};
-
+// @todo list插入或迭代器遍历时具有bug
 template<typename T,bool LOOPBACK=false>
 struct list:public Seq<T>{
   typedef ListNode<T>* listndptr;

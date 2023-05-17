@@ -61,7 +61,7 @@ $(uimg): $(userprogs)
 	$(OBJCOPY) -I binary -O elf64-littleriscv --binary-architecture riscv --prefix-sections=uimg $< $@
 
 
-# TEXTMODE=-nographic > obj/output
+TEXTMODE=-nographic > obj/output
 run: all
 	@${QEMU} -M ? | grep virt >/dev/null || exit
 	@echo "Press Ctrl-A and then X to exit QEMU"
