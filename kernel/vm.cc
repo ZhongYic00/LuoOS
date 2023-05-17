@@ -114,3 +114,20 @@ xlen_t PageTable::toSATP(PageTable &table){
     satp.ppn=vm::addr2pn((xlen_t)(table.getRoot()));
     return satp.value();
 }
+
+VMO vm::VMO::clone() const{
+    PageMapping mapping=this->mapping;
+    PageNum &ppn=mapping.first.second,pages=mapping.second;
+    switch(cloneType){
+        case CloneType::shared:
+            break;
+        case CloneType::clone:
+            ppn=kGlobObjs.pageMgr->alloc(pages);
+            copyframes(this->ppn(),ppn,pages);
+            break;
+        case CloneType::alloc:
+            ppn=kGlobObjs.pageMgr->alloc(pages);
+            break;
+    }
+    return VMO(mapping,perm,cloneType);
+}

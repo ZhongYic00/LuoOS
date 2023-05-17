@@ -4,6 +4,7 @@
 #include "common.h"
 #include "klib.hh"
 
+#define DEBUG 1
 namespace vm
 {
     // struct alignas(4096) Page{char raw[4096];};
@@ -64,6 +65,9 @@ namespace vm
     constexpr xlen_t vaddrOffsetMask=pageSize-1;
     inline xlen_t addr2offset(xlen_t addr){ return addr&(vaddrOffsetMask); }
     inline xlen_t bytes2pages(xlen_t bytes){ return bytes/pageSize+((bytes%pageSize)>0); }
+    inline xlen_t copyframes(PageNum src,PageNum dst,PageNum pages){
+        memcpy((ptr_t)pn2addr(dst),(ptr_t)pn2addr(src),pages*pageSize);
+    }
     
     class alignas(pageSize) PageTableNode{
     private:
@@ -78,12 +82,21 @@ namespace vm
     class VMO{
     public:
         enum class CloneType:uint8_t{
-            clone,alloc,
+            clone,alloc,shared,
         };
         const perm_t perm;
         const CloneType cloneType;
+        
+        /**
+         * @brief {{vpn,ppn},pages}
+         */
         const PageMapping mapping;
         VMO(const PageMapping &mapping,perm_t perm,CloneType cloneType=CloneType::clone):mapping(mapping),perm(perm),cloneType(cloneType){}
+        VMO clone() const;
+        inline PageNum pages() const{return mapping.second;}
+        inline PageNum vpn() const{return mapping.first.first;}
+        inline PageNum ppn() const{return mapping.first.second;}
+        inline void print() const{printf("VMO[0x%lx=>0x%lx@%lx]\n",vpn(),ppn(),pages());}
     private:
     };
 
@@ -128,9 +141,12 @@ namespace vm
     };
     class VMAR{
     public:
+        using CloneType=VMO::CloneType;
         // @todo check initialize order
         inline VMAR(const std::initializer_list<VMO> &vmos,pgtbl_t root=nullptr):vmos(vmos),pagetable(vmos,root){}
-        inline VMAR(const VMAR &other):vmos(other.vmos),pagetable(){}
+        inline VMAR(const VMAR &other):vmos(),pagetable(){
+            for(const auto &vmo:other.vmos)map(vmo.clone());
+        }
         inline void alloc(PageNum vpn,PageNum pages,perm_t perm){
             PageNum ppn=0l;
             VMO vmo((PageMapping){{vpn,ppn},pages},perm);
@@ -138,10 +154,12 @@ namespace vm
             pagetable.createMapping(vmo);
         }
         inline void map(const VMO& vmo){
+            DBG(printf("map ");vmo.print();)
             vmos.push_back(vmo);
             pagetable.createMapping(vmo);
+            DBG(printf("after map, VMAR:");print();)
         }
-        inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm){map(VMO({{vpn,ppn},pages},perm));}
+        inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm,CloneType ct=CloneType::clone){map(VMO({{vpn,ppn},pages},perm,ct));}
         inline void unmap();
         inline xlen_t satp(){return PageTable::toSATP(pagetable);}
         inline klib::ByteArray copyin(xlen_t addr,size_t len){
@@ -150,7 +168,8 @@ namespace vm
             return buff;
         }
         inline void print(){
-            pagetable.print();
+            // pagetable.print();
+            for(auto vmo:vmos)vmo.print();
         }
     private:
         klib::list<VMO> vmos;
