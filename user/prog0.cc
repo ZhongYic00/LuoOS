@@ -1,15 +1,22 @@
 #include "kernel.hh"
 
+void print(const char* str){
+    sys::syscall3(sys::syscalls::testwrite,0,(xlen_t)str,strlen(str)+1);
+}
+
 int main(){
+    puts=print;
+    if(sys::syscall(sys::syscalls::clone)==0){
+        printf("parent return to here");
+       }else{
+        printf("child return to here");
+    }
     while(true)
     {
         int i=10;
-        char strbuf[]="process write test";
-        sys::syscall3(sys::syscalls::testwrite,0,(xlen_t)strbuf,sizeof(strbuf));
+        printf("process write test");
         int pid=sys::syscall(sys::syscalls::getpid);
-        char strbuf1[]="This is process[  ]";
-        strbuf1[17]=pid+'0';
-        sys::syscall3(sys::syscalls::testwrite,0,(xlen_t)strbuf1,sizeof(strbuf1));
+        printf("This is process[%d]",pid);
         while(i--){
             sys::syscall(0);
         }
