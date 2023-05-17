@@ -101,5 +101,5 @@ void proc::clone(Task *task){
 }
 
 Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar){
-    
+    for(int i=0;i<3;i++)files[i]=other.files[i];
 }

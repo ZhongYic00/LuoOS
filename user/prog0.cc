@@ -6,10 +6,18 @@ void print(const char* str){
 
 int main(){
     puts=print;
+    bool ischild;
     if(sys::syscall(sys::syscalls::clone)==0){
         printf("parent return to here");
+        ischild=false;
        }else{
         printf("child return to here");
+        ischild=true;
+    }
+    if(sys::syscall(sys::syscalls::clone)==0){
+        printf("parent of %s return to here",!ischild?"parent":"child");
+       }else{
+        printf("child of %s return to here",!ischild?"parent":"child");
     }
     while(true)
     {
