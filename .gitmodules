@@ -1,0 +1,3 @@
+[submodule "thirdparty/tinystl"]
+	path = thirdparty/tinystl
+	url = https://github.com/mendsley/tinystl.git

@@ -5,6 +5,8 @@
 #include "vm.hh"
 #include "fs.hh"
 #include "resmgr.hh"
+#include "TINYSTL/unordered_set.h"
+#include "TINYSTL/string.h"
 
 namespace proc
 {
@@ -35,14 +37,15 @@ namespace proc
         using File=fs::File;
         tid_t parent;
         VMAR vmar;
-        klib::list<Task*> tasks;
+        tinystl::unordered_set<Task*> tasks;
         File* files[MaxOpenFile];
+        tinystl::string name;
 
         Process(prior_t prior,tid_t parent);
         Process(tid_t pid,prior_t prior,tid_t parent);
         Process(const Process &other,tid_t pid);
         inline Process(const Process &other):Process(other,id){}
-        inline Task* defaultTask(){ return tasks.head->data; }
+        inline Task* defaultTask(){ return *tasks.begin(); } // @todo needs to mark default
         inline tid_t pid(){return id;}
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
@@ -54,7 +57,7 @@ namespace proc
     private:
         xlen_t newUstack();
         xlen_t newKstack();
-        inline void addTask(Task* task){ tasks.push_back(task); }
+        inline void addTask(Task* task){ tasks.insert(task); }
     };
     struct Task:public IdManagable,public Scheduable{ // a.k.a. kthread
         enum class Priv:bool{

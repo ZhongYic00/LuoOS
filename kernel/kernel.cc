@@ -119,6 +119,7 @@ void start_kernel(int hartid){
         printf("%d:Hello RVOS!\n",i);
     extern char _uimg_start;
     auto uproc=proc::createProcess();
+    uproc->name="uprog00";
     uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
     // uproc=proc::createProcess();
     // uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
