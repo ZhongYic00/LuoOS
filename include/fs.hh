@@ -27,6 +27,7 @@ namespace fs{
         {
             pipe::Pipe* pipe;
         }obj;
+        File(FileType ftype=none, INode *inptr=nullptr): type(ftype), in(inptr), ref(0) {};
         void write(xlen_t addr,size_t len);
         void fileClose();
     };

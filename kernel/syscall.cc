@@ -69,7 +69,7 @@ namespace syscall
         in->type = fs::INode::file;
         //
 
-        f = new fs::File;
+        f = new fs::File; // 后面应改成从全局数据结构中分配
         fd = curproc->fdAlloc(f);
         if(fd < 0){
             return statcode::err;
@@ -95,13 +95,14 @@ namespace syscall
         if((fd<0) || (fd>proc::MaxOpenFile)){
             return statcode::err;
         }
-        f = curproc->ofile(fd);
+        
+        f = curproc->files[fd];
         if(f == nullptr){
             return statcode::err;
         }
 
         f->fileClose();
-        f = nullptr;
+        curproc->files[fd] = nullptr;
         return statcode::ok;
     }
     int dupArgsIn(int fd, int newfd=-1){
@@ -112,7 +113,7 @@ namespace syscall
             return statcode::err;
         }
         
-        f = curproc->ofile(fd);
+        f = curproc->files[fd];
         if(f == nullptr){
             return statcode::err;
         }

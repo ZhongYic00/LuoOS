@@ -109,6 +109,7 @@ int Process::fdAlloc(File *file, int fd){ // fd缺省值为-1，在头文件中�
         for(fd = 0; fd < MaxOpenFile; ++fd){
             if(files[fd] == nullptr){
                 files[fd] = file;
+                ++file->ref;
                 return fd;
             }
         }
@@ -116,6 +117,7 @@ int Process::fdAlloc(File *file, int fd){ // fd缺省值为-1，在头文件中�
     else{
         if((fd<MaxOpenFile) && (files[fd]==nullptr)){
             files[fd] = file;
+            ++file->ref;
             return fd;
         }
     }
