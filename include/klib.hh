@@ -60,7 +60,6 @@ struct ListNode{
 
 template<typename T>
 class Seq{};
-// @todo list插入或迭代器遍历时具有bug
 template<typename T,bool LOOPBACK=false>
 struct list:public Seq<T>{
   typedef ListNode<T>* listndptr;
@@ -162,13 +161,14 @@ struct list:public Seq<T>{
       return iterator(head,this);
   }
   iterator end() {
-      return iterator(tail,this);
+      return iterator(tail->iter.next,this);
+      //return iterator(tail,this);
   }
   const_iterator begin() const{
       return const_iterator(head,this);
   }
   const_iterator end() const{
-      return const_iterator(tail,this);
+      return const_iterator(tail->iter.next,this);
   }
   inline bool empty(){
     return head==nullptr;
