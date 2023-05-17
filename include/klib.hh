@@ -64,11 +64,15 @@ class Seq{};
 template<typename T,bool LOOPBACK=false>
 struct list:public Seq<T>{
   typedef ListNode<T>* listndptr;
+  typedef const ListNode<T>* listndptr_const;
   listndptr head;
   listndptr tail;
   inline list(){ head=tail=nullptr; }
   inline list(const std::initializer_list<T> &il):list(){
     for(const auto &i:il)push_back(i);
+  }
+  inline list(const list<T> &other):list(){
+    for(const auto i:other)push_back(i);
   }
   static inline void insertAfter(listndptr cur,listndptr nd){
     nd->iter.next=cur->iter.next;
@@ -105,26 +109,29 @@ struct list:public Seq<T>{
     delete head;
     return rt;
   }
-  class iterator{
-    listndptr ptr;
-    list<T,LOOPBACK> *parent;
+  template<bool isConst>
+  class iteratorbase{
+    using ndptr=std::conditional_t<isConst,listndptr_const,listndptr>;
+    using refT=std::conditional_t<isConst,const T,T>;
+    ndptr ptr;
+    const list<T,LOOPBACK> *parent;
   public:
-      iterator(listndptr p,list<T,LOOPBACK> *parent):ptr(p),parent(parent){}
-      T& operator*() const {
+      iteratorbase(ndptr p,const list<T,LOOPBACK> *parent):ptr(p),parent(parent){}
+      const refT& operator*() const {
           return ptr->data;
       }
-      T* operator->() const {
+      refT* operator->() const {
           return &(ptr->data);
       }
-      iterator& operator++() {
+      iteratorbase& operator++() {
         if(LOOPBACK&&ptr==parent->tail)
           ptr=parent->head;
         else
           ptr=ptr->iter.next;
         return *this;
       }
-      iterator operator++(int) {
-          iterator temp(*this);
+      iteratorbase operator++(int) {
+          iteratorbase temp(*this);
           if(LOOPBACK&&ptr==parent->tail)
             ptr=parent->head;
           else
@@ -132,28 +139,36 @@ struct list:public Seq<T>{
           return temp;
       }
 
-      // iterator operator+(size_t n) const {
+      // iteratorbase operator+(size_t n) const {
       //     listndptr temp=ptr;
       //     while(n-- && temp!=nullptr)temp=temp->iter.next;
-      //     return iterator(temp);
+      //     return iteratorbase(temp);
       // }
-      // iterator& operator+=(size_t n) {
+      // iteratorbase& operator+=(size_t n) {
       //     while(n-- && ptr!=nullptr)ptr=ptr->iter.next;
       //     return *this;
       // }
-      bool operator==(const iterator& other) const {
+      bool operator==(const iteratorbase& other) const {
           return ptr == other.ptr;
       }
-      bool operator!=(const iterator& other) const {
+      bool operator!=(const iteratorbase& other) const {
           return ptr != other.ptr;
       }
 
     };
+  typedef iteratorbase<false> iterator;
+  typedef iteratorbase<true> const_iterator;
   iterator begin() {
       return iterator(head,this);
   }
   iterator end() {
       return iterator(tail,this);
+  }
+  const_iterator begin() const{
+      return const_iterator(head,this);
+  }
+  const_iterator end() const{
+      return const_iterator(tail,this);
   }
   inline bool empty(){
     return head==nullptr;
