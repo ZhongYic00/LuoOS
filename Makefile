@@ -21,6 +21,7 @@ all:  OS #SBI
 ksrcs = kernel/start.S\
 	$(shell find kernel/ -name "*.cc")
 utilsrcs = $(shell find utils/ -name "*.cc")
+utilobjs = $(patsubst %.cc,$(objdir)/%.o,$(utilsrcs))
 src3party = $(shell find thirdparty/ -name "*.cc")
 ksrcs += $(utilsrcs) $(src3party)
 kobjs0 = $(patsubst %.S,$(objdir)/%.o,$(ksrcs))
@@ -50,10 +51,11 @@ $(OS): $(kobjs) $(uimg)
 
 usersrcs = $(shell find user/ -name "*.cc")
 userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))
-$(objdir)/user/%.elf : user/%.cc
-	@echo +CC $<
+$(info utilobjs=$(utilobjs))
+$(objdir)/user/%.elf : user/%.cc $(utilobjs)
+	@echo +CC $^
 	@mkdir -p $(dir $@)
-	$(CC) $(UCFLAGS) -o $@ $<
+	$(CC) $(UCFLAGS) -o $@ $^
 uprogs: $(userprogs)
 $(uimg): $(userprogs)
 	$(OBJCOPY) -I binary -O elf64-littleriscv --binary-architecture riscv --prefix-sections=uimg $< $@
