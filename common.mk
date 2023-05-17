@@ -4,7 +4,7 @@ CROSS_COMPILE = riscv-nuclei-elf-
 CFLAGS = -nostdlib -fno-exceptions -fno-builtin -march=rv64ima -mabi=lp64 -mcmodel=medany -Wall
 
 QEMU = qemu-system-riscv64
-QFLAGS =  -smp 1 -machine virt -bios default -d int,mmu  #-nographic
+QFLAGS =  -smp 1 -m 128M -machine virt -bios default -d int,mmu  #-nographic
 
 GDB = gdb-multiarch
 CC = ${CROSS_COMPILE}g++
