@@ -162,13 +162,14 @@ struct list:public Seq<T>{
       return iterator(head,this);
   }
   iterator end() {
-      return iterator(tail,this);
+      return iterator(tail->iter.next,this);
+      //return iterator(tail,this);
   }
   const_iterator begin() const{
       return const_iterator(head,this);
   }
   const_iterator end() const{
-      return const_iterator(tail,this);
+      return const_iterator(tail->iter.next,this);
   }
   inline bool empty(){
     return head==nullptr;
