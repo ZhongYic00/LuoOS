@@ -19,7 +19,7 @@ xlen_t Process::newKstack(){
     auto kstackv=kInfo.segments.kstack.second;
     xlen_t kstackppn;
     using perm=vm::PageTableEntry::fieldMasks;
-    vmar.map(vm::addr2pn(kstackv),kstackppn=kGlobObjs.pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
+    vmar.map(vm::addr2pn(kstackv),kstackppn=kGlobObjs.pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v,vm::VMO::CloneType::alloc);
     return vm::pn2addr(kstackppn+1)-1;
 }
 
@@ -29,10 +29,17 @@ Task* Process::newTask(){
     thrd->ctx.sp()=newUstack();
     thrd->kctx.kstack=(ptr_t)newKstack();
     addTask(thrd);
+    kGlobObjs.scheduler.add(thrd);
 }
 
-Task* Process::newTask(const Task &other){
+Task* Process::newTask(const Task &other,bool allocStack){
     auto thrd=new (kGlobObjs.taskMgr) Task(other,this->pid());
+    if(allocStack){
+        thrd->ctx.sp()=newUstack();
+        thrd->kctx.kstack=(ptr_t)newKstack();
+    }
+    addTask(thrd);
+    kGlobObjs.scheduler.add(thrd);
 }
 
 void validate(){
@@ -86,13 +93,15 @@ Process* proc::createProcess(){
 Process* Task::getProcess(){ return kGlobObjs.procMgr[proc]; }
 void proc::clone(Task *task){
     auto proc=task->getProcess();
-    // auto newproc=kGlobObjs.procMgr.alloc(*proc);
+    DBG(printf("src proc VMAR:\n");proc->vmar.print();)
     auto newproc=new (kGlobObjs.procMgr) Process(*proc);
-    // newproc->newTask();
+    newproc->newTask(*task,false);
+    newproc->defaultTask()->ctx.a0()=1;
+    DBG(newproc->vmar.print();)
 }
 
 Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar){
-
+    
 }
 
 int Process::fdAlloc(File *file, int fd){ // fd缺省值为-1，在头文件中定义

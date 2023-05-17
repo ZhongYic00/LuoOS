@@ -17,6 +17,7 @@ namespace proc
     {
         xlen_t gpr[30];
         constexpr inline xlen_t& x(int r){return gpr[r-1];}
+        inline xlen_t& a0(){return x(10);}
         inline xlen_t& sp(){return x(2);}
         xlen_t pc;
     };
@@ -47,7 +48,7 @@ namespace proc
         inline xlen_t satp(){return vmar.satp();}
         inline File *ofile(int fd){return files[fd];}
         Task* newTask();
-        Task* newTask(const Task &other);
+        Task* newTask(const Task &other,bool allocStack=true);
         void print();
         int fdAlloc(File *file, int newfd=-1);
     private:

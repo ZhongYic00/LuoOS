@@ -15,7 +15,7 @@ namespace syscall
     }
     int write(){
         auto &ctx=kHartObjs.curtask->ctx;
-        int fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
+        xlen_t fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
         file->write(uva,len);
     }
@@ -47,6 +47,7 @@ namespace syscall
     int clone(){
         auto &ctx=kHartObjs.curtask->ctx;
         proc::clone(kHartObjs.curtask);
+        return statcode::ok;
     }
     int openAt(){
         auto &ctx = kHartObjs.curtask->ctx;
