@@ -18,3 +18,18 @@ void fs::File::write(xlen_t addr,size_t len){
             break;
     }
 }
+
+void fs::File::fileClose(){
+    --ref;
+    if(ref <= 0){
+        /*
+            switch(type){
+                对管道、设备等的处理
+            }
+        */
+        ref = 0;
+        type = none;
+        // 需不需要delete等操作?
+    }
+    return;
+}

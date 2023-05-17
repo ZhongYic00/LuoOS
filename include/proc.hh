@@ -28,6 +28,7 @@ namespace proc
 
     struct Task;
     constexpr xlen_t UserStackDefault=0x7fffffff;
+    constexpr int MaxOpenFile = 3;
 
     typedef tid_t pid_t;
     struct Process:public IdManagable,public Scheduable{
@@ -35,7 +36,7 @@ namespace proc
         tid_t parent;
         VMAR vmar;
         klib::list<Task*> tasks;
-        File* files[3];
+        File* files[MaxOpenFile];
 
         Process(prior_t prior,tid_t parent);
         Process(tid_t pid,prior_t prior,tid_t parent);
@@ -49,6 +50,7 @@ namespace proc
         Task* newTask();
         Task* newTask(const Task &other,bool allocStack=true);
         void print();
+        int fdAlloc(File *file, int newfd=-1);
     private:
         xlen_t newUstack();
         xlen_t newKstack();

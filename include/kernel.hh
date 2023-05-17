@@ -19,6 +19,10 @@ namespace sys
         testexit,
         testyield,
         testwrite,
+        dup=23,
+        dup3=24,
+        openat=56,
+        close=57,
         read=63,
         write=64,
         yield=124,
@@ -28,7 +32,7 @@ namespace sys
         nSyscalls,
     };
     enum statcode{
-        ok
+        ok=0, err=-1
     };
     static inline xlen_t syscall6(xlen_t id, xlen_t arg0, xlen_t arg1, xlen_t arg2, xlen_t arg3, xlen_t arg4, xlen_t arg5){
         register xlen_t a0 asm("a0") = arg0;
