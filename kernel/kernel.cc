@@ -43,12 +43,12 @@ static void stub(){
 // __attribute__((section("init")))
 void kernel::createKernelMapping( vm::VMAR &vmar){
     using perm=vm::PageTableEntry::fieldMasks;
-    { auto &seg=kInfo.segments.text;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::x);}
+    { auto &seg=kInfo.segments.text;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::x,vm::VMO::CloneType::shared);}
     DBG(vmar.print();)
-    { auto &seg=kInfo.segments.rodata;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r);}
-    { auto &seg=kInfo.segments.kstack;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
-    { auto &seg=kInfo.segments.data;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
-    { auto &seg=kInfo.segments.bss;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w);}
+    { auto &seg=kInfo.segments.rodata;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r,vm::VMO::CloneType::shared);}
+    { auto &seg=kInfo.segments.kstack;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w,vm::VMO::CloneType::shared);}
+    { auto &seg=kInfo.segments.data;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w,vm::VMO::CloneType::shared);}
+    { auto &seg=kInfo.segments.bss;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w,vm::VMO::CloneType::shared);}
 }
 static void memInit(){
     csr::satp satp;
@@ -120,10 +120,9 @@ void start_kernel(int hartid){
     extern char _uimg_start;
     auto uproc=proc::createProcess();
     uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
-    kGlobObjs.scheduler.add(uproc->defaultTask());
-    uproc=proc::createProcess();
-    uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
-    kGlobObjs.scheduler.add(uproc->defaultTask());
+    // uproc=proc::createProcess();
+    // uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
+    // kGlobObjs.scheduler.add(uproc->defaultTask());
     timerInit();
     csrClear(sstatus,1l<<csr::mstatus::spp);
     csrSet(sstatus,BIT(csr::mstatus::spie));
