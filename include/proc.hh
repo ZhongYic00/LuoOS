@@ -14,6 +14,7 @@ namespace proc
     using sched::Scheduable;
     using sched::prior_t;
     using vm::VMAR;
+    using klib::SmartPtr;
 
     struct Context
     {
@@ -38,7 +39,7 @@ namespace proc
         tid_t parent;
         VMAR vmar;
         tinystl::unordered_set<Task*> tasks;
-        File* files[MaxOpenFile];
+        sharedptr<File> files[MaxOpenFile];
         tinystl::string name;
 
         Process(prior_t prior,tid_t parent);
@@ -49,11 +50,11 @@ namespace proc
         inline tid_t pid(){return id;}
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
-        inline File *ofile(int fd){return files[fd];}
+        inline sharedptr<File> ofile(int fd){return files[fd];}
         Task* newTask();
         Task* newTask(const Task &other,bool allocStack=true);
         void print();
-        int fdAlloc(File *file, int newfd=-1);
+        int fdAlloc(sharedptr<File> a_file, int a_fd=-1);
     private:
         xlen_t newUstack();
         xlen_t newKstack();

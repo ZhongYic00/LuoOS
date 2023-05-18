@@ -24,39 +24,39 @@ namespace klib
   };
   
 
-template<typename T,size_t buffsize=128>
-struct ringbuf
-{
-	T buff[128];
-	size_t head,tail;
-	FORCEDINLINE size_t next(size_t cur){return (cur+1)%buffsize;}
-	inline void put(T d){
-		buff[tail]=d;
-		tail=next(tail);
-	}
-	inline void pop(){
-		head=next(head);
-	}
-	inline T get(){
-		return buff[head];
-	}
-	inline bool empty(){
-		return head==tail;
-	}
-  inline bool full(){
-    return next(tail)==head;
-  }
-};
+  template<typename T,size_t buffsize=128>
+  struct ringbuf
+  {
+    T buff[128];
+    size_t head,tail;
+    FORCEDINLINE size_t next(size_t cur){return (cur+1)%buffsize;}
+    inline void put(T d){
+      buff[tail]=d;
+      tail=next(tail);
+    }
+    inline void pop(){
+      head=next(head);
+    }
+    inline T get(){
+      return buff[head];
+    }
+    inline bool empty(){
+      return head==tail;
+    }
+    inline bool full(){
+      return next(tail)==head;
+    }
+  };
 
-template<typename T>
-struct ListNode{
-  T data;
-  union {
-    ListNode *prev;
-    ListNode *next;
-  }iter;
-  ListNode(const T& data):data(data){this->iter.next=nullptr; }
-};
+  template<typename T>
+  struct ListNode{
+    T data;
+    union {
+      ListNode *prev;
+      ListNode *next;
+    }iter;
+    ListNode(const T& data):data(data){this->iter.next=nullptr; }
+  };
 
 template<typename T>
 class Seq{};
@@ -81,46 +81,46 @@ struct list:public Seq<T>{
     nd->iter.next=cur;
   }
 
-  inline void push_back(listndptr newNode){
-    if(tail)
-      list::insertAfter(tail,newNode),tail=newNode;
-    else
-      head=tail=newNode;
-  }
-  inline void push_back(const T &data){
-    listndptr newNode=new ListNode<T>(data);
-    push_back(newNode);
-  }
-  inline void push_front(listndptr newNode){
-    if(head)
-      list::insertBefore(head,newNode),head=newNode;
-    else
-      head=tail=newNode;
-  }
-  inline void push_front(const T &data){
-    listndptr newNode=new ListNode<T>(data);
-    push_front(newNode);
-  }
-  inline T pop_front(){
-    T rt=head->data;
-    if(head==tail)tail=nullptr;
-    head=head->iter.next;
-    delete head;
-    return rt;
-  }
-  template<bool isConst>
-  class iteratorbase{
-    using ndptr=std::conditional_t<isConst,listndptr_const,listndptr>;
-    using refT=std::conditional_t<isConst,const T,T>;
-    ndptr ptr;
-    const list<T,LOOPBACK> *parent;
-  public:
+    inline void push_back(listndptr newNode){
+      if(tail)
+        list::insertAfter(tail,newNode),tail=newNode;
+      else
+        head=tail=newNode;
+    }
+    inline void push_back(const T &data){
+      listndptr newNode=new ListNode<T>(data);
+      push_back(newNode);
+    }
+    inline void push_front(listndptr newNode){
+      if(head)
+        list::insertBefore(head,newNode),head=newNode;
+      else
+        head=tail=newNode;
+    }
+    inline void push_front(const T &data){
+      listndptr newNode=new ListNode<T>(data);
+      push_front(newNode);
+    }
+    inline T pop_front(){
+      T rt=head->data;
+      if(head==tail)tail=nullptr;
+      head=head->iter.next;
+      delete head;
+      return rt;
+    }
+    template<bool isConst>
+    class iteratorbase{
+      using ndptr=std::conditional_t<isConst,listndptr_const,listndptr>;
+      using refT=std::conditional_t<isConst,const T,T>;
+      ndptr ptr;
+      const list<T,LOOPBACK> *parent;
+    public:
       iteratorbase(ndptr p,const list<T,LOOPBACK> *parent):ptr(p),parent(parent){}
       const refT& operator*() const {
-          return ptr->data;
+        return ptr->data;
       }
       refT* operator->() const {
-          return &(ptr->data);
+        return &(ptr->data);
       }
       iteratorbase& operator++() {
         if(LOOPBACK&&ptr==parent->tail)
@@ -130,30 +130,28 @@ struct list:public Seq<T>{
         return *this;
       }
       iteratorbase operator++(int) {
-          iteratorbase temp(*this);
-          if(LOOPBACK&&ptr==parent->tail)
-            ptr=parent->head;
-          else
-            ptr=ptr->iter.next;
-          return temp;
+        iteratorbase temp(*this);
+        if(LOOPBACK&&ptr==parent->tail)
+          ptr=parent->head;
+        else
+          ptr=ptr->iter.next;
+        return temp;
       }
-
       // iteratorbase operator+(size_t n) const {
-      //     listndptr temp=ptr;
-      //     while(n-- && temp!=nullptr)temp=temp->iter.next;
-      //     return iteratorbase(temp);
+      //   listndptr temp=ptr;
+      //   while(n-- && temp!=nullptr)temp=temp->iter.next;
+      //   return iteratorbase(temp);
       // }
       // iteratorbase& operator+=(size_t n) {
-      //     while(n-- && ptr!=nullptr)ptr=ptr->iter.next;
-      //     return *this;
+      //   while(n-- && ptr!=nullptr)ptr=ptr->iter.next;
+      //   return *this;
       // }
       bool operator==(const iteratorbase& other) const {
-          return ptr == other.ptr;
+        return ptr == other.ptr;
       }
       bool operator!=(const iteratorbase& other) const {
-          return ptr != other.ptr;
+        return ptr != other.ptr;
       }
-
     };
   typedef iteratorbase<false> iterator;
   typedef iteratorbase<true> const_iterator;
@@ -197,65 +195,145 @@ struct list:public Seq<T>{
     T *buff;
     ArrayBuff(size_t len):len(len){buff=new T[len];}
     ArrayBuff(T* addr,size_t len):ArrayBuff(len){
-        memcpy(buff,addr,len*sizeof(T));
+      memcpy(buff,addr,len*sizeof(T));
     }
     class iterator{
       T* ptr;
     public:
       iterator(T* p) : ptr(p) {}
       T& operator*() const {
-            return *ptr;
-        }
-        T* operator->() const {
-            return ptr;
-        }
-        iterator& operator++() {
-            ++ptr;
-            return *this;
-        }
-        iterator operator++(int) {
-            iterator temp(*this);
-            ++ptr;
-            return temp;
-        }
-        iterator& operator--() {
-            --ptr;
-            return *this;
-        }
-        iterator operator--(int) {
-            iterator temp(*this);
-            --ptr;
-            return temp;
-        }
-        iterator operator+(size_t n) const {
-            return iterator(ptr + n);
-        }
-        iterator operator-(size_t n) const {
-            return iterator(ptr - n);
-        }
-        iterator& operator+=(size_t n) {
-            ptr += n;
-            return *this;
-        }
-        iterator& operator-=(size_t n) {
-            ptr -= n;
-            return *this;
-        }
-        T& operator[](size_t n) const {
-            return *(ptr + n);
-        }
-        bool operator==(const iterator& other) const {
-            return ptr == other.ptr;
-        }
-        bool operator!=(const iterator& other) const {
-            return ptr != other.ptr;
-        }
+        return *ptr;
+      }
+      T* operator->() const {
+        return ptr;
+      }
+      iterator& operator++() {
+        ++ptr;
+        return *this;
+      }
+      iterator operator++(int) {
+        iterator temp(*this);
+        ++ptr;
+        return temp;
+      }
+      iterator& operator--() {
+        --ptr;
+        return *this;
+      }
+      iterator operator--(int) {
+        iterator temp(*this);
+        --ptr;
+        return temp;
+      }
+      iterator operator+(size_t n) const {
+        return iterator(ptr + n);
+      }
+      iterator operator-(size_t n) const {
+        return iterator(ptr - n);
+      }
+      iterator& operator+=(size_t n) {
+        ptr += n;
+        return *this;
+      }
+      iterator& operator-=(size_t n) {
+        ptr -= n;
+        return *this;
+      }
+      T& operator[](size_t n) const {
+        return *(ptr + n);
+      }
+      bool operator==(const iterator& other) const {
+        return ptr == other.ptr;
+      }
+      bool operator!=(const iterator& other) const {
+        return ptr != other.ptr;
+      }
     };
     iterator begin(){return iterator(buff);}
     iterator end(){return iterator(buff+len);}
     const char* c_str(){return reinterpret_cast<char*>(buff);}
   };
   typedef ArrayBuff<uint8_t> ByteArray;
+
+  // meta data block
+  struct MDB{
+    size_t m_ref;
+    MDB(): m_ref(0) {};
+  };
+  template<typename T>
+  /*
+    SmartPointer, by Ct_Unvs
+    SmartPtr只能用于动态对象，且SmartPtr本身不应使用new创建
+  */
+  class SmartPtr {
+    private:
+      T *m_ptr;
+      MDB *m_meta;
+    public:
+      // 构造与析构
+      SmartPtr(): m_ptr(nullptr), m_meta(nullptr) {}
+      SmartPtr(T *a_ptr): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB):nullptr) {}
+      SmartPtr(const SmartPtr<T> &a_sptr): m_ptr(a_sptr.m_ptr), m_meta(a_sptr.m_meta) { ++(m_meta->m_ref); }
+      ~SmartPtr() { deRef(); }
+      // 赋值运算
+      const SmartPtr<T> operator=(T *a_ptr) {
+        deRef();
+        m_ptr = a_ptr;
+        if(a_ptr != nullptr) { m_meta = new MDB; }
+        else { m_meta = nullptr; }
+        return *this;
+      }
+      const SmartPtr<T> operator=(const SmartPtr<T> &a_sptr) {
+        deRef();
+        m_ptr = a_sptr.m_ptr;
+        m_meta = a_sptr.m_meta;
+        if(m_meta != nullptr) { ++(m_meta->m_ref); }
+        return *this;
+      }
+      // 引用运算
+      T& operator*() const { return *m_ptr; }
+      T* operator->() const { return m_ptr; }
+      T& operator[](int a_offset) const { return m_ptr[a_offset]; }
+      // 算术运算
+      T *const operator+(int a_offset) const {
+        if(m_ptr != nullptr) { return m_ptr + a_offset; }
+        else { return nullptr; }
+      }
+      T *const operator-(int a_offset) const {
+        if(m_ptr != nullptr) { return m_ptr - a_offset; }
+        else { return nullptr; }
+      }
+      const int operator-(T *a_ptr) const { return m_ptr - a_ptr; }
+      const int operator-(const SmartPtr<T> &a_sptr) const { return m_ptr - a_sptr.m_ptr; }
+      // 逻辑运算
+      const bool operator>(T *a_ptr) const { return m_ptr > a_ptr; }
+      const bool operator<(T *a_ptr) const { return m_ptr < a_ptr; }
+      const bool operator>=(T *a_ptr) const { return m_ptr >= a_ptr; }
+      const bool operator<=(T *a_ptr) const { return m_ptr <= a_ptr; }
+      const bool operator==(T *a_ptr) const { return m_ptr == a_ptr; }
+      const bool operator>(const SmartPtr<T> &a_sptr) const { return m_ptr > a_sptr.m_ptr; }
+      const bool operator<(const SmartPtr<T> &a_sptr) const { return m_ptr < a_sptr.m_ptr; }
+      const bool operator>=(const SmartPtr<T> &a_sptr) const { return m_ptr >= a_sptr.m_ptr; }
+      const bool operator<=(const SmartPtr<T> &a_sptr) const { return m_ptr <= a_sptr.m_ptr; }
+      const bool operator==(const SmartPtr<T> &a_sptr) const { return m_ptr == a_sptr.m_ptr; }
+      // 功能函数
+      void deRef() {
+        if(m_meta != nullptr) {
+          if(--(m_meta->m_ref) <= 0){
+            delete m_meta;
+            delete m_ptr;
+          }
+        }
+        m_ptr = nullptr;
+        m_meta = nullptr;
+        return;
+      }
+      T *const rawPtr() const { return m_ptr; }
+      const MDB& metaData() const { return *m_meta; }
+      void print() const {
+        printf("SmartPointer: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
+      }
+  };
 } // namespace klib
 
 static klib::ringbuf<char> buf;

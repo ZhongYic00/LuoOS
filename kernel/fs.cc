@@ -18,7 +18,3 @@ void fs::File::write(xlen_t addr,size_t len){
             break;
     }
 }
-
-void fs::File::fileClose(){
-    return;
-}

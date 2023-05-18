@@ -84,7 +84,7 @@ Process* proc::createProcess(){
     // auto proc=kGlobObjs.procMgr.alloc(0,0);
     auto proc=new (kGlobObjs.procMgr) Process(0,0);
     proc->newTask();
-    proc->files[0]=new fs::File(fs::File::stdout);
+    proc->files[0]=make_shared<fs::File>(fs::File::stdout);
     DBG(proc->print();)
     printf("proc created. pid=%d\n",proc->id);
     return proc;
@@ -103,20 +103,20 @@ Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(oth
     for(int i=0;i<3;i++)files[i]=other.files[i];
 }
 
-int Process::fdAlloc(File *file, int fd){ // fd缺省值为-1，在头文件中定义
-    if(fd < 0){
-        for(fd = 0; fd < MaxOpenFile; ++fd){
-            if(files[fd] == nullptr){
-                files[fd] = file;
-                return fd;
-            }
+int Process::fdAlloc(sharedptr<File> a_file, int a_fd){ // fd缺省值为-1，在头文件中定义
+    if(a_fd < 0) {
+        for(int fd = 0; fd < MaxOpenFile; ++fd){
+            // if(files[fd] == nullptr){
+            //     files[fd] = a_file;
+            //     return fd;
+            // }
         }
     }
-    else{
-        if((fd<MaxOpenFile) && (files[fd]==nullptr)){
-            files[fd] = file;
-            return fd;
-        }
+    else {
+        // if((a_fd<MaxOpenFile) && (files[a_fd]==nullptr)){
+        //     files[a_fd] = a_file;
+        //     return a_fd;
+        // }
     }
     return -1;  // 返回错误码
 }

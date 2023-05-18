@@ -33,9 +33,10 @@ ptr_t operator new(size_t size, ObjManager<T> &mgr){
 }
 template<typename T>class sharedptr;
 typedef int ref_t;
-template<typename T,typename... Ts>
+template<typename T>
 class SharedObj{
     ref_t refs;
+    template<typename... Ts>
     SharedObj(Ts&& ...params):refs(0),obj(std::forward<Ts>(params)...){}
 public:
     T obj;
@@ -53,7 +54,7 @@ template<typename T>
 class sharedptr{
     SharedObj<T> *shared;
 public:
-    sharedptr()=delete;
+    sharedptr():shared(nullptr){}
     sharedptr(sharedptr<T>&& other)=default;
     sharedptr(SharedObj<T> *shared):shared(shared){shared->ref();}
     sharedptr(const sharedptr<T> &other):shared(other.shared){shared->ref();}
@@ -61,10 +62,11 @@ public:
     T &operator*() { return shared->obj; }
     T *operator->() { return &(shared->obj); }
     inline ref_t refcount(){return shared->refcount();}
+    inline bool valid(){return shared!=nullptr;}
     sharedptr<T>& operator=(const sharedptr<T>& other)
 	{
         if(shared!=other.shared){
-            shared->release();
+            if(shared)shared->release();
             shared=other.shared;
             shared->ref();
         }
@@ -74,7 +76,7 @@ public:
 
 template<typename T, typename... Ts>
 sharedptr<T> make_shared(Ts&& ...params){
-    auto obj=new SharedObj<T,Ts...>(std::forward<Ts>(params)...);
+    auto obj=new SharedObj<T>(std::forward<Ts>(params)...);
     return sharedptr<T>(obj);
 }
 
