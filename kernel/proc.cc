@@ -84,8 +84,7 @@ Process* proc::createProcess(){
     // auto proc=kGlobObjs.procMgr.alloc(0,0);
     auto proc=new (kGlobObjs.procMgr) Process(0,0);
     proc->newTask();
-    proc->files[0]=new fs::File;
-    proc->files[0]->type=fs::File::stdout;
+    proc->files[0]=new fs::File(fs::File::stdout);
     DBG(proc->print();)
     printf("proc created. pid=%d\n",proc->id);
     return proc;

@@ -69,20 +69,6 @@ namespace syscall
         in->type = fs::INode::file;
         //
 
-        f = new fs::File;
-        fd = curproc->fdAlloc(f);
-        if(fd < 0){
-            return statcode::err;
-        }
-
-        if(in->type == fs::INode::dev){
-            f->type = fs::File::dev;
-        }
-        else{
-            f->type = fs::File::inode;
-        }
-        f->in = in;
-
         return fd;
     }
     int close(){
