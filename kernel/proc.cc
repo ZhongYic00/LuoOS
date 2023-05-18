@@ -3,6 +3,7 @@
 #include "kernel.hh"
 
 using namespace proc;
+using klib::make_shared;
 
 #define DEBUG 1
 Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){

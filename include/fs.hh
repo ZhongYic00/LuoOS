@@ -7,7 +7,8 @@
 #include "klib.hh"
 
 namespace fs{
-    // using klib::SmartPtr;
+    using klib::sharedptr;
+    using klib::make_shared;
     struct INode{
         enum INodeType{
             dir, file, dev

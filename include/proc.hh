@@ -14,7 +14,7 @@ namespace proc
     using sched::Scheduable;
     using sched::prior_t;
     using vm::VMAR;
-    using klib::SmartPtr;
+    using klib::sharedptr;
 
     struct Context
     {

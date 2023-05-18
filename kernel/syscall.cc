@@ -6,7 +6,8 @@ extern void _strapexit();
 namespace syscall
 {
     using sys::statcode;
-    // using klib::SmartPtr;
+    using klib::sharedptr;
+    using klib::make_shared;
     int none(){return 0;}
     int testexit(){
         static bool b=false;
