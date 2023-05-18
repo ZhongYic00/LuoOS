@@ -6,6 +6,7 @@ extern void _strapexit();
 namespace syscall
 {
     using sys::statcode;
+    using klib::SmartPtr;
     int none(){return 0;}
     int testexit(){
         static bool b=false;
@@ -49,16 +50,16 @@ namespace syscall
         proc::clone(kHartObjs.curtask);
         return statcode::ok;
     }
-    int openAt(){
+    int openAt() {
         auto &ctx = kHartObjs.curtask->ctx;
-        int dirfd = ctx.x(10);
-        const char *path = (const char*)ctx.x(11);
-        int flags = ctx.x(12);
-        mode_t mode = ctx.x(13); // uint32
+        int a_dirfd = ctx.x(10);
+        const char *a_path = (const char*)ctx.x(11);
+        int a_flags = ctx.x(12);
+        mode_t a_mode = ctx.x(13); // uint32
 
         int fd;
-        fs::File *f;
-        fs::INode *in;
+        SmartPtr<fs::File> f;
+        SmartPtr<fs::INode> in;
         auto curproc = kHartObjs.curtask->getProcess();
 
         /*
@@ -66,81 +67,63 @@ namespace syscall
         */
         // 测试用
         in = new fs::INode;
-        in->type = fs::INode::file;
+        in->m_type = fs::INode::file;
         //
 
         f = new fs::File; // 后面应改成从全局数据结构中分配
         fd = curproc->fdAlloc(f);
-        if(fd < 0){
-            return statcode::err;
-        }
+        if(fd < 0) { return statcode::err; }
 
-        if(in->type == fs::INode::dev){
-            f->type = fs::File::dev;
-        }
-        else{
-            f->type = fs::File::inode;
-        }
+        if(in->m_type == fs::INode::dev) { f->type = fs::File::dev; }
+        else { f->type = fs::File::inode; }
         f->in = in;
 
         return fd;
     }
-    int close(){
+    int close() {
         auto &ctx = kHartObjs.curtask->ctx;
-        int fd = ctx.x(10);
+        int a_fd = ctx.x(10);
 
-        fs::File *f;
+        SmartPtr<fs::File> f;
         auto curproc = kHartObjs.curtask->getProcess();
         // 判断fd范围也许可以写成宏……
-        if((fd<0) || (fd>proc::MaxOpenFile)){
-            return statcode::err;
-        }
+        if((a_fd<0) || (a_fd>proc::MaxOpenFile)) { return statcode::err; }
         
-        f = curproc->files[fd];
-        if(f == nullptr){
-            return statcode::err;
-        }
+        f = curproc->files[a_fd];
+        if(f == nullptr) { return statcode::err; }
 
-        f->fileClose();
-        curproc->files[fd] = nullptr;
+        curproc->files[a_fd].deRef();
         return statcode::ok;
     }
-    int dupArgsIn(int fd, int newfd=-1){
-        fs::File *f;
+    int dupArgsIn(int a_fd, int a_newfd=-1) {
+        int newfd;
+        SmartPtr<fs::File> f;
         auto curproc = kHartObjs.curtask->getProcess();
         // 判断fd范围也许可以写成宏……
-        if((fd<0) || (fd>proc::MaxOpenFile)){
-            return statcode::err;
-        }
+        if((a_fd<0) || (a_fd>proc::MaxOpenFile)) { return statcode::err; }
         
-        f = curproc->files[fd];
-        if(f == nullptr){
-            return statcode::err;
-        }
+        f = curproc->files[a_fd];
+        if(f == nullptr) { return statcode::err; }
         // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
-        newfd = curproc->fdAlloc(f, newfd);
-        if(newfd < 0){
-            return statcode::err;
-        }
+        newfd = curproc->fdAlloc(f, a_newfd);
+        if(newfd < 0) { return statcode::err; }
 
         return newfd;
     }
-    int dup(){
+    int dup() {
         auto &ctx = kHartObjs.curtask->ctx;
-        int fd = ctx.x(10);
+        int a_fd = ctx.x(10);
 
-        return dupArgsIn(fd);
+        return dupArgsIn(a_fd);
     }
-    int dup3(){
+    int dup3() {
         auto &ctx = kHartObjs.curtask->ctx;
-        int fd = ctx.x(10);
-        int newfd = ctx.x(11);
+        int a_fd = ctx.x(10);
+        int a_newfd = ctx.x(11);
         // 判断fd范围也许可以写成宏……
-        if((newfd<0) || (newfd>proc::MaxOpenFile)){
-            return statcode::err;
-        }
+        if((a_newfd<0) || (a_newfd>proc::MaxOpenFile)){ return statcode::err; }
 
-        return dupArgsIn(fd, newfd);
+        return dupArgsIn(a_fd, a_newfd);
     }
     void init(){
         using sys::syscalls;

@@ -5,6 +5,7 @@
 #include "vm.hh"
 #include "fs.hh"
 #include "resmgr.hh"
+#include "klib.hh"
 
 namespace proc
 {
@@ -12,6 +13,7 @@ namespace proc
     using sched::Scheduable;
     using sched::prior_t;
     using vm::VMAR;
+    using klib::SmartPtr;
 
     struct Context
     {
@@ -36,7 +38,7 @@ namespace proc
         tid_t parent;
         VMAR vmar;
         klib::list<Task*> tasks;
-        File* files[MaxOpenFile];
+        SmartPtr<File> files[MaxOpenFile];
 
         Process(prior_t prior,tid_t parent);
         Process(tid_t pid,prior_t prior,tid_t parent);
@@ -46,11 +48,11 @@ namespace proc
         inline tid_t pid(){return id;}
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
-        inline File *ofile(int fd){return files[fd];}
+        inline SmartPtr<File> ofile(int fd){return files[fd];}
         Task* newTask();
         Task* newTask(const Task &other,bool allocStack=true);
         void print();
-        int fdAlloc(File *file, int newfd=-1);
+        int fdAlloc(SmartPtr<File> a_file, int a_fd=-1);
     private:
         xlen_t newUstack();
         xlen_t newKstack();

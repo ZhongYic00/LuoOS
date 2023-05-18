@@ -104,21 +104,19 @@ Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(oth
     
 }
 
-int Process::fdAlloc(File *file, int fd){ // fd缺省值为-1，在头文件中定义
-    if(fd < 0){
-        for(fd = 0; fd < MaxOpenFile; ++fd){
+int Process::fdAlloc(SmartPtr<File> a_file, int a_fd){ // fd缺省值为-1，在头文件中定义
+    if(a_fd < 0) {
+        for(int fd = 0; fd < MaxOpenFile; ++fd){
             if(files[fd] == nullptr){
-                files[fd] = file;
-                ++file->ref;
+                files[fd] = a_file;
                 return fd;
             }
         }
     }
-    else{
-        if((fd<MaxOpenFile) && (files[fd]==nullptr)){
-            files[fd] = file;
-            ++file->ref;
-            return fd;
+    else {
+        if((a_fd<MaxOpenFile) && (files[a_fd]==nullptr)){
+            files[a_fd] = a_file;
+            return a_fd;
         }
     }
     return -1;  // 返回错误码
