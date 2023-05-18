@@ -259,34 +259,35 @@ struct list:public Seq<T>{
   typedef int ref_t;
   struct MDB{
     ref_t m_ref;
-    MDB(): m_ref(0) {};
+    MDB(): m_ref(1) {};
   };
   template<typename T>
   /*
-    SmartPointer, by Ct_Unvs
-    SmartPtr只能用于动态对象，且SmartPtr本身不应使用new创建
+    SharedPtr, by Ct_Unvs
+    SharedPtr只能用于动态对象，且SharedPtr本身不应使用new创建
   */
-  class sharedptr {
+  class SharedPtr {
     private:
       T *m_ptr;
       MDB *m_meta;
-      sharedptr(T *a_ptr): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB):nullptr) {m_meta->m_ref++;}      
-      template<typename T1, typename... T1s>
-      friend sharedptr<T1> make_shared(T1s&& ...params);
+      // template<typename T1, typename... T1s>
+      // friend SharedPtr<T1> make_shared(T1s&& ...params);
+      // SharedPtr(T *a_ptr): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB):nullptr) {}
     public:
       // 构造与析构
-      sharedptr(): m_ptr(nullptr), m_meta(nullptr) {}
-      sharedptr(const sharedptr<T> &a_sptr): m_ptr(a_sptr.m_ptr), m_meta(a_sptr.m_meta) { ++(m_meta->m_ref); }
-      ~sharedptr() { deRef(); }
+      SharedPtr(): m_ptr(nullptr), m_meta(nullptr) {}
+      SharedPtr(T *a_ptr): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB):nullptr) {}
+      SharedPtr(const SharedPtr<T> &a_sptr): m_ptr(a_sptr.m_ptr), m_meta(a_sptr.m_meta) { ++(m_meta->m_ref); }
+      ~SharedPtr() { deRef(); }
       // 赋值运算
-      const sharedptr<T> operator=(T *a_ptr) {
+      const SharedPtr<T> operator=(T *a_ptr) {
         deRef();
         m_ptr = a_ptr;
         if(a_ptr != nullptr) { m_meta = new MDB; }
         else { m_meta = nullptr; }
         return *this;
       }
-      const sharedptr<T> operator=(const sharedptr<T> &a_sptr) {
+      const SharedPtr<T> operator=(const SharedPtr<T> &a_sptr) {
         deRef();
         m_ptr = a_sptr.m_ptr;
         m_meta = a_sptr.m_meta;
@@ -298,27 +299,21 @@ struct list:public Seq<T>{
       T* operator->() const { return m_ptr; }
       T& operator[](int a_offset) const { return m_ptr[a_offset]; }
       // 算术运算
-      T *const operator+(int a_offset) const {
-        if(m_ptr != nullptr) { return m_ptr + a_offset; }
-        else { return nullptr; }
-      }
-      T *const operator-(int a_offset) const {
-        if(m_ptr != nullptr) { return m_ptr - a_offset; }
-        else { return nullptr; }
-      }
+      T *const operator+(int a_offset) const { return (m_ptr!=nullptr) ? (m_ptr+a_offset) : nullptr; }
+      T *const operator-(int a_offset) const { return (m_ptr!=nullptr) ? (m_ptr-a_offset) : nullptr; }
       const int operator-(T *a_ptr) const { return m_ptr - a_ptr; }
-      const int operator-(const sharedptr<T> &a_sptr) const { return m_ptr - a_sptr.m_ptr; }
+      const int operator-(const SharedPtr<T> &a_sptr) const { return m_ptr - a_sptr.m_ptr; }
       // 逻辑运算
       const bool operator>(T *a_ptr) const { return m_ptr > a_ptr; }
       const bool operator<(T *a_ptr) const { return m_ptr < a_ptr; }
       const bool operator>=(T *a_ptr) const { return m_ptr >= a_ptr; }
       const bool operator<=(T *a_ptr) const { return m_ptr <= a_ptr; }
       const bool operator==(T *a_ptr) const { return m_ptr == a_ptr; }
-      const bool operator>(const sharedptr<T> &a_sptr) const { return m_ptr > a_sptr.m_ptr; }
-      const bool operator<(const sharedptr<T> &a_sptr) const { return m_ptr < a_sptr.m_ptr; }
-      const bool operator>=(const sharedptr<T> &a_sptr) const { return m_ptr >= a_sptr.m_ptr; }
-      const bool operator<=(const sharedptr<T> &a_sptr) const { return m_ptr <= a_sptr.m_ptr; }
-      const bool operator==(const sharedptr<T> &a_sptr) const { return m_ptr == a_sptr.m_ptr; }
+      const bool operator>(const SharedPtr<T> &a_sptr) const { return m_ptr > a_sptr.m_ptr; }
+      const bool operator<(const SharedPtr<T> &a_sptr) const { return m_ptr < a_sptr.m_ptr; }
+      const bool operator>=(const SharedPtr<T> &a_sptr) const { return m_ptr >= a_sptr.m_ptr; }
+      const bool operator<=(const SharedPtr<T> &a_sptr) const { return m_ptr <= a_sptr.m_ptr; }
+      const bool operator==(const SharedPtr<T> &a_sptr) const { return m_ptr == a_sptr.m_ptr; }
       // 功能函数
       void deRef() {
         if(m_meta != nullptr) {
@@ -331,18 +326,27 @@ struct list:public Seq<T>{
         m_meta = nullptr;
         return;
       }
-      T *const rawPtr() const { return m_ptr; }
-      const MDB& metaData() const { return *m_meta; }
-      inline bool valid() const { return m_ptr!=nullptr; }
+      inline T *const rawPtr() const { return m_ptr; }
+      inline const MDB& metaData() const { return *m_meta; }
+      inline const int refCount() const { return (m_meta!=nullptr) ? (m_meta->m_ref) : 0; }
+      inline const bool expired() const { return (m_meta!=nullptr) ? (m_meta->m_ref<=0) : true; }
+      // inline const bool valid() const { return m_ptr != nullptr; }
       void print() const {
-        printf("SmartPointer: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
+        printf("SharedPtr: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
       }
   };
-  template<typename T, typename... Ts>
-  sharedptr<T> make_shared(Ts&& ...params){
-      auto obj=new T(std::forward<Ts>(params)...);
-      return sharedptr<T>(obj);
-  }
+  /*
+    SharedPtr的创建方式:
+      SharedPtr<T> sptr;
+      SharedPtr<T> sptr = nullptr;
+      SharedPtr<T> sptr = new T;
+      SharedPtr<T> sptr = sptr2;
+  */
+  // template<typename T, typename... Ts>
+  // SharedPtr<T> make_shared(Ts&& ...params){
+  //   auto obj = new T(std::forward<Ts>(params)...);
+  //   return SharedPtr<T>(obj);
+  // }
 } // namespace klib
 
 static klib::ringbuf<char> buf;

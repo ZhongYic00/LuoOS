@@ -7,8 +7,8 @@
 #include "klib.hh"
 
 namespace fs{
-    using klib::sharedptr;
-    using klib::make_shared;
+    using klib::SharedPtr;
+    // using klib::make_shared;
     struct INode{
         enum INodeType{
             dir, file, dev
@@ -26,16 +26,21 @@ namespace fs{
         const FileType type;
         union Data
         {
-            sharedptr<Pipe> pipe;
-            sharedptr<INode> inode;
+            SharedPtr<Pipe> pipe;
+            SharedPtr<INode> inode;
             Data(FileType type){
                 switch(type){
-                    case FileType::none:break;
-                    case FileType::pipe:pipe=make_shared<Pipe>();break;
-                    default:;
+                    case FileType::none:
+                        break;
+                    case FileType::pipe: {
+                        pipe = new Pipe;
+                        break;
+                    }
+                    default:
+                        break;
                 }
             }
-            Data(FileType type,const sharedptr<INode> &inode){
+            Data(FileType type,SharedPtr<INode> inode){
                 assert(type==FileType::inode);
                 this->inode=inode;
             }
@@ -45,14 +50,20 @@ namespace fs{
         }
         ~File(){ // 使用智能指针后，关闭逻辑在析构中处理
             switch(type){
-                case FileType::pipe:obj.pipe.~sharedptr();break;
-                case FileType::inode:
-                    obj.inode.~sharedptr();
-                        /*关闭逻辑*/
+                case FileType::pipe: {
+                    // obj.pipe.~SharedPtr(); // 析构函数不应该被显式调用
+                    obj.pipe.deRef();
                     break;
+                }
+                case FileType::inode: {
+                    // obj.inode.~SharedPtr(); // 析构函数不应该被显式调用
+                    obj.inode.deRef();
+                    /*关闭逻辑*/
+                    break;
+                }
             }
         }
-        File(FileType a_type, const sharedptr<INode> &a_in): type(a_type), obj(type,a_in) {};
+        File(FileType a_type, SharedPtr<INode> a_in): type(a_type), obj(type, a_in) {};
         void write(xlen_t addr,size_t len);
     };
 }

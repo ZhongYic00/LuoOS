@@ -6,8 +6,8 @@ extern void _strapexit();
 namespace syscall
 {
     using sys::statcode;
-    using klib::sharedptr;
-    using klib::make_shared;
+    using klib::SharedPtr;
+    // using klib::make_shared;
     int none(){return 0;}
     int testexit(){
         static bool b=false;
@@ -59,23 +59,26 @@ namespace syscall
         mode_t a_mode = ctx.x(13); // uint32
 
         int fd;
+        SharedPtr<fs::File> f;
         auto curproc = kHartObjs.curtask->getProcess();
 
         /*
             inode相关操作
         */
         // 测试用
-        auto in=make_shared<fs::INode>();
+        SharedPtr<fs::INode> in = new fs::INode;
         in->m_type = fs::INode::file;
         //
 
-        auto f=make_shared<fs::File>(fs::File::FileType::inode,in);// 后面应改成从全局数据结构中分配
+        
+        if(in->m_type == fs::INode::dev) {
+            f = new fs::File(fs::File::FileType::dev, in);
+        }
+        else {
+            f = new fs::File(fs::File::FileType::inode, in);
+        }
         fd = curproc->fdAlloc(f);
         if(fd < 0) { return statcode::err; }
-
-        // if(in->m_type == fs::INode::dev) { f->type = fs::File::dev; }
-        // else { f->type = fs::File::inode; }
-        // f->in = in;
 
         return fd;
     }
@@ -83,26 +86,26 @@ namespace syscall
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
 
-        sharedptr<fs::File> f;
+        SharedPtr<fs::File> f;
         auto curproc = kHartObjs.curtask->getProcess();
         // 判断fd范围也许可以写成宏……
         if((a_fd<0) || (a_fd>proc::MaxOpenFile)) { return statcode::err; }
         
         f = curproc->files[a_fd];
-        if(!f.valid()) { return statcode::err; }
+        if(f == nullptr) { return statcode::err; }
 
-        curproc->files[a_fd]=sharedptr<fs::File>();
+        curproc->files[a_fd].deRef();
         return statcode::ok;
     }
     int dupArgsIn(int a_fd, int a_newfd=-1) {
         int newfd;
-        sharedptr<fs::File> f;
+        SharedPtr<fs::File> f;
         auto curproc = kHartObjs.curtask->getProcess();
         // 判断fd范围也许可以写成宏……
         if((a_fd<0) || (a_fd>proc::MaxOpenFile)) { return statcode::err; }
         
         f = curproc->files[a_fd];
-        if(!f.valid()) { return statcode::err; }
+        if(f == nullptr) { return statcode::err; }
         // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
         newfd = curproc->fdAlloc(f, a_newfd);
         if(newfd < 0) { return statcode::err; }

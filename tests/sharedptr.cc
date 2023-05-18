@@ -5,11 +5,11 @@ class A{
     long k[20];
 };
 int main(){
-    auto a=make_shared<int>(10);
-    std::cout<<a.refcount()<<std::endl;
+    SharedPtr<int> a=new int(10);
+    std::cout<<a.refCount()<<std::endl;
     {
         auto b=a;
-        std::cout<<a.refcount()<<std::endl
+        std::cout<<a.refCount()<<std::endl
         <<((*a)==(*b))<<std::endl;
         ;
     }
