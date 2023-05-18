@@ -23,6 +23,7 @@ namespace sys
         dup3=24,
         openat=56,
         close=57,
+        pipe2=59,
         read=63,
         write=64,
         yield=124,

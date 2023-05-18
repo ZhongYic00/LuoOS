@@ -141,6 +141,11 @@ namespace syscall
 
         return dupArgsIn(fd, newfd);
     }
+    int pipe2(){
+        auto &ctx=kHartObjs.curtask->ctx;
+        xlen_t fd=ctx.x(10),flags=ctx.x(11);
+        
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -179,7 +184,7 @@ namespace syscall
         // syscallPtrs[SYS_openat] = sys_openat;
         // syscallPtrs[SYS_close] = sys_close;
         // syscallPtrs[SYS_vhangup] = sys_vhangup;
-        // syscallPtrs[SYS_pipe2] = sys_pipe2;
+        syscallPtrs[syscalls::pipe2] = pipe2;
         // syscallPtrs[SYS_quotactl] = sys_quotactl;
         // syscallPtrs[SYS_getdents64] = sys_getdents64;
         // syscallPtrs[SYS_lseek] = sys_lseek;
