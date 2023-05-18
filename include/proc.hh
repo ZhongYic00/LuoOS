@@ -31,7 +31,7 @@ namespace proc
 
     struct Task;
     constexpr xlen_t UserStackDefault=0x7fffffff;
-    constexpr int MaxOpenFile = 3;
+    constexpr int MaxOpenFile = 101; // 官网测例往fd=100中写东西
 
     typedef tid_t pid_t;
     struct Process:public IdManagable,public Scheduable{
