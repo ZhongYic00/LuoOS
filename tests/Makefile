@@ -22,8 +22,8 @@ alloc: alloc.o tlsf.o
 
 tlsf-src := tlsf.cc
 
-%.o : %.cc
-	${CC} ${CFLAGS} $(INC) -c -o $@ $<
+%.elf : %.cc
+	${CC} ${CFLAGS} $(INC) -o $@ $<
 
 %.o : %.S
 	${CC} ${CFLAGS} $(INC) -c -o $@ $<
