@@ -5,6 +5,7 @@
 #include "ipc.hh"
 #include "resmgr.hh"
 #include "klib.hh"
+// #include "stat.h"
 
 #define ATTR_READ_ONLY      0x01  // 只读
 #define ATTR_HIDDEN         0x02  // 隐藏
@@ -64,12 +65,21 @@ namespace fs{
             ~Data(){}
         }obj;
         const FileType type;
+        struct dirent *ep;
 
         File(FileType a_type): type(a_type), obj(a_type) {}
         File(const SharedPtr<Pipe> &a_pipe, FileOp a_ops): type(FileType::pipe), obj(a_pipe), ops(a_ops) {}
         File(FileType a_type, const SharedPtr<INode> &a_inode): type(a_type), obj(a_inode) {}
         ~File();
         void write(xlen_t addr,size_t len);
+    };
+    ///////////////////////////FAT//////////////////////////
+    struct mapped_file {
+        uint64 baseaddr;
+        unsigned long len;
+        struct File *mfile;
+        int valid;
+        long off;
     };
     // 短文件名(32bytes)
     typedef struct short_name_entry {
@@ -147,36 +157,35 @@ namespace fs{
         uint8 mount_mode; //是否被挂载的标志
     };
 
-    
+
     int fat32_init(void);
-    // struct dirent* dirlookup(struct dirent *entry, char *filename, uint *poff);
-    // char* formatname(char *name);
-    // void emake(struct dirent *dp, struct dirent *ep, uint off);
-    // struct dirent* ealloc(struct dirent *dp, char *name, int attr);
-    // struct dirent* edup(struct dirent *entry);
-    // void eupdate(struct dirent *entry);
-    // void etrunc(struct dirent *entry);
-    // void eremove(struct dirent *entry);
-    // void eput(struct dirent *entry);
-    // void estat(struct dirent *ep, struct stat *st);
-    // void elock(struct dirent *entry);
-    // void eunlock(struct dirent *entry);
-    // int enext(struct dirent *dp, struct dirent *ep, uint off, int *count);
-    // struct dirent* ename(char *path);
-    // struct dirent* enameparent(char *path, char *name);
-    // int eread(struct dirent *entry, int user_dst, uint64 dst, uint off, uint n);
-    // int ewrite(struct dirent *entry, int user_src, uint64 src, uint off, uint n);
-    // struct dirent* enameparent2(char *path, char *name, struct file *f);
-    // struct dirent* ename2(char *path, struct file *f);
-    // // int filewrite2(struct file *f, uint64 addr, int n);
-    // uint32 get_byts_per_clus();
-    // int link(char* oldpath, struct file *f1, char* newpath, struct file *f2);
-    // int unlink(char *path, struct file *f);
-    // int remove(char *path);
-    // int isdirempty(struct dirent *dp);
-    // int remove2(char *path, struct file *f);
-    // int syn_disk(uint64 start,long len);
-    // int do_mount(struct dirent*mountpoint,struct dirent*dev);
-    // int do_umount(struct dirent*mountpoint);
+    struct dirent* dirlookup(struct dirent *entry, char *filename, uint *poff);
+    char* formatname(char *name);
+    void emake(struct dirent *dp, struct dirent *ep, uint off);
+    struct dirent* ealloc(struct dirent *dp, char *name, int attr);
+    struct dirent* edup(struct dirent *entry);
+    void eupdate(struct dirent *entry);
+    void etrunc(struct dirent *entry);
+    void eremove(struct dirent *entry);
+    void eput(struct dirent *entry);
+    void estat(struct dirent *ep, struct stat *st);
+    void elock(struct dirent *entry);
+    void eunlock(struct dirent *entry);
+    int enext(struct dirent *dp, struct dirent *ep, uint off, int *count);
+    struct dirent* ename(char *path);
+    struct dirent* enameparent(char *path, char *name);
+    int eread(struct dirent *entry, int user_dst, uint64 dst, uint off, uint n);
+    int ewrite(struct dirent *entry, int user_src, uint64 src, uint off, uint n);
+    struct dirent* enameparent2(char *path, char *name, struct File *f);
+    struct dirent* ename2(char *path, struct File *f);
+    uint32 get_byts_per_clus();
+    int link(char* oldpath, struct File *f1, char* newpath, struct File *f2);
+    int unlink(char *path, struct File *f);
+    int remove(char *path);
+    int isdirempty(struct dirent *dp);
+    int remove2(char *path, struct File *f);
+    int syn_disk(uint64 start,long len);
+    int do_mount(struct dirent*mountpoint,struct dirent*dev);
+    int do_umount(struct dirent*mountpoint);
 }
 #endif

@@ -7,6 +7,7 @@
 #include "resmgr.hh"
 #include "TINYSTL/unordered_set.h"
 #include "TINYSTL/string.h"
+#include "riscv.h"
 
 namespace proc
 {
@@ -36,11 +37,17 @@ namespace proc
     typedef tid_t pid_t;
     struct Process:public IdManagable,public Scheduable{
         using File=fs::File;
+        using dirent=fs::dirent;
+        using mapped_file=fs::mapped_file;
         tid_t parent;
         VMAR vmar;
         tinystl::unordered_set<Task*> tasks;
         SharedPtr<File> files[MaxOpenFile];
         tinystl::string name;
+        // todo: 以下为临时的FAT接口，需要修改
+        dirent *cwd;
+        pagetable_t pagetable;
+        mapped_file mfile;    //映射的文件的范围
 
         Process(prior_t prior,tid_t parent);
         Process(tid_t pid,prior_t prior,tid_t parent);

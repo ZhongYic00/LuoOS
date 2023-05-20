@@ -192,6 +192,23 @@ int strncmp(const char *s1, const char *s2, size_t n) {
   return *s1<*s2?-1:1;
 }
 
+char* strchr(const char *s, char c) {
+  for(; *s; s++)
+    if(*s == c)
+      return (char*)s;
+  return 0;
+}
+
+// convert wide char string into uchar string 
+void snstr(char *dst, wchar const *src, int len) {
+  while (len -- && *src) {
+    *dst++ = (uchar)(*src & 0xff);
+    src ++;
+  }
+  while(len-- > 0)
+    *dst++ = 0;
+}
+
 void *memset(void *s, int c, size_t n) {
   for(char *b=(char*)s;b-(char*)s<n;b++)*b=c;
   return s;
