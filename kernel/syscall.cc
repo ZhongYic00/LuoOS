@@ -128,9 +128,15 @@ namespace syscall
         return dupArgsIn(a_fd, a_newfd);
     }
     int pipe2(){
-        auto &ctx=kHartObjs.curtask->ctx;
+        auto &cur=kHartObjs.curtask;
+        auto &ctx=cur->ctx;
+        auto proc=cur->getProcess();
         xlen_t fd=ctx.x(10),flags=ctx.x(11);
-        
+        auto pipe=SharedPtr<pipe::Pipe>(new pipe::Pipe);
+        auto rfile=SharedPtr<fs::File>(new fs::File(pipe,fs::File::FileOp::read));
+        auto wfile=SharedPtr<fs::File>(new fs::File(pipe,fs::File::FileOp::write));
+        int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
+        proc->vmar[fd]=fds;
     }
     void init(){
         using sys::syscalls;
