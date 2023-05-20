@@ -5,6 +5,7 @@
 #define FMT_PROC(fmt,...) "Proc[%d]::"#fmt"\n",kHartObjs.curtask->getProcess()->pid(),__VA_ARGS__
 
 void fs::File::write(xlen_t addr,size_t len){
+    if(!ops.fields.w)return ;
     auto bytes=kHartObjs.curtask->getProcess()->vmar.copyin(addr,len);
     switch(type){
         case FileType::stdout:

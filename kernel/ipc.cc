@@ -12,7 +12,7 @@ namespace pipe
     }
     void Pipe::wakeup(){
         for(auto task:waiting){
-
+            kGlobObjs.scheduler.wakeup(task);
         }
     }
 } // namespace ipc

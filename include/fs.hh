@@ -24,30 +24,34 @@ namespace fs{
             stdin,stdout,stderr
         };
         const FileType type;
+        enum class FileOp:uint16_t{
+            none=0,read=0x1,write=0x2,append=0x4,
+        };
+        union FileOps{
+            struct{
+                int r:1;
+                int w:1;
+                int a:1;
+                int gc:1;
+                int defer:1;
+            }fields;
+            FileOp raw;
+            FileOps(FileOp ops=FileOp::none):raw(ops){}
+        }ops;
         union Data
         {
             SharedPtr<Pipe> pipe;
             SharedPtr<INode> inode;
             Data(FileType type){
-                switch(type){
-                    case FileType::none:
-                        break;
-                    case FileType::pipe: {
-                        pipe = new Pipe;
-                        break;
-                    }
-                    default:
-                        break;
-                }
+                assert(type==none||type==stdin||type==stdout||type==stderr);
             }
-            Data(FileType type,SharedPtr<INode> inode){
-                assert(type==FileType::inode);
-                this->inode=inode;
-            }
+            Data(const SharedPtr<Pipe> &pipe):pipe(pipe){}
+            Data(const SharedPtr<INode> &inode):inode(inode){}
             ~Data(){}
         }obj;
         File(FileType type):type(type),obj(type){
         }
+        File(const SharedPtr<Pipe> &pipe,FileOp ops):type(FileType::pipe),obj(pipe),ops(ops){}
         ~File(){ // 使用智能指针后，关闭逻辑在析构中处理
             switch(type){
                 case FileType::pipe: {
@@ -63,7 +67,7 @@ namespace fs{
                 }
             }
         }
-        File(FileType a_type, SharedPtr<INode> a_in): type(a_type), obj(type, a_in) {};
+        File(FileType a_type, SharedPtr<INode> a_in): type(a_type), obj(a_in) {};
         void write(xlen_t addr,size_t len);
     };
 }

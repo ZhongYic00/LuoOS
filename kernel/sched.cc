@@ -24,3 +24,7 @@ void Scheduler::sleep(Scheduable *task){
     ready.remove(task);
     pending.push_back(task);
 }
+void Scheduler::wakeup(Scheduable *task){
+    pending.remove(task);
+    ready.push_back(task);
+}
