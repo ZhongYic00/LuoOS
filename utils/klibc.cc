@@ -91,6 +91,7 @@ static int _vsnprintf(char * out, size_t n, const char* s, va_list vl)
 				break;
 			}
 			default:
+				panic("printf: unimplemented!");
 				break;
 			}
 		} else if (*s == '%') {

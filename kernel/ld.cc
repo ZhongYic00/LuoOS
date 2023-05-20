@@ -6,9 +6,9 @@
 
 xlen_t ld::loadElf(const uint8_t *buff,vm::VMAR &vmar){
     Elf64_Ehdr *elfHeader=(Elf64_Ehdr*)(buff);
-    Log("Elf header=%p, section header table=%lu, secheader str indx=%u",elfHeader,elfHeader->e_shoff,elfHeader->e_shstrndx);
+    Log("Elf header=%p, section header table=%lx, secheader str indx=%lx",elfHeader,elfHeader->e_shoff,elfHeader->e_shstrndx);
     for(int i=0;i<EI_NIDENT;i++)
-        printf("%02x ",elfHeader->e_ident[i]);
+        printf("%x ",elfHeader->e_ident[i]);
     putchar('\n');
     Elf64_Phdr* phdrTable=(Elf64_Phdr*)(buff+elfHeader->e_phoff);
 

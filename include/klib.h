@@ -30,6 +30,7 @@ extern "C" {
 
 extern void (*puts)(const char *s);
 void halt(int errno=0);
+void panic(char *s);
 // string.h
 #ifdef STRING
 void  *memset    (void *s, int c, size_t n);

@@ -55,7 +55,7 @@ namespace vm
         inline xlen_t ppn(){ return raw.ppn; }
         inline pgtbl_t child(){ return reinterpret_cast<pgtbl_t>( pn2addr(ppn()) ); }
         inline void print(){
-            printf("[%08lx] %c%c%c%c\n",raw.ppn,fields.r?'r':'-',fields.w?'w':'-',fields.x?'x':'-',fields.v?'v':'-');
+            printf("[%lx] %c%c%c%c\n",raw.ppn,fields.r?'r':'-',fields.w?'w':'-',fields.x?'x':'-',fields.v?'v':'-');
         }
     };
     
