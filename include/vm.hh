@@ -162,11 +162,28 @@ namespace vm
         inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm,CloneType ct=CloneType::clone){map(VMO({{vpn,ppn},pages},perm,ct));}
         inline void unmap();
         inline xlen_t satp(){return PageTable::toSATP(pagetable);}
+        // @todo @bug what if region is on border?
         inline klib::ByteArray copyin(xlen_t addr,size_t len){
             xlen_t paddr=pagetable.transaddr(addr);
             klib::ByteArray buff((uint8_t*)paddr,len);
             return buff;
         }
+        inline void copyout(xlen_t addr,const klib::ByteArray &buff){
+            xlen_t paddr=pagetable.transaddr(addr);
+            memcpy((ptr_t)paddr,buff.buff,buff.len);
+        }
+        class Writer{
+            xlen_t vaddr;
+            VMAR &parent;
+        public:
+            Writer(xlen_t addr,VMAR &parent):vaddr(addr),parent(parent){}
+            template<typename T>
+            inline void operator=(const T &d){
+                auto buff=klib::ByteArray((uint8_t*)&d,sizeof(d));
+                parent.copyout(vaddr,buff);
+            }
+        };
+        inline Writer operator[](xlen_t vaddr){return Writer(vaddr,*this);}
         inline void print(){
             // pagetable.print();
             for(auto vmo:vmos)vmo.print();
