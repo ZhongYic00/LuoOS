@@ -159,27 +159,34 @@ struct list:public Seq<T>{
       return iterator(head,this);
   }
   iterator end() {
-      return iterator(tail->iter.next,this);
+      return iterator(tail?tail->iter.next:nullptr,this);
       //return iterator(tail,this);
   }
   const_iterator begin() const{
       return const_iterator(head,this);
   }
   const_iterator end() const{
-      return const_iterator(tail->iter.next,this);
+      return const_iterator(tail?tail->iter.next:nullptr,this);
   }
   inline bool empty(){
     return head==nullptr;
   }
+  inline iterator find(const T &data){
+    auto i=begin();
+    for(;i!=end()&&*i!=data;i++);
+    return i;
+  }
   inline void remove(const T &data){
-    // iterator prev;
-    // for(auto i:*this){
-    //   if(*i==data){
-    //     prev.ptr->iter.next=i.ptr->iter.next;
-    //     delete i->ptr;
-    //   }
-    //   prev=i;
-    // }
+    if(head && head->data==data){
+      head=head->iter.next;
+    }
+    else for(listndptr cur=head,prev;cur!=tail;prev=cur,cur=cur->iter.next){
+        if(cur->data==data){
+          prev->iter.next=cur->iter.next;
+          delete cur;
+          return ;
+        }
+      }
   }
   inline void print(void (*printhook)(const T&)){
     printf("{head=0x%lx, tail=0x%lx} [\t",head,tail);
@@ -193,6 +200,7 @@ struct list:public Seq<T>{
   struct ArrayBuff{
     size_t len;
     T *buff;
+    // @todo @bug lacks destructor
     ArrayBuff(size_t len):len(len){buff=new T[len];}
     ArrayBuff(T* addr,size_t len):ArrayBuff(len){
       memcpy(buff,addr,len*sizeof(T));
@@ -277,7 +285,7 @@ struct list:public Seq<T>{
       // 构造与析构
       SharedPtr(): m_ptr(nullptr), m_meta(nullptr) {}
       SharedPtr(T *a_ptr): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB):nullptr) {}
-      SharedPtr(const SharedPtr<T> &a_sptr): m_ptr(a_sptr.m_ptr), m_meta(a_sptr.m_meta) { ++(m_meta->m_ref); }
+      SharedPtr(const SharedPtr<T> &a_sptr): m_ptr(a_sptr.m_ptr), m_meta(a_sptr.m_meta) { if(m_meta)++(m_meta->m_ref); }
       ~SharedPtr() { deRef(); }
       // 赋值运算
       const SharedPtr<T> operator=(T *a_ptr) {
