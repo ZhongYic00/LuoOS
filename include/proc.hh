@@ -1,12 +1,12 @@
 #ifndef PROC_HH__
 #define PROC_HH__
-#include "common.h"
+// #include "common.h"
+// #include "resmgr.hh"
 #include "sched.hh"
 #include "vm.hh"
-#include "fs.hh"
-#include "resmgr.hh"
 #include "TINYSTL/unordered_set.h"
 #include "TINYSTL/string.h"
+#include "fat.hh"
 #include "riscv.h"
 
 namespace proc
