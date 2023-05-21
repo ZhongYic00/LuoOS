@@ -102,10 +102,11 @@ struct list:public Seq<T>{
       push_front(newNode);
     }
     inline T pop_front(){
+      auto old=head;
       T rt=head->data;
       if(head==tail)tail=nullptr;
       head=head->iter.next;
-      delete head;
+      delete old;
       return rt;
     }
     template<bool isConst>
@@ -178,12 +179,15 @@ struct list:public Seq<T>{
   }
   inline void remove(const T &data){
     if(head && head->data==data){
-      head=head->iter.next;
+      pop_front();
     }
-    else for(listndptr cur=head,prev;cur!=tail;prev=cur,cur=cur->iter.next){
+    else for(listndptr cur=head,prev;prev!=tail;prev=cur,cur=cur->iter.next){
         if(cur->data==data){
           prev->iter.next=cur->iter.next;
           delete cur;
+          if(cur==tail){
+            tail=prev;
+          }
           return ;
         }
       }
