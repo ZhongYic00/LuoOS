@@ -180,7 +180,10 @@ namespace vm
             template<typename T>
             inline void operator=(const T &d){
                 auto buff=klib::ByteArray((uint8_t*)&d,sizeof(d));
-                parent.copyout(vaddr,buff);
+                operator=(buff);
+            }
+            inline void operator=(const klib::ByteArray &bytes){
+                parent.copyout(vaddr,bytes);
             }
         };
         inline Writer operator[](xlen_t vaddr){return Writer(vaddr,*this);}
