@@ -37,8 +37,8 @@ Task* Process::newTask(const Task &other,bool allocStack){
     auto thrd=new (kGlobObjs.taskMgr) Task(other,this->pid());
     if(allocStack){
         thrd->ctx.sp()=newUstack();
-        thrd->kctx.kstack=(ptr_t)newKstack();
     }
+    thrd->kctx.kstack=(ptr_t)newKstack();
     addTask(thrd);
     kGlobObjs.scheduler.add(thrd);
 }
@@ -72,6 +72,7 @@ void Task::switchTo(){
     // task->getProcess()->vmar.print();
 }
 void Task::sleep(){
+    printf("Task::sleep(this=Task<%d>)\n",this->id);
     kGlobObjs.scheduler.sleep(this);
     // register xlen_t sp asm("sp");
     // saveContextTo(kctx.gpr);
@@ -85,9 +86,10 @@ Process* proc::createProcess(){
     // auto proc=kGlobObjs.procMgr.alloc(0,0);
     auto proc=new (kGlobObjs.procMgr) Process(0,0);
     proc->newTask();
-    proc->files[0]=new fs::File(fs::File::stdin);
-    proc->files[1]=new fs::File(fs::File::stdout);
-    proc->files[2]=new fs::File(fs::File::stderr);
+    using op=fs::File::FileOp;
+    proc->files[0]=new fs::File(fs::File::stdin,op::read);
+    proc->files[1]=new fs::File(fs::File::stdout,op::write);
+    proc->files[2]=new fs::File(fs::File::stderr,op::write);
     DBG(proc->print();)
     printf("proc created. pid=%d\n",proc->id);
     return proc;
@@ -103,7 +105,7 @@ void proc::clone(Task *task){
 }
 
 Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar){
-    for(int i=0;i<3;i++)files[i]=other.files[i];
+    for(int i=0;i<MaxOpenFile;i++)files[i]=other.files[i];
 }
 
 int Process::fdAlloc(SharedPtr<File> a_file, int a_fd){ // fd缺省值为-1，在头文件中定义

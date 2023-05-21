@@ -49,7 +49,7 @@ namespace fs{
             Data(const SharedPtr<INode> &inode):inode(inode){}
             ~Data(){}
         }obj;
-        File(FileType type):type(type),obj(type){
+        File(FileType type,FileOp ops=FileOp::none):type(type),obj(type),ops(ops){
         }
         File(const SharedPtr<Pipe> &pipe,FileOp ops):type(FileType::pipe),obj(pipe),ops(ops){}
         ~File(){ // 使用智能指针后，关闭逻辑在析构中处理
@@ -69,6 +69,7 @@ namespace fs{
         }
         File(FileType a_type, SharedPtr<INode> a_in): type(a_type), obj(a_in) {};
         void write(xlen_t addr,size_t len);
+        void read(xlen_t addr, size_t len);
     };
 }
 #endif
