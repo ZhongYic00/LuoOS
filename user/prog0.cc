@@ -2,6 +2,9 @@
 void write(int fd,xlen_t addr,size_t len){
     sys::syscall3(sys::syscalls::write,fd,addr,len);
 }
+void read(int fd,xlen_t addr,size_t len){
+    sys::syscall3(sys::syscalls::read,fd,addr,len);
+}
 void print(const char* str){
     write(1,(xlen_t)str,strlen(str)+1);
 }
@@ -15,16 +18,23 @@ int main(){
     if(sys::syscall(sys::syscalls::clone)==0){
         printf("parent return to here");
         ischild=false;
-        char str[500]="test pipe write";
-        write(pipe[1],(xlen_t)str,sizeof(str));
        }else{
         printf("child return to here");
         ischild=true;
-        char readbuf[30];
     }
     if(sys::syscall(sys::syscalls::clone)==0){
         printf("parent of %s return to here",!ischild?"parent":"child");
         if(!ischild){
+            char str[500]="test pipe write";
+            write(pipe[1],(xlen_t)str,sizeof(str));
+            printf("pipe write success!");
+        } else {
+            for(int i=0;i<6;i++){
+                char readbuf[101];
+                read(pipe[0],(xlen_t)readbuf,sizeof(readbuf));
+                printf("pipe read '%s'",readbuf);
+            }
+            printf("pipe read success!");
         }
        }else{
         printf("child of %s return to here",!ischild?"parent":"child");

@@ -14,17 +14,26 @@ void schedule(){
 Scheduable* sched::Scheduler::next(){
     return *(++cur);
 }
+void print(Scheduable* const &tsk){
+    auto task=static_cast<const proc::Task*>(tsk);
+    printf("Task<%d>, ",task->id);
+}
 void sched::Scheduler::add(Scheduable *task){
     ready.push_back(task);
+    ready.print(print);
     cur=ready.begin();
 }
 Scheduler::Scheduler():cur(ready.begin()){
 }
 void Scheduler::sleep(Scheduable *task){
+    ready.print(print);
     ready.remove(task);
+    ready.print(print);
     pending.push_back(task);
+    cur=ready.begin();
 }
 void Scheduler::wakeup(Scheduable *task){
+    if(pending.find(task)==pending.end())return ;
     pending.remove(task);
     ready.push_back(task);
 }

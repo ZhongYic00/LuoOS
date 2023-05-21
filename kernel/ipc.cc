@@ -12,7 +12,9 @@ namespace pipe
     }
     void Pipe::wakeup(){
         for(auto task:waiting){
+            printf("wakeup Task<%d>\n",task->id);
             kGlobObjs.scheduler.wakeup(task);
         }
+        while(!waiting.empty())waiting.pop_front();
     }
 } // namespace ipc

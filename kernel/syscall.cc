@@ -15,6 +15,13 @@ namespace syscall
         if(b)return 1;
         return -1;
     }
+    int read(){
+        auto &ctx=kHartObjs.curtask->ctx;
+        int fd=ctx.x(10);
+        xlen_t uva=ctx.x(11),len=ctx.x(12);
+        auto file=kHartObjs.curtask->getProcess()->ofile(fd);
+        file->read(uva,len);
+    }
     int write(){
         auto &ctx=kHartObjs.curtask->ctx;
         xlen_t fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
@@ -180,11 +187,11 @@ namespace syscall
         // syscallPtrs[SYS_quotactl] = sys_quotactl;
         // syscallPtrs[SYS_getdents64] = sys_getdents64;
         // syscallPtrs[SYS_lseek] = sys_lseek;
-        // syscallPtrs[SYS_read] = sys_read;
         syscallPtrs[syscalls::dup] = syscall::dup;
         syscallPtrs[syscalls::dup3] = syscall::dup3;
         syscallPtrs[syscalls::openat] = syscall::openAt;
         syscallPtrs[syscalls::close] = syscall::close;
+        syscallPtrs[syscalls::read] = read;
         syscallPtrs[syscalls::write] = syscall::write;
         syscallPtrs[syscalls::yield] = syscall::sysyield;
         syscallPtrs[syscalls::getpid] = syscall::getPid;

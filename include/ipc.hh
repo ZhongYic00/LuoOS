@@ -13,14 +13,17 @@ namespace pipe{
         klib::ringbuf<uint8_t> buff;
         klib::list<Task*> waiting;
         inline void write(klib::ByteArray bytes){
+            auto n=bytes.len;
             // TODO parallelize, copy avai bytes at once
             for(auto b:bytes){
                 while(buff.full()){
+                    printf("Pipe::write blocked, %d bytes remains\n",n);
                     //sleep and wakeup
                     wakeup();
                     sleep();
                 }
                 buff.put(b);
+                n--;
             }
         }
         inline klib::ByteArray read(int n){
@@ -29,6 +32,7 @@ namespace pipe{
             for(auto i=bytes.begin();!buff.empty()&&n;n--,i++){
                 *i=buff.get();buff.pop();
             }
+            wakeup();
             return bytes;
         }
         void wakeup();

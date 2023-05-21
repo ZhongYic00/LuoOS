@@ -196,7 +196,7 @@ struct list:public Seq<T>{
     printf("{head=0x%lx, tail=0x%lx} [\t",head,tail);
     for(listndptr cur=head;cur;cur=cur->iter.next)
       printhook(cur->data);
-    // printf("\t]\n");
+    printf("\t]\n");
   }
 };
 
