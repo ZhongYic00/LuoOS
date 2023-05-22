@@ -5,9 +5,11 @@
 #include "platform.h"
 #include "klib.h"
 #include "safestl.hh"
+#include "TINYSTL/string.h"
 
 namespace klib
 {
+  using tinystl::string;
   template<typename T>
   inline T min(T a,T b){ return a<b?a:b; }
   template<typename T>
@@ -57,6 +59,31 @@ namespace klib
     }iter;
     ListNode(const T& data):data(data){this->iter.next=nullptr; }
   };
+
+  namespace __format_internal
+  {  
+    template<typename T>
+    inline decltype(auto) myForward(const T&& t){return t;}
+
+    template<>
+    inline decltype(auto) myForward(const string&& t){return t.c_str();}
+
+    template<typename ...Ts>
+    string format_(const char *fmt,Ts&& ...args){
+      int size=snprintf(nullptr,-1,fmt,args...);
+      assert(size>0);
+      auto buf=new char[size+1];
+      snprintf(buf,size,fmt,args...);
+      auto rt=string(buf);
+      delete[] buf;
+      return rt;
+    }
+    
+  } // namespace __format_interlal
+  template<typename ...Ts>
+  string format(const char *fmt,Ts&& ...args){
+    return __format_internal::format_(fmt,__format_internal::myForward<Ts>(std::forward<Ts>(args))...);
+  }
 
 template<typename T>
 class Seq{};

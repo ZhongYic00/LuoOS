@@ -125,6 +125,14 @@ static int _vprintf(const char* s, va_list vl)
 	return res;
 }
 
+int snprintf(char *str, size_t size, const char *format, ...){
+	va_list vl;
+	va_start(vl,format);
+	int res=_vsnprintf(str,size,format,vl);
+	va_end(vl);
+	return res;
+}
+
 int printf(const char* s, ...)
 {
 	int res = 0;
