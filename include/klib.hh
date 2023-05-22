@@ -365,6 +365,7 @@ static klib::ringbuf<char> buf;
 
 class IO{
 public:
+  static void _sbiputs(const char *s);
   inline static void _blockingputs(const char *s){
     while(*s)platform::uart0::blocking::putc(*s++);
   }

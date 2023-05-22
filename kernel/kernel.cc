@@ -102,6 +102,11 @@ void start_kernel(int hartid){
     register ptr_t sp asm("sp");
     // auto &ctx=kHartObjs.curtask->ctx; //TODO fixbug
     // ctx.kstack=sp;
+    puts=IO::_sbiputs;
+    puts("\n\n>>>Hello LuoOS<<<\n\n");
+    sbi_init();
+    
+    // @todo needs plic and uart init?
     puts=IO::_blockingputs;
     puts("\n\n>>>Hello RVOS<<<\n\n");
     sbi_init();
