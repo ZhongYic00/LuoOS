@@ -1,6 +1,5 @@
 #include "fat.hh"
 #include "param.h"
-#include "riscv.h"
 #include "buf.h"
 #include "stat.h"
 #include "kernel.hh"
@@ -41,20 +40,20 @@ int either_copyin(void *dst, int user_src, uint64 src, uint64 len) {
 }
 // todo: 使用我们的函数实现替换该接口
 // 来自xv6的vm.c，仅供替换时参考，完成替换后要删掉
-pte_t * walk(pagetable_t pagetable, uint64 va, int alloc) {
-//   if(va >= MAXVA) { panic("walk"); }
-//   for(int level = 2; level > 0; level--) {
-//     pte_t *pte = &pagetable[PX(level, va)];
-//     if(*pte & PTE_V) { pagetable = (pagetable_t)PTE2PA(*pte); }
-//     else {
-//       if(!alloc || (pagetable = (pde_t*)kalloc()) == NULL) { return NULL; }
-//       memset(pagetable, 0, PGSIZE);
-//       *pte = PA2PTE(pagetable) | PTE_V;
-//     }
-//   }
-//   return &pagetable[PX(0, va)];
-    return NULL;
-}
+// pte_t * walk(pagetable_t pagetable, uint64 va, int alloc) {
+// //   if(va >= MAXVA) { panic("walk"); }
+// //   for(int level = 2; level > 0; level--) {
+// //     pte_t *pte = &pagetable[PX(level, va)];
+// //     if(*pte & PTE_V) { pagetable = (pagetable_t)PTE2PA(*pte); }
+// //     else {
+// //       if(!alloc || (pagetable = (pde_t*)kalloc()) == NULL) { return NULL; }
+// //       memset(pagetable, 0, PGSIZE);
+// //       *pte = PA2PTE(pagetable) | PTE_V;
+// //     }
+// //   }
+// //   return &pagetable[PX(0, va)];
+//     return NULL;
+// }
 ///////////////////FAT////////////////////
 // todo: 把FAT中页表和进程相关的代码全部改成适用于我们项目的形式
 static struct {
@@ -1087,30 +1086,30 @@ int fs::remove2(char *path, struct File *f) {
 }
 int fs::syn_disk(uint64 start,long len) {
     uint i, n;
-    pte_t *pte;
+    // pte_t *pte;
     uint64 pa,va;
     long off;
     struct proc::Process*p=kHartObjs.curtask->getProcess();
     struct dirent *ep=p->mfile.mfile->ep;
-    pagetable_t pagetable = p->pagetable;
-    if(start>p->mfile.baseaddr) { off=p->mfile.off+start-p->mfile.baseaddr; }
-    else { off=p->mfile.off; }
-    va=start;
-    elock(ep);
-    for(i = 0; i < (int)len; i += PGSIZE) {
-        pte = walk(pagetable, va+i, 0);
-        if(pte == 0) { return 0; }
-        if((*pte & PTE_V) == 0) { return 0; }
-        if((*pte & PTE_U) == 0) { return 0; }
-        if((*pte & PTE_D) == 0) { continue; }
-        pa = PTE2PA(*pte);
-        if(pa == NULL) { panic("start_map: address should exist"); }
-        if(len - i < PGSIZE) { n = len - i; }
-        else { n = PGSIZE; }
-        printf("write\n");
-        if(ewrite(ep, 0, (uint64)pa, off+i, n) != n) { return -1; }
-    }
-    eunlock(ep);
+    // pagetable_t pagetable = p->pagetable;
+    // if(start>p->mfile.baseaddr) { off=p->mfile.off+start-p->mfile.baseaddr; }
+    // else { off=p->mfile.off; }
+    // va=start;
+    // elock(ep);
+    // for(i = 0; i < (int)len; i += PGSIZE) {
+    //     pte = walk(pagetable, va+i, 0);
+    //     if(pte == 0) { return 0; }
+    //     if((*pte & PTE_V) == 0) { return 0; }
+    //     if((*pte & PTE_U) == 0) { return 0; }
+    //     if((*pte & PTE_D) == 0) { continue; }
+    //     pa = PTE2PA(*pte);
+    //     if(pa == NULL) { panic("start_map: address should exist"); }
+    //     if(len - i < PGSIZE) { n = len - i; }
+    //     else { n = PGSIZE; }
+    //     printf("write\n");
+    //     if(ewrite(ep, 0, (uint64)pa, off+i, n) != n) { return -1; }
+    // }
+    // eunlock(ep);
     return 1;
 }
 int fs::do_mount(struct dirent*mountpoint,struct dirent*dev) {

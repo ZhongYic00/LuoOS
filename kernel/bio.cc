@@ -19,7 +19,6 @@
 #include "param.h"
 // #include "include/spinlock.h"
 // #include "include/sleeplock.h"
-#include "riscv.h"
 #include "buf.h"
 // #include "include/sdcard.h"
 // #include "include/printf.h"

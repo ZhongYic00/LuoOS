@@ -7,7 +7,6 @@
 #include "TINYSTL/unordered_set.h"
 #include "TINYSTL/string.h"
 #include "fat.hh"
-#include "riscv.h"
 
 namespace proc
 {
@@ -46,7 +45,6 @@ namespace proc
         tinystl::string name;
         // todo: 以下为临时的FAT接口，需要修改
         dirent *cwd;
-        pagetable_t pagetable;
         mapped_file mfile;    //映射的文件的范围
 
         Process(prior_t prior,tid_t parent);
