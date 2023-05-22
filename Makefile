@@ -88,4 +88,4 @@ clean:
 
 .PHONY : stats
 stats:
-	@echo $(shell find -regex ".*\.[h|c]+" |xargs cat | wc -l) lines
+	@echo $(shell find -regex ".*\.[h|c|S]+" | grep -v thirdparty |xargs cat | wc -l) lines
