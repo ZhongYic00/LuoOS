@@ -6,29 +6,29 @@
 using namespace sched;
 
 void schedule(){
-    printf("scheduling\n");
+    Log(info,"scheduling");
     auto curtask=static_cast<proc::Task*>(kGlobObjs.scheduler.next());
-    printf("current task=%d proc=[%d]%s\n",curtask->id,curtask->getProcess()->pid(),curtask->getProcess()->name.c_str());
+    Log(info,"current task=%d proc=[%d]%s",curtask->id,curtask->getProcess()->pid(),curtask->getProcess()->name.c_str());
     curtask->switchTo();
 }
 Scheduable* sched::Scheduler::next(){
     return *(++cur);
 }
-void print(Scheduable* const &tsk){
+klib::string print(Scheduable* const &tsk){
     auto task=static_cast<const proc::Task*>(tsk);
-    printf("Task<%d>, ",task->id);
+    return task->toString();
 }
 void sched::Scheduler::add(Scheduable *task){
     ready.push_back(task);
-    ready.print(print);
+    Log(debug,"%s",ready.toString(print).c_str());
     cur=ready.begin();
 }
 Scheduler::Scheduler():cur(ready.begin()){
 }
 void Scheduler::sleep(Scheduable *task){
-    ready.print(print);
+    Log(debug,"%s",ready.toString(print).c_str());
     ready.remove(task);
-    ready.print(print);
+    Log(debug,"%s",ready.toString(print).c_str());
     pending.push_back(task);
     cur=ready.begin();
 }

@@ -52,7 +52,7 @@ $(OS): $(kobjs) $(uimg)
 usersrcs = $(shell find user/ -name "*.cc")
 userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))
 $(info utilobjs=$(utilobjs))
-$(objdir)/user/%.elf : user/%.cc $(utilobjs)
+$(objdir)/user/%.elf : user/%.cc obj/utils/klibc.o
 	@echo +CC $^
 	@mkdir -p $(dir $@)
 	$(CC) $(UCFLAGS) -o $@ $^
@@ -88,4 +88,4 @@ clean:
 
 .PHONY : stats
 stats:
-	@echo $(shell find -regex ".*\.[h|c]+" |xargs cat | wc -l) lines
+	@echo $(shell find -regex ".*\.[h|c|S]+" | grep -v thirdparty |xargs cat | wc -l) lines

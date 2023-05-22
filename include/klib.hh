@@ -5,9 +5,11 @@
 #include "platform.h"
 #include "klib.h"
 #include "safestl.hh"
+#include "TINYSTL/string.h"
 
 namespace klib
 {
+  using tinystl::string;
   template<typename T>
   inline T min(T a,T b){ return a<b?a:b; }
   template<typename T>
@@ -57,6 +59,31 @@ namespace klib
     }iter;
     ListNode(const T& data):data(data){this->iter.next=nullptr; }
   };
+
+  namespace __format_internal
+  {  
+    template<typename T>
+    inline decltype(auto) myForward(const T&& t){return t;}
+
+    template<>
+    inline decltype(auto) myForward(const string&& t){return t.c_str();}
+
+    template<typename ...Ts>
+    string format_(const char *fmt,Ts&& ...args){
+      int size=snprintf(nullptr,-1,fmt,args...);
+      assert(size>0);
+      auto buf=new char[size+1];
+      snprintf(buf,size,fmt,args...);
+      auto rt=string(buf);
+      delete[] buf;
+      return rt;
+    }
+    
+  } // namespace __format_interlal
+  template<typename ...Ts>
+  string format(const char *fmt,Ts&& ...args){
+    return __format_internal::format_(fmt,__format_internal::myForward<Ts>(std::forward<Ts>(args))...);
+  }
 
 template<typename T>
 class Seq{};
@@ -192,12 +219,15 @@ struct list:public Seq<T>{
         }
       }
   }
-  inline void print(void (*printhook)(const T&)){
-    printf("{head=0x%lx, tail=0x%lx} [\t",head,tail);
+  inline string toString(string (*stringifyHook)(const T&)){
+    string s=format("{head=0x%lx, tail=0x%lx} [\t",head,tail);
     for(listndptr cur=head;cur;cur=cur->iter.next)
-      printhook(cur->data);
-    printf("\t]\n");
+      s+=stringifyHook(cur->data)+",";
+    s+="\t]\n";
+    return s;
   }
+  static inline string defaultStringify(const T& d){return d.toString();}
+  inline string toString(){defaultStringify;}
 };
 
   template<typename T>
@@ -344,7 +374,7 @@ struct list:public Seq<T>{
       inline const bool expired() const { return (m_meta!=nullptr) ? (m_meta->m_ref<=0) : true; }
       // inline const bool valid() const { return m_ptr != nullptr; }
       void print() const {
-        printf("SharedPtr: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
+        Log(debug,"SharedPtr: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
       }
   };
   /*
@@ -365,6 +395,7 @@ static klib::ringbuf<char> buf;
 
 class IO{
 public:
+  static void _sbiputs(const char *s);
   inline static void _blockingputs(const char *s){
     while(*s)platform::uart0::blocking::putc(*s++);
   }

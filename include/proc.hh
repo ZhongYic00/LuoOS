@@ -92,6 +92,10 @@ namespace proc
         }
         void switchTo();
         void sleep();
+
+        inline klib::string toString() const{
+            return klib::format("Task<%d>",id);
+        }
     };
     typedef ObjManager<Process> ProcManager;
     typedef ObjManager<Task> TaskManager;

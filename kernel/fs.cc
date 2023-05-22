@@ -3,7 +3,7 @@
 #include "kernel.hh"
 // #include "klib.h"
 
-#define FMT_PROC(fmt,...) "Proc[%d]::"#fmt"\n",kHartObjs.curtask->getProcess()->pid(),__VA_ARGS__
+#define FMT_PROC(fmt,...) Log(info,"Proc[%d]::\n\"\n" fmt "\n\"",kHartObjs.curtask->getProcess()->pid(),__VA_ARGS__)
 
 // @todo error handling
 using namespace fs;
@@ -14,7 +14,7 @@ void fs::File::write(xlen_t addr,size_t len){
     switch(type){
         case FileType::stdout:
         case FileType::stderr:
-            printf(FMT_PROC("%s",bytes.c_str()));
+            FMT_PROC("%s",bytes.c_str());
             break;
         case FileType::pipe:
             obj.pipe->write(bytes);

@@ -46,15 +46,28 @@ namespace tinystl {
 		basic_string& operator=(const basic_string& other);
 		basic_string& operator=(basic_string&& other);
 
+		basic_string& operator=(char ch);
+		basic_string& operator=(const char* sz);
+
+		basic_string& operator+=(const basic_string& other);
+		basic_string& operator+=(char ch);
+		basic_string& operator+=(const char* sz);
+
 		const char* c_str() const;
 		size_t size() const;
+		size_t capacity() const{
+			return m_capacity;
+		}
 
 		void reserve(size_t size);
 		void resize(size_t size);
 
 		void clear();
+		void push_back(char ch);
 		void append(const char* first, const char* last);
+		void append(const basic_string& other);
 		void assign(const char* s, size_t n);
+		void assign(const char* sz);
 
 		void shrink_to_fit();
 		void swap(basic_string& other);
@@ -149,6 +162,36 @@ namespace tinystl {
 		return *this;
 	}
 
+
+	template<typename allocator>
+	inline basic_string<allocator>& basic_string<allocator>::operator=(char ch) {
+		assign(ch);
+		return *this;
+	}
+
+	template<typename allocator>
+	inline basic_string<allocator>& basic_string<allocator>::operator=(const char* sz) {
+		assign(sz);
+		return *this;
+	}
+
+	template<typename allocator>
+	inline basic_string<allocator>& basic_string<allocator>::operator+=(const basic_string<allocator>& other) {
+		append(other);
+		return *this;
+	}
+	template<typename allocator>
+	inline basic_string<allocator>& basic_string<allocator>::operator+=(char ch) {
+		push_back(ch);
+		return *this;
+	}
+
+	template<typename allocator>
+	inline basic_string<allocator>& basic_string<allocator>::operator+=(const char* sz) {
+		append(sz);
+		return *this;
+	}
+
 	template<typename allocator>
 	inline const char* basic_string<allocator>::c_str() const {
 		return m_first;
@@ -197,6 +240,11 @@ namespace tinystl {
 	}
 
 	template<typename allocator>
+	inline void basic_string<allocator>::push_back(char ch) {
+		append(&ch, &ch + 1);
+	}
+
+	template<typename allocator>
 	inline void basic_string<allocator>::append(const char* first, const char* last) {
 		const size_t newsize = (size_t)((m_last - m_first) + (last - first) + 1);
 		if (m_first + newsize > m_capacity)
@@ -208,9 +256,21 @@ namespace tinystl {
 	}
 
 	template<typename allocator>
+	inline void basic_string<allocator>::append(const basic_string& other) {
+		append(other.m_first, other.m_last);
+	}
+
+	template<typename allocator>
 	inline void basic_string<allocator>::assign(const char* sz, size_t n) {
 		clear();
 		append(sz, sz+n);
+	}
+	template<typename allocator>
+	inline void basic_string<allocator>::assign(const char* sz) {
+		size_t len = 0;
+		for (const char *it = sz; *it; ++it)
+			++len;
+		assign(sz, len);
 	}
 
 	template<typename allocator>
@@ -282,6 +342,22 @@ namespace tinystl {
 				return false;
 
 		return true;
+	}
+
+	template<typename allocator>
+	inline basic_string<allocator> operator+(const basic_string<allocator>& lhs, const basic_string<allocator>& rhs) {
+		basic_string<allocator> ret;
+		ret.reserve(lhs.size() + rhs.size());
+		ret += lhs;
+		ret += rhs;
+		return ret;
+	}
+
+	template<typename allocator>
+	inline basic_string<allocator> operator+(const basic_string<allocator>& lhs, const char* rhs) {
+		basic_string<allocator> ret = lhs;
+		ret += rhs;
+		return ret;
 	}
 
 	template<typename allocator>

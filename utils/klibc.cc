@@ -125,6 +125,14 @@ static int _vprintf(const char* s, va_list vl)
 	return res;
 }
 
+int snprintf(char *str, size_t size, const char *format, ...){
+	va_list vl;
+	va_start(vl,format);
+	int res=_vsnprintf(str,size,format,vl);
+	va_end(vl);
+	return res;
+}
+
 int printf(const char* s, ...)
 {
 	int res = 0;
@@ -137,10 +145,8 @@ int printf(const char* s, ...)
 
 void panic(char *s)
 {
-	printf("panic: ");
-	printf(s);
-	printf("\n");
-	while(1){};
+	Log(error,"panic: %s",s);
+	halt();
 }
 void halt(int errno){
 	while(1)asm("wfi");

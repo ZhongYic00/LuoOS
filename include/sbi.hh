@@ -332,6 +332,9 @@ inline int sbi_err_map_linux_errno(int err){
 unsigned long riscv_cached_mvendorid(unsigned int cpu_id);
 unsigned long riscv_cached_marchid(unsigned int cpu_id);
 unsigned long riscv_cached_mimpid(unsigned int cpu_id);
+struct sbiret sbi_debug_console_write(unsigned long num_bytes,
+                                      unsigned long base_addr_lo,
+                                      unsigned long base_addr_hi);
 
 void sbi_ipi_init(void);
 
