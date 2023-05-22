@@ -2,7 +2,8 @@
 #include "alloc.hh"
 #include "kernel.hh"
 #include "rvcsr.hh"
-#define DEBUG 1
+
+#define moduleLevel LogLevel::info
 
 using namespace vm;
 PageNum PageTable::trans(PageNum vpn){
@@ -17,16 +18,14 @@ PageNum PageTable::trans(PageNum vpn){
     }
 }
 #define DBG_ENTRY DBG(\
-            entry.print();\
+            Log(debug,"%s",entry.toString().c_str());\
             assert(entry.isValid());\
         )
 void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,const perm_t perm,int level){
     xlen_t bigPageSize=1l<<(9*level);
     xlen_t unaligned=vpn&(bigPageSize-1);
-    DBG(
-        printf("createMapping(table,vpn=0x%lx,ppn=0x%lx,pages=0x%lx,perm=%x,level=%d)\n",vpn,ppn,pages,perm,level);
-        printf("bigPageSize=%lx,unaligned=%lx\n",bigPageSize,unaligned);
-    )
+    Log(debug,"createMapping(table,vpn=0x%lx,ppn=0x%lx,pages=0x%lx,perm=%x,level=%d)\n",vpn,ppn,pages,perm,level);
+    Log(debug,"bigPageSize=%lx,unaligned=%lx\n",bigPageSize,unaligned);
     // align vpn to boundary
     if(unaligned){
         auto partial=klib::min(bigPageSize-unaligned,pages);
@@ -46,7 +45,7 @@ void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages
             entry.setValid();entry.raw.ppn=addr2pn(reinterpret_cast<xlen_t>(subTable));
         }
         DBG_ENTRY
-        DBG(printf("subtable=%lx\n",subTable);)
+        Log(debug,"subtable=%lx\n",subTable);
         createMapping(subTable,vpn,ppn,partial,perm,level-1); // actual create mapping
         vpn+=partial,ppn+=partial,pages-=partial;
     }
@@ -86,25 +85,26 @@ void PageTable::createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages
         createMapping(subTable,vpn,ppn,pages,perm,level-1);
     }
 }
-void PageTable::print(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
+klib::string PageTable::toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
     assert(entrySize>0);
+    klib::string s;
     for(int i=0;i<pageEntriesPerPage;i++){
         auto &entry=table[i];
         if(entry.isValid()){
             if(entry.isLeaf()){
-                printf("%lx => %lx [%lx]\n",(xlen_t)i*entrySize+vpnBase,entry.ppn(),entrySize);
+                s+=entry.toString((xlen_t)i*entrySize+vpnBase,entrySize)+",";
             } else {
-                printf("%lx => PTNode@%lx\n",(xlen_t)i*entrySize+vpnBase,entry.ppn());
-                print(entry.child(),i*entrySize+vpnBase,entrySize>>9);
+                s+=klib::format("%s:\t[%s]\t,",entry.toString((xlen_t)i*entrySize+vpnBase).c_str(),toString(entry.child(),i*entrySize+vpnBase,entrySize>>9).c_str());
             }
         }
     }
+    return s;
 }
 pgtbl_t PageTable::createPTNode(){
     // return reinterpret_cast<pgtbl_t>(aligned_alloc(pageSize,pageSize));
     // auto rt=reinterpret_cast<pgtbl_t>(new PageTableNode);
     auto rt=reinterpret_cast<pgtbl_t>(vm::pn2addr(kGlobObjs.pageMgr->alloc(1)));
-    printf("createPTNode=0x%lx\n",rt);
+    Log(debug,"createPTNode=0x%lx",rt);
     return rt;
 }
 xlen_t PageTable::toSATP(PageTable &table){

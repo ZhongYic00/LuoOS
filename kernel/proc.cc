@@ -4,8 +4,7 @@
 
 using namespace proc;
 // using klib::make_shared;
-
-#define DEBUG 1
+#define moduleLevel LogLevel::debug
 Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
 }
@@ -72,15 +71,15 @@ void Task::switchTo(){
     // task->getProcess()->vmar.print();
 }
 void Task::sleep(){
-    printf("Task::sleep(this=Task<%d>)\n",this->id);
+    Log(info,"sleep(this=Task<%d>)",this->id);
     kGlobObjs.scheduler.sleep(this);
     // register xlen_t sp asm("sp");
     // saveContextTo(kctx.gpr);
 }
 void Process::print(){
-    printf("Process[%d]\n",pid());
-    vmar.print();
-    printf("===========");
+    Log(info,"Process[%d]",pid());
+    TRACE(vmar.print();)
+    Log(info,"===========");
 }
 Process* proc::createProcess(){
     // auto proc=kGlobObjs.procMgr.alloc(0,0);
@@ -91,17 +90,18 @@ Process* proc::createProcess(){
     proc->files[1]=new fs::File(fs::File::stdout,op::write);
     proc->files[2]=new fs::File(fs::File::stderr,op::write);
     DBG(proc->print();)
-    printf("proc created. pid=%d\n",proc->id);
+    Log(info,"proc created. pid=%d\n",proc->id);
     return proc;
 }
 Process* Task::getProcess(){ return kGlobObjs.procMgr[proc]; }
 void proc::clone(Task *task){
     auto proc=task->getProcess();
-    DBG(printf("src proc VMAR:\n");proc->vmar.print();)
+    Log(info,"clone(src=%p:[%d])",proc,proc->pid());
+    TRACE(Log(info,"src proc VMAR:\n");proc->vmar.print();)
     auto newproc=new (kGlobObjs.procMgr) Process(*proc);
     newproc->newTask(*task,false);
     newproc->defaultTask()->ctx.a0()=1;
-    DBG(newproc->vmar.print();)
+    TRACE(newproc->vmar.print();)
 }
 
 Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar){

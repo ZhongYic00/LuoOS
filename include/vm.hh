@@ -4,7 +4,6 @@
 #include "common.h"
 #include "klib.hh"
 
-#define DEBUG 1
 namespace vm
 {
     // struct alignas(4096) Page{char raw[4096];};
@@ -54,8 +53,14 @@ namespace vm
         inline perm_t perm(){ return raw.perm; }
         inline xlen_t ppn(){ return raw.ppn; }
         inline pgtbl_t child(){ return reinterpret_cast<pgtbl_t>( pn2addr(ppn()) ); }
-        inline void print(){
-            printf("[%lx] %c%c%c%c\n",raw.ppn,fields.r?'r':'-',fields.w?'w':'-',fields.x?'x':'-',fields.v?'v':'-');
+        inline klib::string toString(){
+            return klib::format("[%lx] %c%c%c%c",(xlen_t)raw.ppn,fields.r?'r':'-',fields.w?'w':'-',fields.x?'x':'-',fields.v?'v':'-');
+        }
+        inline klib::string toString(PageNum vpn,PageNum pages){
+            return klib::format("%lx=>%lx[%x] %c%c%c%c",vpn,ppn(),pages,fields.r?'r':'-',fields.w?'w':'-',fields.x?'x':'-',fields.v?'v':'-');
+        }
+        inline klib::string toString(PageNum vpn){
+            return klib::format("%lx => PTNode@%lx",vpn,ppn());
         }
     };
     
@@ -96,7 +101,7 @@ namespace vm
         inline PageNum pages() const{return mapping.second;}
         inline PageNum vpn() const{return mapping.first.first;}
         inline PageNum ppn() const{return mapping.first.second;}
-        inline void print() const{printf("VMO[0x%lx=>0x%lx@%lx]\n",vpn(),ppn(),pages());}
+        inline klib::string toString() const{return klib::format("<VMO>{0x%lx=>0x%lx@%lx}\n",vpn(),ppn(),pages());}
     private:
     };
 
@@ -132,10 +137,11 @@ namespace vm
         inline xlen_t transaddr(xlen_t addr){
             return pn2addr(trans(addr2pn(addr)))+addr2offset(addr);
         }
-        void print(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize);
+        klib::string toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize);
+        inline klib::string toString(){return toString(root,0l,1l<<18);}
         inline void print(){
-            printf("PageTable::print(root=%p)\n",root);
-            print(root,0l,1l<<18);
+            Log(debug,"PageTable::print(root=%p)\n",root);
+            Log(trace,"%s",toString().c_str());
         }
         static xlen_t toSATP(PageTable &table);
     };
@@ -154,10 +160,10 @@ namespace vm
             pagetable.createMapping(vmo);
         }
         inline void map(const VMO& vmo){
-            DBG(printf("map ");vmo.print();)
+            Log(debug,"map %s",vmo.toString().c_str());
             vmos.push_back(vmo);
             pagetable.createMapping(vmo);
-            DBG(printf("after map, VMAR:");print();)
+            Log(trace,"after map, VMAR:",vmos.toString().c_str());
         }
         inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm,CloneType ct=CloneType::clone){map(VMO({{vpn,ppn},pages},perm,ct));}
         inline void unmap();
@@ -188,8 +194,8 @@ namespace vm
         };
         inline Writer operator[](xlen_t vaddr){return Writer(vaddr,*this);}
         inline void print(){
-            // pagetable.print();
-            for(auto vmo:vmos)vmo.print();
+            Log(trace,"VMOs:\t%s",vmos.toString());
+            pagetable.print();
         }
     private:
         klib::list<VMO> vmos;

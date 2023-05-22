@@ -219,12 +219,15 @@ struct list:public Seq<T>{
         }
       }
   }
-  inline void print(void (*printhook)(const T&)){
-    printf("{head=0x%lx, tail=0x%lx} [\t",head,tail);
+  inline string toString(string (*stringifyHook)(const T&)){
+    string s=format("{head=0x%lx, tail=0x%lx} [\t",head,tail);
     for(listndptr cur=head;cur;cur=cur->iter.next)
-      printhook(cur->data);
-    printf("\t]\n");
+      s+=stringifyHook(cur->data)+",";
+    s+="\t]\n";
+    return s;
   }
+  static inline string defaultStringify(const T& d){return d.toString();}
+  inline string toString(){defaultStringify;}
 };
 
   template<typename T>
@@ -371,7 +374,7 @@ struct list:public Seq<T>{
       inline const bool expired() const { return (m_meta!=nullptr) ? (m_meta->m_ref<=0) : true; }
       // inline const bool valid() const { return m_ptr != nullptr; }
       void print() const {
-        printf("SharedPtr: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
+        Log(debug,"SharedPtr: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
       }
   };
   /*

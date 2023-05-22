@@ -145,10 +145,8 @@ int printf(const char* s, ...)
 
 void panic(char *s)
 {
-	printf("panic: ");
-	printf(s);
-	printf("\n");
-	while(1){};
+	Log(error,"panic: %s",s);
+	halt();
 }
 void halt(int errno){
 	while(1)asm("wfi");

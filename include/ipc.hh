@@ -17,7 +17,7 @@ namespace pipe{
             // TODO parallelize, copy avai bytes at once
             for(auto b:bytes){
                 while(buff.full()){
-                    printf("Pipe::write blocked, %d bytes remains\n",n);
+                    Log(info,"Pipe::write blocked, %d bytes remains\n",n);
                     //sleep and wakeup
                     wakeup();
                     sleep();

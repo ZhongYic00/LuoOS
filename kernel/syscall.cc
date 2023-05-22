@@ -21,12 +21,14 @@ namespace syscall
         xlen_t uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
         file->read(uva,len);
+        return statcode::ok;
     }
     int write(){
         auto &ctx=kHartObjs.curtask->ctx;
         xlen_t fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
         file->write(uva,len);
+        return statcode::ok;
     }
     __attribute__((naked))
     void sleepSave(ptr_t gpr){
@@ -35,12 +37,12 @@ namespace syscall
         _strapexit(); //TODO check
     }
     void yield(){
+        Log(info,"yield!");
         auto &cur=kHartObjs.curtask;
         cur->lastpriv=proc::Task::Priv::Kernel;
         sleepSave(cur->kctx.gpr);
     }
     int sysyield(){
-        printf("syscall yield\n");
         yield();
         return statcode::ok;
     }

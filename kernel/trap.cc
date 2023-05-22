@@ -4,6 +4,8 @@
 #include "sbi.hh"
 #include "kernel.hh"
 
+// #define moduleLevel LogLevel::debug
+
 extern void schedule();
 static hook_t hooks[10]={schedule};
 
@@ -16,18 +18,23 @@ void uecallHandler(){
     register int ecallId asm("a7");
     xlen_t &rtval=kHartObjs.curtask->ctx.x(10);
     kHartObjs.curtask->ctx.pc+=4;
-    printf("uecall [%d]\n",ecallId);
+    Log(debug,"uecall [%d]",ecallId);
     using namespace sys;
-    if(ecallId<nSyscalls)rtval=syscallPtrs[ecallId]();
-    else rtval=1;
-    printf("uecall exit(id=%d,rtval=%d)\n",ecallId,rtval);
+    if(ecallId<nSyscalls){
+        rtval=syscallPtrs[ecallId]();
+        Log(info,"syscall %d %s",ecallId,rtval==statcode::ok?"success":"failed");
+    } else {
+        Log(warning,"syscall num exceeds valid range");
+        rtval=1;
+    }
+    Log(debug,"uecall exit(id=%d,rtval=%d)",ecallId,rtval);
 }
 
 extern "C" void straphandler(){
     ptr_t sepc; csrRead(sepc,sepc);
     xlen_t scause; csrRead(scause,scause);
     xlen_t stval; csrRead(stval,stval);
-    printf("straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
+    Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
     kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
 
     if(csr::mcause::isInterrupt(scause)){
@@ -48,7 +55,8 @@ extern "C" void straphandler(){
             // case hei: break;
             // case mei: break;
             default:
-                halt();
+                Log(error,"scause=%d",scause);
+                panic("unhandled interrupt!");
         }
     } else {
         switch(scause){
@@ -57,8 +65,8 @@ extern "C" void straphandler(){
             // case secall:break;
             case storeAccessFault:break;
             default:
-                printf("exception\n");
-                halt();
+                Log(error,"scause=%d",scause);
+                panic("unhandled exception!");
         }
         csrWrite(sepc,kHartObjs.curtask->ctx.pc);
     }

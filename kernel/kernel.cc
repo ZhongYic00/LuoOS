@@ -88,7 +88,7 @@ static void infoInit(){
     kInfo.segments.bss={(xlen_t)&_bss_start,(xlen_t)&_bss_end};
     kInfo.segments.frames={(xlen_t)&_frames_start,(xlen_t)&_frames_end};
     for(int i=0;i<sizeof(kInfo.segments)/sizeof(kInfo.segments.bss);i++){
-        printf("{0x%lx 0x%lx}\n",*(((vm::segment_t*)&kInfo.segments)+i));
+        Log(info,"{0x%lx 0x%lx}",*(((vm::segment_t*)&kInfo.segments)+i));
     }
 }
 
@@ -108,8 +108,7 @@ void start_kernel(int hartid){
     
     // @todo needs plic and uart init?
     puts=IO::_blockingputs;
-    puts("\n\n>>>Hello RVOS<<<\n\n");
-    sbi_init();
+
     infoInit();
     memInit();
     syscall::init();
@@ -121,7 +120,7 @@ void start_kernel(int hartid){
     // halt();
     // while(true);
     for(int i=0;i<10;i++)
-        printf("%d:Hello RVOS!\n",i);
+        printf("%d:Hello LuoOS!\n",i);
     extern char _uimg_start;
     auto uproc=proc::createProcess();
     uproc->name="uprog00";
