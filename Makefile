@@ -50,7 +50,8 @@ $(OS): $(kobjs) $(uimg)
 	$(CC) $(CFLAGS) -T kernel/os.ld -o $(OS) $^
 
 usersrcs = $(shell find user/ -name "*.cc")
-userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))
+# userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))
+userprogs := obj/riscv64/yield
 $(info utilobjs=$(utilobjs))
 $(objdir)/user/%.elf : user/%.cc obj/utils/klibc.o
 	@echo +CC $^

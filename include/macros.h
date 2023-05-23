@@ -18,7 +18,7 @@ enum LogLevel{
 
 #define outputLevel LogLevel::debug
 #ifndef moduleLevel
-    #define moduleLevel LogLevel::info
+    #define moduleLevel LogLevel::error
 #endif
 #define Log(level,fmt,...) \
     if(level>=outputLevel && level>=moduleLevel){printf((__FILE__":%d:%s::\t" fmt "\n"),__LINE__,__PRETTY_FUNCTION__,##__VA_ARGS__);}
