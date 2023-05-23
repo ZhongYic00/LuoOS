@@ -7,10 +7,11 @@
 // #define moduleLevel LogLevel::debug
 
 extern void schedule();
-static hook_t hooks[10]={schedule};
+static hook_t hooks[]={schedule};
 
 extern void nextTimeout();
 void timerInterruptHandler(){
+    for(auto hook:hooks)hook();
     nextTimeout();
 }
 extern syscall_t syscallPtrs[];
