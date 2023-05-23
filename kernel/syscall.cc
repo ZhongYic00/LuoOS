@@ -20,15 +20,13 @@ namespace syscall
         int fd=ctx.x(10);
         xlen_t uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
-        file->read(uva,len);
-        return statcode::ok;
+        return file->read(uva,len);
     }
     int write(){
         auto &ctx=kHartObjs.curtask->ctx;
         xlen_t fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
-        file->write(uva,len);
-        return statcode::ok;
+        return file->write(uva,len);
     }
     __attribute__((naked))
     void sleepSave(ptr_t gpr){
@@ -57,8 +55,8 @@ namespace syscall
     }
     int clone(){
         auto &ctx=kHartObjs.curtask->ctx;
-        proc::clone(kHartObjs.curtask);
-        return statcode::ok;
+        auto pid=proc::clone(kHartObjs.curtask);
+        return pid;
     }
     int openAt() {
         auto &ctx = kHartObjs.curtask->ctx;

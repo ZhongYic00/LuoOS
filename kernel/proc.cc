@@ -94,14 +94,15 @@ Process* proc::createProcess(){
     return proc;
 }
 Process* Task::getProcess(){ return kGlobObjs.procMgr[proc]; }
-void proc::clone(Task *task){
+proc::pid_t proc::clone(Task *task){
     auto proc=task->getProcess();
     Log(info,"clone(src=%p:[%d])",proc,proc->pid());
     TRACE(Log(info,"src proc VMAR:\n");proc->vmar.print();)
     auto newproc=new (kGlobObjs.procMgr) Process(*proc);
     newproc->newTask(*task,false);
-    newproc->defaultTask()->ctx.a0()=1;
+    newproc->defaultTask()->ctx.a0()=sys::statcode::ok;
     TRACE(newproc->vmar.print();)
+    return newproc->pid();
 }
 
 Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar){

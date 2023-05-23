@@ -8,13 +8,15 @@
 // @todo error handling
 using namespace fs;
 
-void fs::File::write(xlen_t addr,size_t len){
-    if(!ops.fields.w)return ;
+xlen_t fs::File::write(xlen_t addr,size_t len){
+    xlen_t rt=sys::statcode::err;
+    if(!ops.fields.w)return rt;
     auto bytes=kHartObjs.curtask->getProcess()->vmar.copyin(addr,len);
     switch(type){
         case FileType::stdout:
         case FileType::stderr:
-            FMT_PROC("%s",bytes.c_str());
+            FMT_PROC("%s",klib::string(bytes.c_str(),len).c_str());
+            rt=bytes.len;
             break;
         case FileType::pipe:
             obj.pipe->write(bytes);
@@ -22,20 +24,26 @@ void fs::File::write(xlen_t addr,size_t len){
         default:
             break;
     }
+    return rt;
 }
-void fs::File::read(xlen_t addr,size_t len){
-    if(!ops.fields.r)return ;
+xlen_t fs::File::read(xlen_t addr,size_t len){
+    xlen_t rt=sys::statcode::err;
+    if(!ops.fields.r)return rt;
     switch(type){
         case FileType::stdin:
             panic("unimplementd!");
             break;
         case FileType::pipe:
-            {auto bytes=obj.pipe->read(len);
-            kHartObjs.curtask->getProcess()->vmar[addr]=bytes;}
+            {
+                auto bytes=obj.pipe->read(len);
+                kHartObjs.curtask->getProcess()->vmar[addr]=bytes;
+                rt=bytes.len;
+            }
             break;
         default:
             break;
     }
+    return rt;
 }
 
 fs::File::~File() {

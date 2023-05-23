@@ -99,7 +99,7 @@ namespace proc
     typedef ObjManager<Task> TaskManager;
     Process* createProcess();
     Process* createKProcess();
-    void clone(Task* task);
+    pid_t clone(Task* task);
 } // namespace proc
 
 

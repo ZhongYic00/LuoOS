@@ -52,8 +52,8 @@ namespace fs{
         File(const SharedPtr<Pipe> &a_pipe, FileOp a_ops): type(FileType::pipe), obj(a_pipe), ops(a_ops) {}
         File(FileType a_type, const SharedPtr<INode> &a_inode): type(a_type), obj(a_inode) {}
         ~File();
-        void write(xlen_t addr,size_t len);
-        void read(xlen_t addr, size_t len);
+        xlen_t write(xlen_t addr,size_t len);
+        xlen_t read(xlen_t addr, size_t len);
     };
 }
 #endif
