@@ -6,6 +6,7 @@
 #include "vm.hh"
 #include "TINYSTL/unordered_set.h"
 #include "TINYSTL/string.h"
+#include "TINYSTL/vector.h"
 #include "fat.hh"
 
 namespace proc
@@ -30,7 +31,7 @@ namespace proc
     };
 
     struct Task;
-    constexpr xlen_t UserStackDefault=0x7fffffff;
+    constexpr xlen_t UserStackDefault=0x7ffffff0;
     constexpr int MaxOpenFile = 101; // 官网测例往fd=100中写东西
 
     typedef tid_t pid_t;
@@ -46,12 +47,16 @@ namespace proc
         // todo: 以下为临时的FAT接口，需要修改
         dirent *cwd;
         mapped_file mfile;    //映射的文件的范围
+        int exitstatus;
 
         Process(prior_t prior,tid_t parent);
         Process(tid_t pid,prior_t prior,tid_t parent);
         Process(const Process &other,tid_t pid);
         inline Process(const Process &other):Process(other,id){}
+        ~Process();
+
         inline Task* defaultTask(){ return *tasks.begin(); } // @todo needs to mark default
+        Process *parentProc();
         inline tid_t pid(){return id;}
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
@@ -60,6 +65,8 @@ namespace proc
         Task* newTask(const Task &other,bool allocStack=true);
         void print();
         int fdAlloc(SharedPtr<File> a_file, int a_fd=-1);
+        void exit(int status);
+        void zombieExit();
     private:
         xlen_t newUstack();
         xlen_t newKstack();
@@ -95,8 +102,20 @@ namespace proc
             return klib::format("Task<%d>",id);
         }
     };
-    typedef ObjManager<Process> ProcManager;
+    typedef ObjManager<Process> ProcManagerBase;
     typedef ObjManager<Task> TaskManager;
+    class ProcManager:public ProcManagerBase{
+    public:
+        tinystl::vector<Process*> getChilds(pid_t pid){
+            tinystl::vector<Process*> rt;
+            for(int i=0;i<128;i++){
+                auto p=this->operator[](i);
+                if(p && p->parent==pid)
+                    rt.push_back(p);
+            }
+            return rt;
+        }
+    };
     Process* createProcess();
     Process* createKProcess();
     pid_t clone(Task* task);

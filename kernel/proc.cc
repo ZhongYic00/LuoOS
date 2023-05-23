@@ -4,7 +4,7 @@
 
 using namespace proc;
 // using klib::make_shared;
-#define moduleLevel LogLevel::debug
+// #define moduleLevel LogLevel::debug
 Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
 }
@@ -105,9 +105,33 @@ proc::pid_t proc::clone(Task *task){
     return newproc->pid();
 }
 
-Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar){
+Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id){
     for(int i=0;i<MaxOpenFile;i++)files[i]=other.files[i];
 }
+void Process::exit(int status){
+    Log(info,"Proc[%d] exit(%d)",pid(),status);
+    
+    this->exitstatus=status;
+    /// @todo resource recycle
+
+    for(auto task:tasks){
+        kGlobObjs.scheduler.remove(task);
+    }
+
+    state=sched::Zombie;
+
+    auto task=parentProc()->defaultTask();
+    kGlobObjs.scheduler.wakeup(task);
+}
+void Process::zombieExit(){
+    Log(info,"Proc[%d] zombie exit",pid());
+    kGlobObjs.procMgr.del(this);
+}
+Process::~Process(){
+    for(auto task:tasks)kGlobObjs.taskMgr.del(task);
+    tasks.clear();
+}
+Process *Process::parentProc(){return kGlobObjs.procMgr[parent];}
 
 int Process::fdAlloc(SharedPtr<File> a_file, int a_fd){ // fd缺省值为-1，在头文件中定义
     if(a_fd < 0) {

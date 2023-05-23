@@ -145,6 +145,52 @@ namespace syscall
         int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
         proc->vmar[fd]=fds;
     }
+    int exit(){
+        auto status=kHartObjs.curtask->ctx.a0();
+        kHartObjs.curtask->getProcess()->exit(status);
+        yield();
+    }
+    int waitpid(tid_t pid,xlen_t wstatus,int options){
+        auto curproc=kHartObjs.curtask->getProcess();
+        proc::Process* target=nullptr;
+        if(pid==-1){
+            // get child procs
+            // every child wakes up parent at exit?
+            auto childs=kGlobObjs.procMgr.getChilds(curproc->pid());
+            while(!childs.empty()){
+                for(auto child:childs){
+                    if(child->state==sched::Zombie){
+                        target=child;
+                        break;
+                    }
+                }
+                if(target)break;
+                sleep();
+                childs=kGlobObjs.procMgr.getChilds(curproc->pid());
+            }
+        }
+        else if(pid>0){
+            auto proc=kGlobObjs.procMgr[pid];
+            while(proc->state!=sched::Zombie){
+                // proc add hook
+                sleep();
+            }
+        }
+        else if(pid==0)panic("waitpid: unimplemented!");
+        else if(pid<0)panic("waitpid: unimplemented!");
+        if(target==nullptr)return statcode::err;
+        auto rt=target->pid();
+        if(wstatus)kHartObjs.curtask->getProcess()->vmar[wstatus]=(int)(target->exitstatus<<8);
+        target->zombieExit();
+        return rt;
+    }
+    int wait(){
+        auto &cur=kHartObjs.curtask;
+        auto &ctx=cur->ctx;
+        pid_t pid=ctx.x(10);
+        xlen_t wstatus=ctx.x(11);
+        return waitpid(pid,wstatus,0);
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -193,8 +239,10 @@ namespace syscall
         syscallPtrs[syscalls::close] = syscall::close;
         syscallPtrs[syscalls::read] = read;
         syscallPtrs[syscalls::write] = syscall::write;
+        syscallPtrs[syscalls::exit] = syscall::exit;
         syscallPtrs[syscalls::yield] = syscall::sysyield;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
         syscallPtrs[syscalls::clone] = syscall::clone;
+        syscallPtrs[syscalls::wait] = syscall::wait;
     }
 } // namespace syscall
