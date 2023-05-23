@@ -25,6 +25,7 @@ namespace pipe{
                 buff.put(b);
                 n--;
             }
+            wakeup();
         }
         inline klib::ByteArray read(int n){
             klib::ByteArray bytes(n);
