@@ -151,6 +151,7 @@ namespace syscall
         yield();
     }
     int waitpid(tid_t pid,xlen_t wstatus,int options){
+        Log(info,"waitpid(pid=%d,options=%d)",pid,options);
         auto curproc=kHartObjs.curtask->getProcess();
         proc::Process* target=nullptr;
         if(pid==-1){
