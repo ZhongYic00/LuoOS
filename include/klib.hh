@@ -301,7 +301,8 @@ struct list:public Seq<T>{
   typedef int ref_t;
   struct MDB{
     ref_t m_ref;
-    MDB(): m_ref(1) {};
+    bool m_weak;
+    MDB(bool a_weak=false): m_ref(1), m_weak(a_weak) {};
   };
   template<typename T>
   /*
@@ -319,6 +320,7 @@ struct list:public Seq<T>{
       // 构造与析构
       SharedPtr(): m_ptr(nullptr), m_meta(nullptr) {}
       SharedPtr(T *a_ptr): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB):nullptr) {}
+      SharedPtr(T *a_ptr, bool a_weak): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB(a_weak)):nullptr) {}
       SharedPtr(const SharedPtr<T> &a_sptr): m_ptr(a_sptr.m_ptr), m_meta(a_sptr.m_meta) { if(m_meta)++(m_meta->m_ref); }
       ~SharedPtr() { deRef(); }
       // 赋值运算
@@ -340,17 +342,31 @@ struct list:public Seq<T>{
       T& operator*() const { return *m_ptr; }
       T* operator->() const { return m_ptr; }
       T& operator[](int a_offset) const { return m_ptr[a_offset]; }
-      // 算术运算
-      T *const operator+(int a_offset) const { return (m_ptr!=nullptr) ? (m_ptr+a_offset) : nullptr; }
-      T *const operator-(int a_offset) const { return (m_ptr!=nullptr) ? (m_ptr-a_offset) : nullptr; }
-      const int operator-(T *a_ptr) const { return m_ptr - a_ptr; }
-      const int operator-(const SharedPtr<T> &a_sptr) const { return m_ptr - a_sptr.m_ptr; }
+      // 算术运算——不再支持
+      // const SharedPtr<T> operator+(int a_offset) const { return (m_ptr!=nullptr) ? (SharedPtr<T>(m_ptr+a_offset,true)) : nullptr; }
+      // const SharedPtr<T> operator-(int a_offset) const { return (m_ptr!=nullptr) ? (SharedPtr<T>(m_ptr-a_offset,true)) : nullptr; }
+      // const int operator-(T *a_ptr) const { return m_ptr - a_ptr; }
+      // const int operator-(const SharedPtr<T> &a_sptr) const { return m_ptr - a_sptr.m_ptr; }
+      // const SharedPtr<T> operator++() { return *this = *this + 1; }
+      // const SharedPtr<T> operator--() { return *this = *this - 1; }
+      // const SharedPtr<T> operator++(int) {
+      //   SharedPtr<T> tmp = *this;
+      //   *this = *this + 1;
+      //   return tmp;
+      // }
+      // const SharedPtr<T> operator--(int) {
+      //   SharedPtr<T> tmp = *this;
+      //   *this = *this - 1;
+      //   return tmp;
+      // }
       // 逻辑运算
+      const bool operator!() const { return !m_ptr; }
       const bool operator>(T *a_ptr) const { return m_ptr > a_ptr; }
       const bool operator<(T *a_ptr) const { return m_ptr < a_ptr; }
       const bool operator>=(T *a_ptr) const { return m_ptr >= a_ptr; }
       const bool operator<=(T *a_ptr) const { return m_ptr <= a_ptr; }
       const bool operator==(T *a_ptr) const { return m_ptr == a_ptr; }
+      const bool operator!=(T *a_ptr) const { return m_ptr != a_ptr; }
       const bool operator>(const SharedPtr<T> &a_sptr) const { return m_ptr > a_sptr.m_ptr; }
       const bool operator<(const SharedPtr<T> &a_sptr) const { return m_ptr < a_sptr.m_ptr; }
       const bool operator>=(const SharedPtr<T> &a_sptr) const { return m_ptr >= a_sptr.m_ptr; }
@@ -359,7 +375,7 @@ struct list:public Seq<T>{
       // 功能函数
       void deRef() {
         if(m_meta != nullptr) {
-          if(--(m_meta->m_ref) <= 0){
+          if(!(m_meta->m_weak) && ((--(m_meta->m_ref))<=0)) {
             delete m_meta;
             delete m_ptr;
           }

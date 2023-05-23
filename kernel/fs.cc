@@ -44,9 +44,11 @@ fs::File::~File() {
             obj.pipe.deRef();
             break;
         }
-        case FileType::inode: {
-            obj.inode.deRef();
-            /*关闭逻辑*/
+        case FileType::entry: {
+            eput(obj.ep);
+            break;
+        }
+        case FileType::dev: {
             break;
         }
     }

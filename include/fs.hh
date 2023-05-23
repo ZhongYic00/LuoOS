@@ -5,12 +5,14 @@
 #include "ipc.hh"
 #include "resmgr.hh"
 #include "klib.hh"
+#include "fcntl.h"
 
 
 namespace fs{
     using klib::SharedPtr;
     using pipe::Pipe;
 
+    struct dirent;
 
     struct INode{
         enum INodeType{
@@ -22,7 +24,7 @@ namespace fs{
     };
 
     struct File {
-        enum FileType { none,pipe,entry,dev,inode, stdin,stdout,stderr };
+        enum FileType { none,pipe,entry,dev, stdin,stdout,stderr };
         enum class FileOp:uint16_t { none=0,read=0x1,write=0x2,append=0x4, };
 
         union FileOps {
@@ -35,22 +37,30 @@ namespace fs{
             }fields;
             FileOp raw;
             FileOps(FileOp a_ops=FileOp::none):raw(a_ops){}
+            FileOps(int a_flags) {
+                fields.r = !(a_flags & O_WRONLY);
+                fields.w = (a_flags & O_WRONLY) || (a_flags & O_RDWR);
+                fields.a = a_flags & O_APPEND;
+            }
         }ops;
         union Data {
             SharedPtr<Pipe> pipe;
-            SharedPtr<INode> inode;
+            struct dirent *ep;
             Data(FileType a_type){ assert(a_type==none || a_type==stdin || a_type==stdout || a_type==stderr); }
-            Data(const SharedPtr<Pipe> &a_pipe):pipe(a_pipe){}
-            Data(const SharedPtr<INode> &a_inode):inode(a_inode){}
-            ~Data(){}
+            Data(const SharedPtr<Pipe> &a_pipe): pipe(a_pipe) {}
+            Data(struct dirent *a_ep): ep(a_ep) {}
+            ~Data() {}
         }obj;
         const FileType type;
-        struct dirent *ep;
+        uint off;
 
-        File(FileType type,FileOp ops=FileOp::none):type(type),obj(type),ops(ops){}
         File(FileType a_type): type(a_type), obj(a_type) {}
+        File(FileType a_type, FileOp a_ops=FileOp::none): type(a_type), obj(a_type), ops(a_ops) {}
+        File(FileType a_type, int a_flags): type(a_type), obj(a_type), ops(a_flags) {}
         File(const SharedPtr<Pipe> &a_pipe, FileOp a_ops): type(FileType::pipe), obj(a_pipe), ops(a_ops) {}
-        File(FileType a_type, const SharedPtr<INode> &a_inode): type(a_type), obj(a_inode) {}
+        File(const SharedPtr<Pipe> &a_pipe, int a_flags): type(FileType::pipe), obj(a_pipe), ops(a_flags) {}
+        File(struct dirent *a_ep, FileOp a_ops): type(FileType::entry), obj(a_ep), ops(a_ops) {}
+        File(struct dirent *a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags) {}
         ~File();
         void write(xlen_t addr,size_t len);
         void read(xlen_t addr, size_t len);

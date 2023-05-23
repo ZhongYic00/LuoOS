@@ -1,5 +1,7 @@
 #include "kernel.hh"
 #include "sched.hh"
+#include "stat.h"
+#include "fat.hh"
 
 syscall_t syscallPtrs[sys::syscalls::nSyscalls];
 extern void _strapexit();
@@ -63,31 +65,48 @@ namespace syscall
     int openAt() {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_dirfd = ctx.x(10);
-        const char *a_path = (const char*)ctx.x(11);
+        char *a_path = (char*)ctx.x(11);
         int a_flags = ctx.x(12);
         mode_t a_mode = ctx.x(13); // uint32
 
         int fd;
-        SharedPtr<fs::File> f;
+        SharedPtr<fs::File> f, f2;
+        struct fs::dirent *ep;
         auto curproc = kHartObjs.curtask->getProcess();
-
-        /*
-            inode相关操作
-        */
-        // 测试用
-        SharedPtr<fs::INode> in = new fs::INode;
-        in->m_type = fs::INode::file;
-        //
-
-        
-        if(in->m_type == fs::INode::dev) {
-            f = new fs::File(fs::File::FileType::dev, in);
+        // entry point
+        if((a_path[0]!='/') && (fd>=0) && (fd<proc::MaxOpenFile)) {
+            f2 = curproc->files[fd];
+        }
+        if(a_flags & O_CREATE) {
+            ep = fs::create2(a_path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
+            if(ep == nullptr) { return statcode::err; }
         }
         else {
-            f = new fs::File(fs::File::FileType::inode, in);
+            if((ep = fs::ename2(a_path, f2)) == nullptr) { return statcode::err; }
+            // elock(ep);
+            if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
+                printf("dir can't write\n");
+                // eunlock(ep);
+                fs::eput(ep);
+                return statcode::err;
+            }
+            if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
+                printf("it is not dir\n");
+                // eunlock(ep);
+                fs::eput(ep);
+                return statcode::err;
+            }
         }
+        // file and fd
+        f = new fs::File(ep, a_flags); // todo: 权限
+        f->off = (a_flags&O_APPEND) ? ep->file_size : 0;
         fd = curproc->fdAlloc(f);
-        if(fd < 0) { return statcode::err; }
+        if(fd < 0) {
+            eput(ep);
+            return statcode::err;
+            // 如果fd分配不成功，f过期后会自动delete        
+        }
+        if(!(ep->attribute&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { etrunc(ep); }
 
         return fd;
     }
