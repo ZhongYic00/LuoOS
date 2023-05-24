@@ -18,7 +18,7 @@ int main(){
     if(sys::syscall(sys::syscalls::clone)!=0){
         printf("parent return to here");
         ischild=false;
-        int ret=sys::syscall1(sys::syscalls::wait,0);
+        int ret=sys::syscall1(sys::syscalls::wait,-1);
         printf("wait ret=%d\n",ret);
     }else{
         printf("child return to here");
