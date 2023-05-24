@@ -26,10 +26,12 @@ namespace sys
         pipe2=59,
         read=63,
         write=64,
+        exit=93,
         yield=124,
         getpid=172,
         getppid=173,
         clone=220,
+        wait=260,
         nSyscalls,
     };
     enum statcode{

@@ -7,10 +7,11 @@
 // #define moduleLevel LogLevel::debug
 
 extern void schedule();
-static hook_t hooks[10]={schedule};
+static hook_t hooks[]={schedule};
 
 extern void nextTimeout();
 void timerInterruptHandler(){
+    for(auto hook:hooks)hook();
     nextTimeout();
 }
 extern syscall_t syscallPtrs[];
@@ -22,7 +23,7 @@ void uecallHandler(){
     using namespace sys;
     if(ecallId<nSyscalls){
         rtval=syscallPtrs[ecallId]();
-        Log(info,"syscall %d %s",ecallId,rtval==statcode::ok?"success":"failed");
+        Log(info,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
     } else {
         Log(warning,"syscall num exceeds valid range");
         rtval=1;

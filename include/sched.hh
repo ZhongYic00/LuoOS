@@ -5,7 +5,7 @@
 namespace sched
 {
     enum State:short{
-        Init,Ready,Running,Pending,Exit,
+        Init,Ready,Running,Pending,Zombie,
     };
     typedef short prior_t;
     struct Scheduable{
@@ -22,6 +22,7 @@ namespace sched
         Scheduable *next();
         Scheduler();
         void add(Scheduable *elem);
+        void remove(Scheduable *elem);
         void wakeup(Scheduable *elem);
         void sleep(Scheduable *elem);
     };

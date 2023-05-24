@@ -22,15 +22,13 @@ namespace syscall
         int fd=ctx.x(10);
         xlen_t uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
-        file->read(uva,len);
-        return statcode::ok;
+        return file->read(uva,len);
     }
     int write(){
         auto &ctx=kHartObjs.curtask->ctx;
         xlen_t fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
-        file->write(uva,len);
-        return statcode::ok;
+        return file->write(uva,len);
     }
     __attribute__((naked))
     void sleepSave(ptr_t gpr){
@@ -59,8 +57,8 @@ namespace syscall
     }
     int clone(){
         auto &ctx=kHartObjs.curtask->ctx;
-        proc::clone(kHartObjs.curtask);
-        return statcode::ok;
+        auto pid=proc::clone(kHartObjs.curtask);
+        return pid;
     }
     int openAt() {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -166,6 +164,53 @@ namespace syscall
         int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
         proc->vmar[fd]=fds;
     }
+    int exit(){
+        auto status=kHartObjs.curtask->ctx.a0();
+        kHartObjs.curtask->getProcess()->exit(status);
+        yield();
+    }
+    int waitpid(tid_t pid,xlen_t wstatus,int options){
+        Log(info,"waitpid(pid=%d,options=%d)",pid,options);
+        auto curproc=kHartObjs.curtask->getProcess();
+        proc::Process* target=nullptr;
+        if(pid==-1){
+            // get child procs
+            // every child wakes up parent at exit?
+            auto childs=kGlobObjs.procMgr.getChilds(curproc->pid());
+            while(!childs.empty()){
+                for(auto child:childs){
+                    if(child->state==sched::Zombie){
+                        target=child;
+                        break;
+                    }
+                }
+                if(target)break;
+                sleep();
+                childs=kGlobObjs.procMgr.getChilds(curproc->pid());
+            }
+        }
+        else if(pid>0){
+            auto proc=kGlobObjs.procMgr[pid];
+            while(proc->state!=sched::Zombie){
+                // proc add hook
+                sleep();
+            }
+        }
+        else if(pid==0)panic("waitpid: unimplemented!");
+        else if(pid<0)panic("waitpid: unimplemented!");
+        if(target==nullptr)return statcode::err;
+        auto rt=target->pid();
+        if(wstatus)kHartObjs.curtask->getProcess()->vmar[wstatus]=(int)(target->exitstatus<<8);
+        target->zombieExit();
+        return rt;
+    }
+    int wait(){
+        auto &cur=kHartObjs.curtask;
+        auto &ctx=cur->ctx;
+        pid_t pid=ctx.x(10);
+        xlen_t wstatus=ctx.x(11);
+        return waitpid(pid,wstatus,0);
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -214,8 +259,10 @@ namespace syscall
         syscallPtrs[syscalls::close] = syscall::close;
         syscallPtrs[syscalls::read] = read;
         syscallPtrs[syscalls::write] = syscall::write;
+        syscallPtrs[syscalls::exit] = syscall::exit;
         syscallPtrs[syscalls::yield] = syscall::sysyield;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
         syscallPtrs[syscalls::clone] = syscall::clone;
+        syscallPtrs[syscalls::wait] = syscall::wait;
     }
 } // namespace syscall

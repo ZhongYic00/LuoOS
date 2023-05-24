@@ -19,7 +19,7 @@ class ObjManager{
 public:
     inline tid_t newId(){return ++idCnt;}
     inline void addObj(tid_t id,T* obj){objlist[id]=obj;}
-    void free(tid_t id);
+    void del(T *obj);
     inline T* operator[](tid_t id){return objlist[id];}
 };
 
@@ -30,5 +30,11 @@ ptr_t operator new(size_t size, ObjManager<T> &mgr){
     new (obj) IdManagable(id);
     mgr.addObj(id,(T*)obj);
     return obj;
+}
+template<typename T>
+void ObjManager<T>::del(T* obj){
+    obj->~T();
+    objlist[obj->id]=nullptr;
+    /// @todo id recycle
 }
 #endif

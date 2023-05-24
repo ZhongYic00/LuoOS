@@ -62,8 +62,8 @@ namespace fs{
         File(struct dirent *a_ep, FileOp a_ops): type(FileType::entry), obj(a_ep), ops(a_ops) {}
         File(struct dirent *a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags) {}
         ~File();
-        void write(xlen_t addr,size_t len);
-        void read(xlen_t addr, size_t len);
+        xlen_t write(xlen_t addr,size_t len);
+        xlen_t read(xlen_t addr, size_t len);
     };
 }
 #endif
