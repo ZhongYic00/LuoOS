@@ -227,7 +227,7 @@ struct list:public Seq<T>{
     return s;
   }
   static inline string defaultStringify(const T& d){return d.toString();}
-  inline string toString(){defaultStringify;}
+  inline string toString(){return toString(defaultStringify);}
 };
 
   template<typename T>
