@@ -1,6 +1,7 @@
 #ifndef GUEST
 
 #include "klib.h"
+#include "alloc.hh"
 
 void (*puts)(const char *s);
 
@@ -254,6 +255,9 @@ extern "C" int __cxa_atexit(void (*func)(void*), void* arg, void* dso) {
 // entry->next = head;
 // head = entry;
 return 0;
+}
+extern "C" int __dso_handle(){
+	panic("unimplemented!");
 }
 #endif
 

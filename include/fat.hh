@@ -2,6 +2,7 @@
 #define FAT_HH__
 
 #include "fs.hh"
+#include "buf.h"
 
 #define ATTR_READ_ONLY      0x01  // 只读
 #define ATTR_HIDDEN         0x02  // 隐藏
@@ -87,22 +88,42 @@ namespace fs {
         union dentry de;
         uint32 link_count;
     };
-    // file system?
-    struct fstype {
+    struct SuperBlock{
         uint32 first_data_sec; // data所在的第一个扇区
         uint32 data_sec_cnt; // 数据扇区数
         uint32 data_clus_cnt; // 数据簇数
         uint32 byts_per_clus; // 每簇字节数
-        struct { 
-            uint16 byts_per_sec;  // 扇区字节数
-            uint8 sec_per_clus;  // 每簇扇区数
-            uint16 rsvd_sec_cnt;  // 保留扇区数
-            uint8 fat_cnt;  // fat数          
-            uint32 hidd_sec;  // 隐藏扇区数         
-            uint32 tot_sec;  // 总扇区数          
-            uint32 fat_sz;   // 一个fat所占扇区数           
-            uint32 root_clus; // 根目录簇号 
+        struct {
+            uint16  byts_per_sec;  // 扇区字节数
+            uint8   sec_per_clus;  // 每簇扇区数
+            uint16  rsvd_sec_cnt;  // 保留扇区数
+            uint8   fat_cnt;  // fat数          
+            uint32  hidd_sec;  // 隐藏扇区数         
+            uint32  tot_sec;  // 总扇区数          
+            uint32  fat_sz;   // 一个fat所占扇区数           
+            uint32  root_clus; // 根目录簇号 
         } bpb;
+        
+        SuperBlock()=default;
+        SuperBlock(BlockBuf &other){
+            auto &fat=*this;
+            if (strncmp(other.d<char const*>(82), "FAT32", 5)) { panic("not FAT32 volume"); }
+            memmove(&fat.bpb.byts_per_sec, other.data + 11, 2); // avoid misaligned load on k210
+            fat.bpb.sec_per_clus = other.d<uint8>(13);
+            fat.bpb.rsvd_sec_cnt = other.d<uint16>(14);
+            fat.bpb.fat_cnt = other.d<uint8>(16);
+            fat.bpb.hidd_sec = other[28];
+            fat.bpb.tot_sec = other[32];
+            fat.bpb.fat_sz = other[36];
+            fat.bpb.root_clus = other[44];
+            fat.first_data_sec = fat.bpb.rsvd_sec_cnt + fat.bpb.fat_cnt * fat.bpb.fat_sz;
+            fat.data_sec_cnt = fat.bpb.tot_sec - fat.first_data_sec;
+            fat.data_clus_cnt = fat.data_sec_cnt / fat.bpb.sec_per_clus;
+            fat.byts_per_clus = fat.bpb.sec_per_clus * fat.bpb.byts_per_sec;
+        }
+    };
+    // file system?
+    struct fstype:public SuperBlock{
         int vaild;
         struct dirent root; //这个文件系统的根目录文件
         uint8 mount_mode; //是否被挂载的标志

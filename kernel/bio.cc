@@ -24,27 +24,59 @@
 // #include "include/printf.h"
 // #include "include/disk.h"
 // #include "include/proc.h"
+#include "klib.hh"
+#include "kernel.hh"
+#include "TINYSTL/unordered_map.h"
 
-struct buf buf[NBUF];
+using tinystl::unordered_map;
+using klib::pair;
 
-int listhash(uint dev, uint sectorno){
-  return (dev+sectorno) & (NBUFLIST - 1);
-}
+template<typename K,typename V>
+class CacheMgr{
+    constexpr static int nbufs=32;
+    struct Piece{
+      int ref;
+      V d;
+    };
+    unordered_map<K,Piece> pool;
+    void reserve(size_t capacity){
+        while(pool.size()+capacity>nbufs){
+            auto lacks=pool.size()+capacity-nbufs;
+            /// @todo retire one piece
+            /// @todo suspend curtask when no buffer available
+            for(auto &piece:pool){
+              if(piece.second.ref==0){
+                pool.erase(pool.find(piece.first));
+                lacks--;
+                if(lacks==0)return ;
+              }
+            }
+        }
+    }
+public:
+    template<typename Lambda>
+    V& get(K key,Lambda refill){
+        if(pool.find(key)==pool.end()){
+          reserve(1);
+          pool[key].d=refill();
+        }
+        pool[key].ref++;
+        return pool[key].d;
+    }
+    void release(K key){
+      pool[key].ref--;
+    }
+};
 
-struct {
-  // struct spinlock lock;
-  struct buf head;
-} listcache[NBUFLIST];
-
-struct {
-  // struct spinlock lock;
-  struct buf head;
-} freecache;
+// struct DiskBlock{uint8 d[512];};
+typedef CacheMgr<secno_t,BlockBuf> BCacheMgr;
+unordered_map<dev_t,BCacheMgr> bcacheMgr;
 
 void
 binit(void)
 {
-  // struct buf *b;
+    bcacheMgr[0]=BCacheMgr();
+  // BlockRef *b;
   // // initlock(&freecache.lock, "freecache");
   // freecache.head.freeprev = &freecache.head;
   // freecache.head.freenext = &freecache.head;
@@ -76,10 +108,11 @@ binit(void)
 // Look through buffer cache for block on device dev.
 // If not found, allocate a buffer.
 // In either case, return locked buffer.
-static struct buf*
+static BlockRef*
 bget(uint dev, uint sectorno) {
+  /// @warning unused
   // while(1){
-  //   struct buf *b;
+  //   BlockRef *b;
   //   int n = listhash(dev, sectorno);
   //   // acquire(&listcache[n].lock);
   //   for(b = listcache[n].head.next; b != &listcache[n].head; b = b->next){
@@ -141,31 +174,40 @@ bget(uint dev, uint sectorno) {
   // }
 }
 
+constexpr xlen_t diskPages=128,
+  diskBytes=diskPages*vm::pageSize;
+klib::ByteArray memdisk(nullptr,diskBytes);
+void disk_init(){
+  memdisk.buff=(uint8_t*)vm::pn2addr(kGlobObjs.pageMgr->alloc(diskPages));
+}
+BlockBuf disk_read(secno_t secno){
+  BlockBuf buf;
+  memcpy(buf.data,memdisk.buff+secno*BSIZE,BSIZE);
+  return buf;
+}
+void disk_write(BlockRef& ref){
+  memcpy(memdisk.buff+ref.secno*BSIZE,ref.buf.data,BSIZE);
+}
 
-struct buf* 
+BlockRef&
 bread(uint dev, uint sectorno) {
-  struct buf *b;
-  // b = bget(dev, sectorno);
-
-  // if (!b->vaild) {
-  //   disk_read(b);
-  //   b->vaild = 1;
-  // }
-
-  return b;
+  auto &buf=bcacheMgr[dev].get(sectorno,[=](){return disk_read(sectorno);});
+  auto rt=BlockRef{.secno=sectorno,.buf=buf};
+  return rt;
 }
 
 // Write b's contents to disk.  Must be locked.
 void 
-bwrite(struct buf *b) {
-  // disk_write(b);
+bwrite(BlockRef &b) {
+  disk_write(b);
   // b->vaild = 1;
 }
 
 
 void
-brelse(struct buf *b)
+brelse(BlockRef &b)
 {
+  bcacheMgr[0].release(b.secno);
   // // acquire(&freecache.lock);
   // b->busy = 0;
   // if(b->vaild){

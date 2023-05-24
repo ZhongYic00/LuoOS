@@ -5,24 +5,28 @@
 // #include "sleeplock.h"
 #include "types.h"
 
-struct buf {
-  uint8 busy;
-  uint8 vaild;
-  int disk;		// does disk "own" buf? 
-  uint dev;
-  uint sectorno;	// sector number 
+typedef word_t secno_t;
+
+struct BlockBuf {
   // struct sleeplock lock;
-  // uint refcnt;
-  struct buf *freeprev;
-  struct buf *freenext;
-  struct buf *prev;
-  struct buf *next;
-  uchar data[BSIZE];
+  uint8_t data[BSIZE];
+  template<typename T=uint32>
+  inline T& operator[](off_t off){return reinterpret_cast<T*>(data)[off];}
+  template<typename T=uint32>
+  inline T& d(off_t off){return reinterpret_cast<T*>(data)[off];}
+};
+struct BlockRef{
+  secno_t secno;
+  BlockBuf &buf;
+  template<typename T=uint32>
+  inline T& operator[](off_t off){return reinterpret_cast<T*>(buf.data)[off];}
+  template<typename T=uint32>
+  inline T& d(off_t off){return reinterpret_cast<T*>(buf.data)[off];}
 };
 
 void binit(void);
-struct buf* bread(uint, uint);
-void brelse(struct buf*);
-void bwrite(struct buf*);
+BlockRef& bread(uint, uint);
+void brelse(BlockRef&);
+void bwrite(BlockRef&);
 
 #endif
