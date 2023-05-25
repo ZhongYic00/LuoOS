@@ -64,8 +64,9 @@ namespace vm
         }
     };
     
-    constexpr xlen_t pageSize=0x1000,
-        pageEntriesPerPage=pageSize/sizeof(PageTableEntry);
+    constexpr xlen_t pageShift=12;
+    constexpr xlen_t pageSize=1L<<pageShift;
+    constexpr xlen_t pageEntriesPerPage=pageSize/sizeof(PageTableEntry);
     constexpr xlen_t vpnMask=0x1ff;
     constexpr xlen_t vaddrOffsetMask=pageSize-1;
     inline xlen_t addr2offset(xlen_t addr){ return addr&(vaddrOffsetMask); }

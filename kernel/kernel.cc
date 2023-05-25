@@ -7,6 +7,9 @@
 #include "ld.hh"
 #include "sched.hh"
 #include "proc.hh"
+#include "buf.h"
+#include "virtio.h"
+#include "fat.hh"
 
 extern char _kstack_end;
 xlen_t kstack_end=(xlen_t)&_kstack_end;
@@ -131,6 +134,12 @@ void start_kernel(int hartid){
     timerInit();
     csrClear(sstatus,1l<<csr::mstatus::spp);
     csrSet(sstatus,BIT(csr::mstatus::spie));
+    // virtio_disk_init();
+    // printf("virtio disk init!\n");
+    // binit();
+    // printf("buf init!\n");
+    // fs::fat32_init();
+    // printf("fat32 init!\n");
     schedule();
     volatile register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
     _strapexit();

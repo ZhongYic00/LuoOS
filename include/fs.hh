@@ -1,10 +1,8 @@
 #ifndef FS_HH__
 #define FS_HH__
 
-#include "common.h"
 #include "ipc.hh"
 #include "resmgr.hh"
-#include "klib.hh"
 #include "fcntl.h"
 
 
@@ -14,14 +12,14 @@ namespace fs{
 
     struct dirent;
 
-    struct INode{
-        enum INodeType{
-            dir, file, dev
-        };
-        bool m_valid;
-        INodeType m_type;
-        size_t m_size;
-    };
+    // struct INode{
+    //     enum INodeType{
+    //         dir, file, dev
+    //     };
+    //     bool m_valid;
+    //     INodeType m_type;
+    //     size_t m_size;
+    // };
 
     struct File {
         enum FileType { none,pipe,entry,dev, stdin,stdout,stderr };

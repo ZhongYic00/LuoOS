@@ -1,8 +1,6 @@
 #ifndef __PARAM_H
 #define __PARAM_H
 
-// todo: 把宏定义写成合适的形式，删去我们不用的宏定义，优化布局，同步修改引用的代码
-
 #define NPROC        50  // maximum number of processes
 #define NCPU          2  // maximum number of CPUs
 #define NOFILE      101  // open files per process

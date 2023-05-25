@@ -12,7 +12,6 @@ using namespace fs;
     Copy to either a user address, or kernel address,
     depending on usr_dst.
     Returns 0 on success, -1 on error.
-    todo: 使用我们的函数在FAT的代码中替换该接口
     来自xv6的proc.c，仅供替换时参考，完成替换后要删掉
 */
 int either_copyout(int user_dst, uint64 dst, void *src, uint64 len) {
@@ -27,7 +26,6 @@ int either_copyout(int user_dst, uint64 dst, void *src, uint64 len) {
     Copy from either a user address, or kernel address,
     depending on usr_src.
     Returns 0 on success, -1 on error.
-    todo: 使用我们的函数实现替换该接口
     来自xv6的proc.c，仅供替换时参考，完成替换后要删掉
 */
 int either_copyin(void *dst, int user_src, uint64 src, uint64 len) {
@@ -38,7 +36,6 @@ int either_copyin(void *dst, int user_src, uint64 src, uint64 len) {
 //   }
     return 0;
 }
-// todo: 使用我们的函数实现替换该接口
 // 来自xv6的vm.c，仅供替换时参考，完成替换后要删掉
 // pte_t * walk(pagetable_t pagetable, uint64 va, int alloc) {
 // //   if(va >= MAXVA) { panic("walk"); }
@@ -55,7 +52,6 @@ int either_copyin(void *dst, int user_src, uint64 src, uint64 len) {
 //     return NULL;
 // }
 ///////////////////FAT////////////////////
-// todo: 把FAT中页表和进程相关的代码全部改成适用于我们项目的形式
 static struct {
     uint32 first_data_sec; // data所在的第一个扇区
     uint32 data_sec_cnt; // 数据扇区数

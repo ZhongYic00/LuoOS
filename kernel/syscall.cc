@@ -98,7 +98,7 @@ namespace syscall
             }
         }
         // file and fd
-        f = new fs::File(ep, a_flags); // todo: 权限
+        f = new fs::File(ep, a_flags);
         f->off = (a_flags&O_APPEND) ? ep->file_size : 0;
         fd = curproc->fdAlloc(f);
         if(fd < 0) {

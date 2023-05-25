@@ -3,7 +3,7 @@
 
 #define BSIZE 512
 // #include "sleeplock.h"
-#include "types.h"
+#include "common.h"
 
 struct buf {
   uint8 busy;
