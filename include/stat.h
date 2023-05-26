@@ -60,7 +60,7 @@ namespace fs {
 		long st_ctime_sec;		/* Time of last status change */
 		long st_ctime_nsec;
 		// unsigned __unused[2];
-		unsigned unused[2]; // todo: 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
+		unsigned _unused[2]; // todo: 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
 	};
 }
 

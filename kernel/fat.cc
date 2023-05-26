@@ -1,7 +1,6 @@
 #include "fat.hh"
 #include "param.h"
 #include "buf.h"
-#include "stat.h"
 #include "kernel.hh"
 
 using namespace fs;
@@ -1179,4 +1178,34 @@ struct dirent *fs::create2(char *path, short type, int mode, SharedPtr<File> f) 
     eput(dp);
     elock(ep);
     return ep;
+}
+void fs::getdstat(struct dirent *de, struct dstat *st) {
+    strncpy(st->d_name, de->filename, STAT_MAX_NAME);
+    st->d_type = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
+    st->d_ino = de->first_clus;
+    st->d_off = 0;
+    st->d_reclen = de->file_size;
+}
+void fs::getkstat(struct dirent *de, struct kstat *kst) {
+    kst->st_dev = de->dev;
+    kst->st_ino = de->first_clus;
+    kst->st_mode = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
+    kst->st_nlink = 1;
+    kst->st_uid = 0;
+    kst->st_gid = 0;
+    kst->st_rdev = 0;
+    kst->__pad = 0;
+    kst->__pad2 = 0;
+    kst->st_size = de->file_size;
+    kst->st_blksize = get_byts_per_clus();
+    kst->st_blocks = (kst->st_size / kst->st_blksize);
+    if (kst->st_blocks * kst->st_blksize < kst->st_size) { kst->st_blocks++; }
+    kst->st_atime_nsec = 0;
+    kst->st_atime_sec = 0;
+    kst->st_ctime_nsec = 0;
+    kst->st_ctime_sec = 0;
+    kst->st_mtime_nsec = 0;
+    kst->st_mtime_sec = 0;
+    kst->_unused[0] = 0;
+    kst->_unused[1] = 0;
 }

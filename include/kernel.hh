@@ -24,6 +24,7 @@ namespace sys
         openat=56,
         close=57,
         pipe2=59,
+        getdents64=61,
         read=63,
         write=64,
         yield=124,

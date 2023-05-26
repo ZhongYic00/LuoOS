@@ -17,6 +17,123 @@ namespace syscall
         if(b)return 1;
         return -1;
     }
+    inline bool fdOutRange(int a_fd) { return (a_fd<0) || (a_fd>proc::MaxOpenFile); }
+    int dupArgsIn(int a_fd, int a_newfd=-1) {
+        if(fdOutRange(a_fd)) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        SharedPtr<fs::File> f = curproc->files[a_fd];
+        if(f == nullptr) { return statcode::err; }
+        // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
+        int newfd = curproc->fdAlloc(f, a_newfd);
+        if(newfd < 0) { return statcode::err; }
+
+        return newfd;
+    }
+    int dup() {
+        auto &ctx = kHartObjs.curtask->ctx;
+        int a_fd = ctx.x(10);
+
+        return dupArgsIn(a_fd);
+    }
+    int dup3() {
+        auto &ctx = kHartObjs.curtask->ctx;
+        int a_fd = ctx.x(10);
+        int a_newfd = ctx.x(11);
+        if(fdOutRange(a_newfd)){ return statcode::err; }
+
+        return dupArgsIn(a_fd, a_newfd);
+    }
+    int openAt() {
+        auto &ctx = kHartObjs.curtask->ctx;
+        int a_dirfd = ctx.x(10);
+        char *a_path = (char*)ctx.x(11);
+        int a_flags = ctx.x(12);
+        mode_t a_mode = ctx.x(13); // uint32
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        SharedPtr<fs::File> f, f2;
+        struct fs::dirent *ep;
+        int fd;
+        // entry point
+        if((a_path[0]!='/') && !fdOutRange(a_dirfd)) { f2 = curproc->files[a_dirfd]; }
+        if(a_flags & O_CREATE) {
+            ep = fs::create2(a_path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
+            if(ep == nullptr) { return statcode::err; }
+        }
+        else {
+            if((ep = fs::ename2(a_path, f2)) == nullptr) { return statcode::err; }
+            // elock(ep);
+            if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
+                printf("dir can't write\n");
+                // eunlock(ep);
+                fs::eput(ep);
+                return statcode::err;
+            }
+            if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
+                printf("it is not dir\n");
+                // eunlock(ep);
+                fs::eput(ep);
+                return statcode::err;
+            }
+        }
+        // file and fd
+        f = new fs::File(ep, a_flags);
+        f->off = (a_flags&O_APPEND) ? ep->file_size : 0;
+        fd = curproc->fdAlloc(f);
+        if(fd < 0) {
+            eput(ep);
+            return statcode::err;
+            // 如果fd分配不成功，f过期后会自动delete        
+        }
+        if(!(ep->attribute&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { etrunc(ep); }
+
+        return fd;
+    }
+    int close() {
+        auto &ctx = kHartObjs.curtask->ctx;
+        int a_fd = ctx.x(10);
+        if(fdOutRange(a_fd)) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        if(curproc->files[a_fd] == nullptr) { return statcode::err; } // 不能关闭一个已关闭的文件
+        // 不能用新的局部变量代替，局部变量和files[a_fd]是两个不同的SharedPtr
+        curproc->files[a_fd].deRef();
+
+        return statcode::ok;
+    }
+    int pipe2(){
+        auto &cur=kHartObjs.curtask;
+        auto &ctx=cur->ctx;
+        auto proc=cur->getProcess();
+        xlen_t fd=ctx.x(10),flags=ctx.x(11);
+        auto pipe=SharedPtr<pipe::Pipe>(new pipe::Pipe);
+        auto rfile=SharedPtr<fs::File>(new fs::File(pipe,fs::File::FileOp::read));
+        auto wfile=SharedPtr<fs::File>(new fs::File(pipe,fs::File::FileOp::write));
+        int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
+        proc->vmar[fd]=fds;
+    }
+    int getDents64(void) {
+        auto &ctx = kHartObjs.curtask->ctx;
+        int a_fd = ctx.x(10);
+        struct fs::dstat *a_buf = (struct fs::dstat*)ctx.x(11);
+        int a_len = ctx.x(12);
+        if(fdOutRange(a_fd) || a_len<0) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        SharedPtr<fs::File> f = curproc->files[a_fd];
+        struct fs::dstat ds;
+        size_t copylen = a_len<sizeof(ds)?a_len:sizeof(ds); // 最大不超过a_len（即MAXINT）
+        if(f == nullptr) { return statcode::err; }
+        getdstat(f->obj.ep, &ds);
+        // todo: 内存相关
+        // if(copyout2(buf, (char*)&ds, a_len<sizeof(ds)?a_len:sizeof(ds)) < 0) {
+        //     printf("copy wrong\n");
+        //     return statcode::err;
+        // }
+
+        return (int)copylen;
+    }
     int read(){
         auto &ctx=kHartObjs.curtask->ctx;
         int fd=ctx.x(10);
@@ -62,110 +179,6 @@ namespace syscall
         proc::clone(kHartObjs.curtask);
         return statcode::ok;
     }
-    int openAt() {
-        auto &ctx = kHartObjs.curtask->ctx;
-        int a_dirfd = ctx.x(10);
-        char *a_path = (char*)ctx.x(11);
-        int a_flags = ctx.x(12);
-        mode_t a_mode = ctx.x(13); // uint32
-
-        int fd;
-        SharedPtr<fs::File> f, f2;
-        struct fs::dirent *ep;
-        auto curproc = kHartObjs.curtask->getProcess();
-        // entry point
-        if((a_path[0]!='/') && (fd>=0) && (fd<proc::MaxOpenFile)) {
-            f2 = curproc->files[fd];
-        }
-        if(a_flags & O_CREATE) {
-            ep = fs::create2(a_path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
-            if(ep == nullptr) { return statcode::err; }
-        }
-        else {
-            if((ep = fs::ename2(a_path, f2)) == nullptr) { return statcode::err; }
-            // elock(ep);
-            if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
-                printf("dir can't write\n");
-                // eunlock(ep);
-                fs::eput(ep);
-                return statcode::err;
-            }
-            if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
-                printf("it is not dir\n");
-                // eunlock(ep);
-                fs::eput(ep);
-                return statcode::err;
-            }
-        }
-        // file and fd
-        f = new fs::File(ep, a_flags);
-        f->off = (a_flags&O_APPEND) ? ep->file_size : 0;
-        fd = curproc->fdAlloc(f);
-        if(fd < 0) {
-            eput(ep);
-            return statcode::err;
-            // 如果fd分配不成功，f过期后会自动delete        
-        }
-        if(!(ep->attribute&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { etrunc(ep); }
-
-        return fd;
-    }
-    int close() {
-        auto &ctx = kHartObjs.curtask->ctx;
-        int a_fd = ctx.x(10);
-
-        SharedPtr<fs::File> f;
-        auto curproc = kHartObjs.curtask->getProcess();
-        // 判断fd范围也许可以写成宏……
-        if((a_fd<0) || (a_fd>proc::MaxOpenFile)) { return statcode::err; }
-        
-        f = curproc->files[a_fd];
-        if(f == nullptr) { return statcode::err; }
-
-        curproc->files[a_fd].deRef();
-        return statcode::ok;
-    }
-    int dupArgsIn(int a_fd, int a_newfd=-1) {
-        int newfd;
-        SharedPtr<fs::File> f;
-        auto curproc = kHartObjs.curtask->getProcess();
-        // 判断fd范围也许可以写成宏……
-        if((a_fd<0) || (a_fd>proc::MaxOpenFile)) { return statcode::err; }
-        
-        f = curproc->files[a_fd];
-        if(f == nullptr) { return statcode::err; }
-        // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
-        newfd = curproc->fdAlloc(f, a_newfd);
-        if(newfd < 0) { return statcode::err; }
-
-        return newfd;
-    }
-    int dup() {
-        auto &ctx = kHartObjs.curtask->ctx;
-        int a_fd = ctx.x(10);
-
-        return dupArgsIn(a_fd);
-    }
-    int dup3() {
-        auto &ctx = kHartObjs.curtask->ctx;
-        int a_fd = ctx.x(10);
-        int a_newfd = ctx.x(11);
-        // 判断fd范围也许可以写成宏……
-        if((a_newfd<0) || (a_newfd>proc::MaxOpenFile)){ return statcode::err; }
-
-        return dupArgsIn(a_fd, a_newfd);
-    }
-    int pipe2(){
-        auto &cur=kHartObjs.curtask;
-        auto &ctx=cur->ctx;
-        auto proc=cur->getProcess();
-        xlen_t fd=ctx.x(10),flags=ctx.x(11);
-        auto pipe=SharedPtr<pipe::Pipe>(new pipe::Pipe);
-        auto rfile=SharedPtr<fs::File>(new fs::File(pipe,fs::File::FileOp::read));
-        auto wfile=SharedPtr<fs::File>(new fs::File(pipe,fs::File::FileOp::write));
-        int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
-        proc->vmar[fd]=fds;
-    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -204,7 +217,6 @@ namespace syscall
         // syscallPtrs[SYS_openat] = sys_openat;
         // syscallPtrs[SYS_close] = sys_close;
         // syscallPtrs[SYS_vhangup] = sys_vhangup;
-        syscallPtrs[syscalls::pipe2] = pipe2;
         // syscallPtrs[SYS_quotactl] = sys_quotactl;
         // syscallPtrs[SYS_getdents64] = sys_getdents64;
         // syscallPtrs[SYS_lseek] = sys_lseek;
@@ -212,7 +224,9 @@ namespace syscall
         syscallPtrs[syscalls::dup3] = syscall::dup3;
         syscallPtrs[syscalls::openat] = syscall::openAt;
         syscallPtrs[syscalls::close] = syscall::close;
-        syscallPtrs[syscalls::read] = read;
+        syscallPtrs[syscalls::pipe2] = syscall::pipe2;
+        syscallPtrs[syscalls::getdents64] = syscall::getDents64;
+        syscallPtrs[syscalls::read] = syscall::read;
         syscallPtrs[syscalls::write] = syscall::write;
         syscallPtrs[syscalls::yield] = syscall::sysyield;
         syscallPtrs[syscalls::getpid] = syscall::getPid;

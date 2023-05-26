@@ -2,6 +2,7 @@
 #define FAT_HH__
 
 #include "fs.hh"
+#include "stat.h"
 
 #define ATTR_READ_ONLY      0x01  // 只读
 #define ATTR_HIDDEN         0x02  // 隐藏
@@ -139,6 +140,8 @@ namespace fs {
     int do_mount(struct dirent *mountpoint,struct dirent *dev);
     int do_umount(struct dirent *mountpoint);
     struct dirent *create2(char *path, short type, int mode, SharedPtr<File> f);
+    void getdstat(struct dirent *de, struct dstat *st);
+    void getkstat(struct dirent *de, struct kstat *kst);
 
 }
 
