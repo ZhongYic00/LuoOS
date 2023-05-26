@@ -105,7 +105,7 @@ namespace kernel{
     struct KernelHartObjs{
         KernelTaskObjs *curtask;
     };
-    inline int readHartId(){register int hartid asm("t0"); return hartid;}
+    inline int readHartId(){register int hartid asm("tp"); return hartid;}
     void createKernelMapping(vm::VMAR &vmar);
     
 }
