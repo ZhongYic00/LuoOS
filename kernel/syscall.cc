@@ -10,15 +10,43 @@ namespace syscall
     using sys::statcode;
     using klib::SharedPtr;
     // using klib::make_shared;
-    int none(){return 0;}
-    int testexit(){
+    xlen_t none(){return 0;}
+    xlen_t testexit(){
         static bool b=false;
         b=!b;
         if(b)return 1;
         return -1;
     }
+    xlen_t getCwd(void) {
+        auto &ctx = kHartObjs.curtask->ctx;
+        char *a_buf = (char*)ctx.x(10);
+        size_t a_len = ctx.x(11);
+        if(a_buf == nullptr) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        struct fs::dirent *de = curproc->cwd;
+        char path[FAT32_MAX_PATH];
+        char *s;
+        // todo: 路径处理过程考虑包装成类
+        if (de->parent == nullptr) { s = "/"; } // s为字符串指针，必须指向双引号字符串"/"
+        else {
+            s = path + FAT32_MAX_PATH - 1;
+            *s = '\0';
+            for(size_t len;de->parent != nullptr;) {
+                len = strlen(de->filename);
+                s -= len;
+                if (s <= path) { return statcode::err; } // can't reach root '/'
+                strncpy(s, de->filename, len);
+                *(--s) = '/';
+                de = de->parent;
+            }
+        }
+        // todo: 内存相关
+        // if (copyout2(a_buf, s, strlen(s)+1) < 0) { return nullptr; }
+        return (xlen_t)a_buf;
+    }
     inline bool fdOutRange(int a_fd) { return (a_fd<0) || (a_fd>proc::MaxOpenFile); }
-    int dupArgsIn(int a_fd, int a_newfd=-1) {
+    xlen_t dupArgsIn(int a_fd, int a_newfd=-1) {
         if(fdOutRange(a_fd)) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
@@ -30,13 +58,13 @@ namespace syscall
 
         return newfd;
     }
-    int dup() {
+    xlen_t dup() {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
 
         return dupArgsIn(a_fd);
     }
-    int dup3() {
+    xlen_t dup3() {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
         int a_newfd = ctx.x(11);
@@ -44,7 +72,7 @@ namespace syscall
 
         return dupArgsIn(a_fd, a_newfd);
     }
-    int openAt() {
+    xlen_t openAt() {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_dirfd = ctx.x(10);
         char *a_path = (char*)ctx.x(11);
@@ -90,7 +118,7 @@ namespace syscall
 
         return fd;
     }
-    int close() {
+    xlen_t close() {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
         if(fdOutRange(a_fd)) { return statcode::err; }
@@ -102,7 +130,7 @@ namespace syscall
 
         return statcode::ok;
     }
-    int pipe2(){
+    xlen_t pipe2(){
         auto &cur=kHartObjs.curtask;
         auto &ctx=cur->ctx;
         auto proc=cur->getProcess();
@@ -113,17 +141,17 @@ namespace syscall
         int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
         proc->vmar[fd]=fds;
     }
-    int getDents64(void) {
+    xlen_t getDents64(void) {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
         struct fs::dstat *a_buf = (struct fs::dstat*)ctx.x(11);
-        int a_len = ctx.x(12);
-        if(fdOutRange(a_fd) || a_len<0) { return statcode::err; }
+        size_t a_len = ctx.x(12);
+        if(fdOutRange(a_fd) || a_buf==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
         SharedPtr<fs::File> f = curproc->files[a_fd];
         struct fs::dstat ds;
-        size_t copylen = a_len<sizeof(ds)?a_len:sizeof(ds); // 最大不超过a_len（即MAXINT）
+        size_t copylen = a_len<sizeof(ds)?a_len:sizeof(ds);
         if(f == nullptr) { return statcode::err; }
         getdstat(f->obj.ep, &ds);
         // todo: 内存相关
@@ -132,9 +160,9 @@ namespace syscall
         //     return statcode::err;
         // }
 
-        return (int)copylen;
+        return copylen;
     }
-    int read(){
+    xlen_t read(){
         auto &ctx=kHartObjs.curtask->ctx;
         int fd=ctx.x(10);
         xlen_t uva=ctx.x(11),len=ctx.x(12);
@@ -142,7 +170,7 @@ namespace syscall
         file->read(uva,len);
         return statcode::ok;
     }
-    int write(){
+    xlen_t write(){
         auto &ctx=kHartObjs.curtask->ctx;
         xlen_t fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
@@ -161,11 +189,11 @@ namespace syscall
         cur->lastpriv=proc::Task::Priv::Kernel;
         sleepSave(cur->kctx.gpr);
     }
-    int sysyield(){
+    xlen_t sysyield(){
         yield();
         return statcode::ok;
     }
-    int getPid(){
+    xlen_t getPid(){
         return kHartObjs.curtask->getProcess()->pid();
     }
     int sleep(){
@@ -174,7 +202,7 @@ namespace syscall
         yield();
         return statcode::ok;
     }
-    int clone(){
+    xlen_t clone(){
         auto &ctx=kHartObjs.curtask->ctx;
         proc::clone(kHartObjs.curtask);
         return statcode::ok;
@@ -185,9 +213,6 @@ namespace syscall
         syscallPtrs[syscalls::testexit]=testexit;
         syscallPtrs[syscalls::testyield]=sysyield;
         syscallPtrs[syscalls::testwrite]=write;
-        // syscallPtrs[SYS_getcwd] = sys_getcwd;
-        // syscallPtrs[SYS_dup] = sys_dup;
-        // syscallPtrs[SYS_dup3] = sys_dup3;
         // syscallPtrs[SYS_fcntl] = sys_fcntl;
         // syscallPtrs[SYS_ioctl] = sys_ioctl;
         // syscallPtrs[SYS_flock] = sys_flock;
@@ -214,12 +239,10 @@ namespace syscall
         // syscallPtrs[SYS_fchmodat] = sys_fchmodat;
         // syscallPtrs[SYS_fchownat] = sys_fchownat;
         // syscallPtrs[SYS_fchown] = sys_fchown;
-        // syscallPtrs[SYS_openat] = sys_openat;
-        // syscallPtrs[SYS_close] = sys_close;
         // syscallPtrs[SYS_vhangup] = sys_vhangup;
         // syscallPtrs[SYS_quotactl] = sys_quotactl;
-        // syscallPtrs[SYS_getdents64] = sys_getdents64;
         // syscallPtrs[SYS_lseek] = sys_lseek;
+        syscallPtrs[syscalls::getcwd] = syscall::getCwd;
         syscallPtrs[syscalls::dup] = syscall::dup;
         syscallPtrs[syscalls::dup3] = syscall::dup3;
         syscallPtrs[syscalls::openat] = syscall::openAt;

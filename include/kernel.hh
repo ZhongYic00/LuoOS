@@ -19,6 +19,7 @@ namespace sys
         testexit,
         testyield,
         testwrite,
+        getcwd=17,
         dup=23,
         dup3=24,
         openat=56,
