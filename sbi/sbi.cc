@@ -163,13 +163,13 @@ extern "C" void sbi_init(){
 
     csrWrite(mscratch,gpr);
     {asm volatile ("csrw ""mtvec"", %0" :: "r"(mtrapwrapper));}
-    csrSet(mie,BIT(csr::mie::meie));
+    // csrSet(mie,BIT(csr::mie::meie));
     // csrSet(mstatus,BIT(csr::mstatus::mie));
     // mtrap_test();
     uartIntTest();
 
     // timerInit();
-    csrSet(mideleg,BIT(csr::mie::stie)|BIT(csr::mie::ssie));
+    csrSet(mideleg,BIT(csr::mie::stie)|BIT(csr::mie::ssie)|BIT(csr::mie::seie));
     csrSet(medeleg,BIT(csr::mcause::uecall));
     csrSet(mie,BIT(csr::mie::mtie));
     csrSet(mstatus,1l<<csr::mstatus::mpp);

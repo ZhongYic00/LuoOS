@@ -51,7 +51,7 @@ extern "C" void straphandler(){
             // case mti: break;
 
             // case uei: break;
-            // case sei: break;
+            case sei: printf("s-mode external interrupt!"); break;
             // case hei: break;
             // case mei: break;
             default:
