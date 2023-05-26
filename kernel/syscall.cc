@@ -54,7 +54,7 @@ namespace syscall
         if(f == nullptr) { return statcode::err; }
         // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
         int newfd = curproc->fdAlloc(f, a_newfd);
-        if(newfd < 0) { return statcode::err; }
+        if(fdOutRange(newfd)) { return statcode::err; }
 
         return newfd;
     }
@@ -71,6 +71,26 @@ namespace syscall
         if(fdOutRange(a_newfd)) { return statcode::err; }
 
         return dupArgsIn(a_fd, a_newfd);
+    }
+    xlen_t linkAt(void) {
+        auto &ctx = kHartObjs.curtask->ctx;
+        int a_olddirfd = ctx.x(10);
+        const char *a_oldpath = (const char*)ctx.x(11);
+        int a_newdirfd = ctx.x(12);
+        const char *a_newpath = (const char*)ctx.x(13);
+        int a_flags = ctx.x(14);
+        if(fdOutRange(a_olddirfd) || fdOutRange(a_newdirfd) || a_oldpath==nullptr || a_newpath==nullptr) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        char oldpath[FAT32_MAX_PATH], newpath[FAT32_MAX_PATH];
+         // todo: 是否能直接copy？
+        strncpy(oldpath, a_oldpath, FAT32_MAX_PATH);
+        strncpy(newpath, a_newpath, FAT32_MAX_PATH);
+        SharedPtr<fs::File> f1, f2; // 初始化为nullptr
+        if(*oldpath != '/') { f1 = curproc->files[a_olddirfd]; }
+        if(*newpath != '/') { f2 = curproc->files[a_newdirfd]; }
+
+        return fs::link(oldpath, f1, newpath, f2);
     }
     xlen_t chDir(void) {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -98,46 +118,48 @@ namespace syscall
     xlen_t openAt() {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_dirfd = ctx.x(10);
-        char *a_path = (char*)ctx.x(11);
+        const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12);
-        mode_t a_mode = ctx.x(13); // uint32
+        mode_t a_mode = ctx.x(13);
+        if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        SharedPtr<fs::File> f, f2;
+        char path[FAT32_MAX_PATH];
+        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        SharedPtr<fs::File> f1, f2;
+        if(a_path[0] != '/') { f2 = curproc->files[a_dirfd]; }
         struct fs::dirent *ep;
         int fd;
-        // entry point
-        if((a_path[0]!='/') && !fdOutRange(a_dirfd)) { f2 = curproc->files[a_dirfd]; }
+
         if(a_flags & O_CREATE) {
-            ep = fs::create2(a_path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
+            ep = fs::create2(path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
             if(ep == nullptr) { return statcode::err; }
         }
         else {
-            if((ep = fs::ename2(a_path, f2)) == nullptr) { return statcode::err; }
-            // elock(ep);
+            if((ep = fs::ename2(path, f2)) == nullptr) { return statcode::err; }
+            fs::elock(ep);
             if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
                 printf("dir can't write\n");
-                // eunlock(ep);
+                fs::eunlock(ep);
                 fs::eput(ep);
                 return statcode::err;
             }
             if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
                 printf("it is not dir\n");
-                // eunlock(ep);
+                fs::eunlock(ep);
                 fs::eput(ep);
                 return statcode::err;
             }
         }
-        // file and fd
-        f = new fs::File(ep, a_flags);
-        f->off = (a_flags&O_APPEND) ? ep->file_size : 0;
-        fd = curproc->fdAlloc(f);
-        if(fd < 0) {
-            eput(ep);
+        f1 = new fs::File(ep, a_flags);
+        f1->off = (a_flags&O_APPEND) ? ep->file_size : 0;
+        fd = curproc->fdAlloc(f1);
+        if(fdOutRange(fd)) {
+            fs::eput(ep);
             return statcode::err;
             // 如果fd分配不成功，f过期后会自动delete        
         }
-        if(!(ep->attribute&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { etrunc(ep); }
+        if(!(ep->attribute&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { fs::etrunc(ep); }
 
         return fd;
     }
@@ -243,7 +265,6 @@ namespace syscall
         // syscallPtrs[SYS_mkdirat] = sys_mkdirat;
         // syscallPtrs[SYS_unlinkat] = sys_unlinkat;
         // syscallPtrs[SYS_symlinkat] = sys_symlinkat;
-        // syscallPtrs[SYS_linkat] = sys_linkat;
         // syscallPtrs[SYS_renameat] = sys_renameat;
         // syscallPtrs[SYS_umount2] = sys_umount2;
         // syscallPtrs[SYS_mount] = sys_mount;
@@ -267,6 +288,7 @@ namespace syscall
         syscallPtrs[syscalls::getcwd] = syscall::getCwd;
         syscallPtrs[syscalls::dup] = syscall::dup;
         syscallPtrs[syscalls::dup3] = syscall::dup3;
+        syscallPtrs[syscalls::linkat] = syscall::linkAt;
         syscallPtrs[syscalls::chdir] = syscall::chDir;
         syscallPtrs[syscalls::openat] = syscall::openAt;
         syscallPtrs[syscalls::close] = syscall::close;

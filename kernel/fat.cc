@@ -42,13 +42,13 @@ int either_copyin(void *dst, int user_src, uint64 src, uint64 len) {
 // //     pte_t *pte = &pagetable[PX(level, va)];
 // //     if(*pte & PTE_V) { pagetable = (pagetable_t)PTE2PA(*pte); }
 // //     else {
-// //       if(!alloc || (pagetable = (pde_t*)kalloc()) == NULL) { return NULL; }
+// //       if(!alloc || (pagetable = (pde_t*)kalloc()) == nullptr) { return nullptr; }
 // //       memset(pagetable, 0, PGSIZE);
 // //       *pte = PA2PTE(pagetable) | PTE_V;
 // //     }
 // //   }
 // //   return &pagetable[PX(0, va)];
-//     return NULL;
+//     return nullptr;
 // }
 ///////////////////FAT////////////////////
 static struct {
@@ -303,7 +303,7 @@ static void generate_shortname(char *shortname, char *name) {
         if (c >= 'a' && c <= 'z') {
             c += 'A' - 'a';
         } else {
-            if (strchr(illegal, c) != NULL) { c = '_'; }
+            if (strchr(illegal, c) != nullptr) { c = '_'; }
         }
         shortname[i++] = c;
     }
@@ -938,7 +938,7 @@ struct dirent *fs::enameparent2(char *path, char *name, SharedPtr<File> f) { ret
 
 int fs::link(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2){
   struct dirent *dp1, *dp2;
-  if((dp1 = ename2(oldpath, f1)) == NULL) {
+  if((dp1 = ename2(oldpath, f1)) == nullptr) {
     printf("can't find dir\n");
     return -1;
   }
@@ -983,7 +983,7 @@ int fs::link(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f
     }
   }
   char name[FAT32_MAX_FILENAME + 1];
-  if((dp2 = enameparent2(newpath, name, f2)) == NULL){
+  if((dp2 = enameparent2(newpath, name, f2)) == nullptr){
     printf("can't find dir\n");
     return NULL;
   }
@@ -1005,7 +1005,7 @@ int fs::link(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f
 }
 int fs::unlink(char *path, SharedPtr<File> f) {
   struct dirent *dp;
-  if((dp = ename2(path, f)) == NULL) { return -1; }
+  if((dp = ename2(path, f)) == nullptr) { return -1; }
   struct dirent *parent;
   parent = dp->parent;
   int off;
@@ -1049,7 +1049,7 @@ int fs::remove(char *path) {
   while (s >= path && *s == '/') { s--; }
   if (s >= path && *s == '.' && (s == path || *--s == '/')) { return -1; }
   struct dirent *ep;
-  if((ep = ename(path)) == NULL){ return -1; }
+  if((ep = ename(path)) == nullptr){ return -1; }
   elock(ep);
   if((ep->attribute & ATTR_DIRECTORY) && !isdirempty(ep)) {
     eunlock(ep);
@@ -1065,7 +1065,7 @@ int fs::remove(char *path) {
 }
 int fs::remove2(char *path, SharedPtr<File> f) {
   struct dirent *ep;
-  if((ep = ename2(path, f)) == NULL){ return -1; }
+  if((ep = ename2(path, f)) == nullptr){ return -1; }
   elock(ep);
   if((ep->attribute & ATTR_DIRECTORY) && !isdirempty(ep)){
     eunlock(ep);
@@ -1086,6 +1086,7 @@ int fs::syn_disk(uint64 start,long len) {
     long off;
     struct proc::Process*p=kHartObjs.curtask->getProcess();
     struct dirent *ep=p->mfile.mfile->obj.ep;
+    // todo: 内存相关
     // pagetable_t pagetable = p->pagetable;
     // if(start>p->mfile.baseaddr) { off=p->mfile.off+start-p->mfile.baseaddr; }
     // else { off=p->mfile.off; }
