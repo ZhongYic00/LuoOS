@@ -22,6 +22,7 @@ namespace sys
         getcwd=17,
         dup=23,
         dup3=24,
+        chdir=49,
         openat=56,
         close=57,
         pipe2=59,

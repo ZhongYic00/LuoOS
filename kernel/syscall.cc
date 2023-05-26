@@ -68,9 +68,32 @@ namespace syscall
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
         int a_newfd = ctx.x(11);
-        if(fdOutRange(a_newfd)){ return statcode::err; }
+        if(fdOutRange(a_newfd)) { return statcode::err; }
 
         return dupArgsIn(a_fd, a_newfd);
+    }
+    xlen_t chDir(void) {
+        auto &ctx = kHartObjs.curtask->ctx;
+        const char *a_path = (const char*)ctx.x(10);
+        if(a_path == nullptr) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        char path[FAT32_MAX_PATH];
+        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能直接copy？
+        struct fs::dirent *ep = fs::ename(path);
+        if(ep == nullptr) { return statcode::err; }
+        fs::elock(ep);
+        if(!(ep->attribute & ATTR_DIRECTORY)){
+            fs::eunlock(ep);
+            fs::eput(ep);
+            return statcode::err;
+        }
+        fs::eunlock(ep);
+
+        fs::eput(curproc->cwd);
+        curproc->cwd = ep;
+
+        return statcode::ok;
     }
     xlen_t openAt() {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -232,7 +255,6 @@ namespace syscall
         // syscallPtrs[SYS_ftruncate] = sys_ftruncate;
         // syscallPtrs[SYS_fallocate] = sys_fallocate;
         // syscallPtrs[SYS_faccessat] = sys_faccessat;
-        // syscallPtrs[SYS_chdir] = sys_chdir;
         // syscallPtrs[SYS_fchdir] = sys_fchdir;
         // syscallPtrs[SYS_chroot] = sys_chroot;
         // syscallPtrs[SYS_fchmod] = sys_fchmod;
@@ -245,6 +267,7 @@ namespace syscall
         syscallPtrs[syscalls::getcwd] = syscall::getCwd;
         syscallPtrs[syscalls::dup] = syscall::dup;
         syscallPtrs[syscalls::dup3] = syscall::dup3;
+        syscallPtrs[syscalls::chdir] = syscall::chDir;
         syscallPtrs[syscalls::openat] = syscall::openAt;
         syscallPtrs[syscalls::close] = syscall::close;
         syscallPtrs[syscalls::pipe2] = syscall::pipe2;
