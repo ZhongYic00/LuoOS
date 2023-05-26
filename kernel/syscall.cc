@@ -78,6 +78,29 @@ namespace syscall
 
         return dupArgsIn(a_fd, a_newfd);
     }
+    xlen_t mkDirAt(void) {
+        auto &ctx = kHartObjs.curtask->ctx;
+        int a_dirfd = ctx.x(10); // todo: 需要兼容AT_FDCWD的情况(-100)
+        const char *a_path = (const char*)ctx.x(11);
+        mode_t a_mode = ctx.x(12); // todo: 还没用上
+        if(fdOutRange(a_dirfd) || a_path == nullptr) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        char path[FAT32_MAX_PATH];
+        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        SharedPtr<fs::File> f;
+        if(*path != '/') { f = curproc->files[a_dirfd]; }
+        struct fs::dirent *ep;
+
+        if((ep = fs::create2(path, T_DIR, 0, f)) == nullptr) {
+            printf("can't create %s\n", path);
+            return statcode::err;
+        }
+        fs::eunlock(ep);
+        fs::eput(ep);
+
+        return statcode::err;
+    }
     xlen_t unlinkAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_dirfd = ctx.x(10); // todo: 需要兼容AT_FDCWD的情况(-100)
@@ -111,6 +134,66 @@ namespace syscall
         if(*newpath != '/') { f2 = curproc->files[a_newdirfd]; }
 
         return fs::link(oldpath, f1, newpath, f2);
+    }
+    xlen_t umount2(void) {
+        auto &ctx = kHartObjs.curtask->ctx;
+        const char *a_devpath = (const char*)ctx.x(10);
+        int a_flags = ctx.x(11); // 没用上
+        if(a_devpath == nullptr) { return statcode::err; }
+
+        char devpath[FAT32_MAX_PATH];
+        strncpy(devpath, a_devpath, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        if(strncmp("/",devpath,2) == 0) {
+            printf("path error\n");
+            return statcode::err;
+        }
+        struct fs::dirent *ep = fs::ename(devpath);
+        if(ep == nullptr) {
+            printf("not found file\n");
+            return statcode::err;
+        }
+
+        return fs::do_umount(ep);
+    }
+    xlen_t mount() {
+        auto &ctx = kHartObjs.curtask->ctx;
+        const char *a_devpath = (const char*)ctx.x(10);
+        const char *a_mountpath = (const char*)ctx.x(11);
+        const char *a_fstype = (const char*)ctx.x(12);
+        xlen_t a_flags = ctx.x(13); // 没用上
+        const void *a_data = (const void*)ctx.x(14); // 手册表示可为NULL
+        if(a_devpath==nullptr || a_mountpath==nullptr || a_fstype==nullptr) { return statcode::err; }
+        // 错误输出可以合并
+        char devpath[FAT32_MAX_PATH];
+        strncpy(devpath, a_devpath, FAT32_MAX_PATH);
+        char mountpath[FAT32_MAX_PATH];
+        strncpy(mountpath, a_mountpath, FAT32_MAX_PATH);
+        if(strncmp("/",mountpath,2) == 0) { //mountpoint not allowed the root
+            printf("not allowed\n");
+            return statcode::err;
+        }
+        char fstype[10];
+        strncpy(fstype, a_fstype, FAT32_MAX_PATH);
+        if ((strncmp("vfat",fstype,5)!=0) && (strncmp("fat32",fstype,6)!=0)) {
+            printf("the fstype is not fat32\n");
+            return statcode::err;
+        }
+        struct fs::dirent *dev_ep = fs::ename(devpath);
+        if(dev_ep == nullptr) {
+            printf("dev not found file\n");
+            return statcode::err;
+        }
+        struct fs::dirent *ep = fs::ename(mountpath);
+        if(ep == nullptr) {
+            printf("mount not found file\n");
+            return statcode::err;
+        }
+        if(!(ep->attribute & ATTR_DIRECTORY)) {
+            printf("mountpoint is not a dir\n");
+            return statcode::err;
+        }
+
+        return do_mount(ep, dev_ep);
     }
     xlen_t chDir(void) {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -217,7 +300,7 @@ namespace syscall
         SharedPtr<fs::File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
         struct fs::dstat ds;
-        getdstat(f->obj.ep, &ds);
+        getDStat(f->obj.ep, &ds);
         // todo: 内存相关
         // if(copyout2(a_buf, (char*)&ds, sizeof(ds)) < 0) {
         //     printf("copy wrong\n");
@@ -239,6 +322,25 @@ namespace syscall
         xlen_t fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
         file->write(uva,len);
+        return statcode::ok;
+    }
+    xlen_t fStat() {
+        auto &ctx = kHartObjs.curtask->ctx;
+        int a_fd = ctx.x(10);
+        struct fs::kstat *a_kst = (struct fs::kstat*)ctx.x(11);
+        if(fdOutRange(a_fd) || a_kst==nullptr) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        SharedPtr<fs::File> f = curproc->files[a_fd];
+        if(f == nullptr) { return statcode::err; }
+        struct fs::kstat kst;
+        fs::getKStat(f->obj.ep, &kst);
+        // todo: 内存相关
+        // if(copyout2(a_kst, (char*)&kst, sizeof(kst)) < 0) {
+        //     printf("copy wrong\n");
+        //     return statcode::err;
+        // }
+
         return statcode::ok;
     }
     __attribute__((naked))
@@ -281,15 +383,11 @@ namespace syscall
         // syscallPtrs[SYS_ioctl] = sys_ioctl;
         // syscallPtrs[SYS_flock] = sys_flock;
         // syscallPtrs[SYS_mknodat] = sys_mknodat;
-        // syscallPtrs[SYS_mkdirat] = sys_mkdirat;
         // syscallPtrs[SYS_symlinkat] = sys_symlinkat;
         // syscallPtrs[SYS_renameat] = sys_renameat;
-        // syscallPtrs[SYS_umount2] = sys_umount2;
-        // syscallPtrs[SYS_mount] = sys_mount;
         // syscallPtrs[SYS_pivot_root] = sys_pivot_root;
         // syscallPtrs[SYS_nfsservctl] = sys_nfsservctl;
         // syscallPtrs[SYS_statfs] = sys_statfs;
-        // syscallPtrs[SYS_fstatfs] = sys_fstatfs;
         // syscallPtrs[SYS_truncate] = sys_truncate;
         // syscallPtrs[SYS_ftruncate] = sys_ftruncate;
         // syscallPtrs[SYS_fallocate] = sys_fallocate;
@@ -306,8 +404,11 @@ namespace syscall
         syscallPtrs[syscalls::getcwd] = syscall::getCwd;
         syscallPtrs[syscalls::dup] = syscall::dup;
         syscallPtrs[syscalls::dup3] = syscall::dup3;
+        syscallPtrs[syscalls::mkdirat] = syscall::mkDirAt;
         syscallPtrs[syscalls::linkat] = syscall::linkAt;
         syscallPtrs[syscalls::unlinkat] = syscall::unlinkAt;
+        syscallPtrs[syscalls::umount2] = syscall::umount2;
+        syscallPtrs[syscalls::mount] = syscall::mount;
         syscallPtrs[syscalls::chdir] = syscall::chDir;
         syscallPtrs[syscalls::openat] = syscall::openAt;
         syscallPtrs[syscalls::close] = syscall::close;
@@ -315,6 +416,7 @@ namespace syscall
         syscallPtrs[syscalls::getdents64] = syscall::getDents64;
         syscallPtrs[syscalls::read] = syscall::read;
         syscallPtrs[syscalls::write] = syscall::write;
+        syscallPtrs[syscalls::fstat] = syscall::fStat;
         syscallPtrs[syscalls::yield] = syscall::sysyield;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
         syscallPtrs[syscalls::clone] = syscall::clone;

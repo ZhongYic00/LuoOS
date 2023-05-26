@@ -140,8 +140,8 @@ namespace fs {
     int do_mount(struct dirent *mountpoint,struct dirent *dev);
     int do_umount(struct dirent *mountpoint);
     struct dirent *create2(char *path, short type, int mode, SharedPtr<File> f);
-    void getdstat(struct dirent *de, struct dstat *st);
-    void getkstat(struct dirent *de, struct kstat *kst);
+    void getDStat(struct dirent *de, struct dstat *st);
+    void getKStat(struct dirent *de, struct kstat *kst);
 
 }
 

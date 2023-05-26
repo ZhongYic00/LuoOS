@@ -1180,14 +1180,14 @@ struct dirent *fs::create2(char *path, short type, int mode, SharedPtr<File> f) 
     elock(ep);
     return ep;
 }
-void fs::getdstat(struct dirent *de, struct dstat *st) {
+void fs::getDStat(struct dirent *de, struct dstat *st) {
     strncpy(st->d_name, de->filename, STAT_MAX_NAME);
     st->d_type = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
     st->d_ino = de->first_clus;
     st->d_off = 0;
     st->d_reclen = de->file_size;
 }
-void fs::getkstat(struct dirent *de, struct kstat *kst) {
+void fs::getKStat(struct dirent *de, struct kstat *kst) {
     kst->st_dev = de->dev;
     kst->st_ino = de->first_clus;
     kst->st_mode = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
