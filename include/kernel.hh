@@ -22,6 +22,7 @@ namespace sys
         getcwd=17,
         dup=23,
         dup3=24,
+        unlinkat=35,
         linkat=37,
         chdir=49,
         openat=56,

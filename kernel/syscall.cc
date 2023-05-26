@@ -21,12 +21,16 @@ namespace syscall
         auto &ctx = kHartObjs.curtask->ctx;
         char *a_buf = (char*)ctx.x(10);
         size_t a_len = ctx.x(11);
-        if(a_buf == nullptr) { return statcode::err; }
+        if(a_buf == nullptr) {
+            // todo: 当a_buf == nullptr时改为由系统分配缓冲区
+            a_len = 0;
+            return statcode::err;
+        }
 
         auto curproc = kHartObjs.curtask->getProcess();
         struct fs::dirent *de = curproc->cwd;
         char path[FAT32_MAX_PATH];
-        char *s;
+        char *s;  // s为path的元素指针
         // todo: 路径处理过程考虑包装成类
         if (de->parent == nullptr) { s = "/"; } // s为字符串指针，必须指向双引号字符串"/"
         else {
@@ -41,8 +45,10 @@ namespace syscall
                 de = de->parent;
             }
         }
+        if(a_len < strlen(s)+1)  { return NULL; }
         // todo: 内存相关
-        // if (copyout2(a_buf, s, strlen(s)+1) < 0) { return nullptr; }
+        // if(copyout2(a_buf, s, strlen(s)+1) < 0) { return NULL; }
+
         return (xlen_t)a_buf;
     }
     inline bool fdOutRange(int a_fd) { return (a_fd<0) || (a_fd>proc::MaxOpenFile); }
@@ -72,21 +78,35 @@ namespace syscall
 
         return dupArgsIn(a_fd, a_newfd);
     }
+    xlen_t unlinkAt(void) {
+        auto &ctx = kHartObjs.curtask->ctx;
+        int a_dirfd = ctx.x(10); // todo: 需要兼容AT_FDCWD的情况(-100)
+        const char *a_path = (const char*)ctx.x(11);
+        int a_flags = ctx.x(12); // 这玩意有什么用？
+        if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        char path[FAT32_MAX_PATH];
+        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        SharedPtr<fs::File> f;
+        if(*path != '/') { f = curproc->files[a_dirfd]; } // 非绝对路径
+
+        return fs::unlink(path, f);
+    }
     xlen_t linkAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_olddirfd = ctx.x(10);
+        int a_olddirfd = ctx.x(10); // todo: 需要兼容AT_FDCWD的情况(-100)
         const char *a_oldpath = (const char*)ctx.x(11);
-        int a_newdirfd = ctx.x(12);
+        int a_newdirfd = ctx.x(12); // todo: 需要兼容AT_FDCWD的情况(-100)
         const char *a_newpath = (const char*)ctx.x(13);
         int a_flags = ctx.x(14);
         if(fdOutRange(a_olddirfd) || fdOutRange(a_newdirfd) || a_oldpath==nullptr || a_newpath==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
         char oldpath[FAT32_MAX_PATH], newpath[FAT32_MAX_PATH];
-         // todo: 是否能直接copy？
-        strncpy(oldpath, a_oldpath, FAT32_MAX_PATH);
-        strncpy(newpath, a_newpath, FAT32_MAX_PATH);
-        SharedPtr<fs::File> f1, f2; // 初始化为nullptr
+        strncpy(oldpath, a_oldpath, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        strncpy(newpath, a_newpath, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        SharedPtr<fs::File> f1, f2;
         if(*oldpath != '/') { f1 = curproc->files[a_olddirfd]; }
         if(*newpath != '/') { f2 = curproc->files[a_newdirfd]; }
 
@@ -99,7 +119,7 @@ namespace syscall
 
         auto curproc = kHartObjs.curtask->getProcess();
         char path[FAT32_MAX_PATH];
-        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能直接copy？
+        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能这样copy？
         struct fs::dirent *ep = fs::ename(path);
         if(ep == nullptr) { return statcode::err; }
         fs::elock(ep);
@@ -117,7 +137,7 @@ namespace syscall
     }
     xlen_t openAt() {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_dirfd = ctx.x(10);
+        int a_dirfd = ctx.x(10); // todo: 需要兼容AT_FDCWD的情况(-100)
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12);
         mode_t a_mode = ctx.x(13);
@@ -191,21 +211,20 @@ namespace syscall
         int a_fd = ctx.x(10);
         struct fs::dstat *a_buf = (struct fs::dstat*)ctx.x(11);
         size_t a_len = ctx.x(12);
-        if(fdOutRange(a_fd) || a_buf==nullptr) { return statcode::err; }
+        if(fdOutRange(a_fd) || a_buf==nullptr || a_len<sizeof(fs::dstat)) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
         SharedPtr<fs::File> f = curproc->files[a_fd];
-        struct fs::dstat ds;
-        size_t copylen = a_len<sizeof(ds)?a_len:sizeof(ds);
         if(f == nullptr) { return statcode::err; }
+        struct fs::dstat ds;
         getdstat(f->obj.ep, &ds);
         // todo: 内存相关
-        // if(copyout2(buf, (char*)&ds, a_len<sizeof(ds)?a_len:sizeof(ds)) < 0) {
+        // if(copyout2(a_buf, (char*)&ds, sizeof(ds)) < 0) {
         //     printf("copy wrong\n");
         //     return statcode::err;
         // }
 
-        return copylen;
+        return sizeof(ds);
     }
     xlen_t read(){
         auto &ctx=kHartObjs.curtask->ctx;
@@ -263,7 +282,6 @@ namespace syscall
         // syscallPtrs[SYS_flock] = sys_flock;
         // syscallPtrs[SYS_mknodat] = sys_mknodat;
         // syscallPtrs[SYS_mkdirat] = sys_mkdirat;
-        // syscallPtrs[SYS_unlinkat] = sys_unlinkat;
         // syscallPtrs[SYS_symlinkat] = sys_symlinkat;
         // syscallPtrs[SYS_renameat] = sys_renameat;
         // syscallPtrs[SYS_umount2] = sys_umount2;
@@ -289,6 +307,7 @@ namespace syscall
         syscallPtrs[syscalls::dup] = syscall::dup;
         syscallPtrs[syscalls::dup3] = syscall::dup3;
         syscallPtrs[syscalls::linkat] = syscall::linkAt;
+        syscallPtrs[syscalls::unlinkat] = syscall::unlinkAt;
         syscallPtrs[syscalls::chdir] = syscall::chDir;
         syscallPtrs[syscalls::openat] = syscall::openAt;
         syscallPtrs[syscalls::close] = syscall::close;
