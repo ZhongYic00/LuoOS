@@ -134,9 +134,10 @@ void start_kernel(int hartid){
     timerInit();
     csrClear(sstatus,1l<<csr::mstatus::spp);
     csrSet(sstatus,BIT(csr::mstatus::spie));
-    // virtio_disk_init();
-    // printf("virtio disk init!\n");
-    // binit();
+    virtio_disk_init();
+    Log(info,"virtio disk init over\n");
+    binit();
+    // fs::fat32_init();
     // printf("buf init!\n");
     // fs::fat32_init();
     // printf("fat32 init!\n");
