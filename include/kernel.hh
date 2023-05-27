@@ -11,6 +11,7 @@
 extern "C" void start_kernel(int hartid);
 namespace syscall{
     void init();
+    int sleep();
 }
 namespace sys
 {
@@ -19,6 +20,7 @@ namespace sys
         testexit,
         testyield,
         testwrite,
+        testbio,
         dup=23,
         dup3=24,
         openat=56,
