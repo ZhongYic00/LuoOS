@@ -45,9 +45,10 @@ namespace syscall
                 de = de->parent;
             }
         }
-        if(a_len < strlen(s)+1)  { return NULL; }
-        // todo: 内存相关
-        // if(copyout2(a_buf, s, strlen(s)+1) < 0) { return NULL; }
+        size_t len = strlen(s)+1;
+        if(a_len < len)  { return NULL; }
+
+        curproc->vmar.copyout((xlen_t)a_buf, klib::ByteArray((uint8_t*)s,len));
 
         return (xlen_t)a_buf;
     }
@@ -301,11 +302,7 @@ namespace syscall
         if(f == nullptr) { return statcode::err; }
         struct fs::dstat ds;
         getDStat(f->obj.ep, &ds);
-        // todo: 内存相关
-        // if(copyout2(a_buf, (char*)&ds, sizeof(ds)) < 0) {
-        //     printf("copy wrong\n");
-        //     return statcode::err;
-        // }
+        curproc->vmar.copyout((xlen_t)a_buf, klib::ByteArray((uint8_t*)&ds,sizeof(ds)));
 
         return sizeof(ds);
     }
@@ -335,11 +332,7 @@ namespace syscall
         if(f == nullptr) { return statcode::err; }
         struct fs::kstat kst;
         fs::getKStat(f->obj.ep, &kst);
-        // todo: 内存相关
-        // if(copyout2(a_kst, (char*)&kst, sizeof(kst)) < 0) {
-        //     printf("copy wrong\n");
-        //     return statcode::err;
-        // }
+        curproc->vmar.copyout((xlen_t)a_kst, klib::ByteArray((uint8_t*)&kst,sizeof(kst)));
 
         return statcode::ok;
     }
