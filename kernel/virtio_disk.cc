@@ -10,15 +10,10 @@
 // #include "include/types.h"
 // #include "include/riscv.h"
 #include "param.h"
-// #include "include/memlayout.h"
-// #include "include/spinlock.h"
-// #include "include/sleeplock.h"
-// #include "include/buf.h"
+#include "kernel.hh"
 #include "virtio.h"
-// #include "include/proc.h"
+#include "proc.hh"
 #include "vm.hh"
-// #include "include/string.h"
-// #include "include/printf.h"
 #include "klib.hh"
 #define moduleLevel debug
 namespace syscall
@@ -27,9 +22,7 @@ namespace syscall
 } // namespace syscall
 
 
-
-// the address of virtio mmio register r.
-#define R(r) ((volatile uint32 *)(VIRTIO0_V + (r)))
+klib::list<proc::Task*> waiting;
 
 static struct disk {
  // memory for virtio descriptors &c for queue 0.
@@ -52,6 +45,7 @@ static struct disk {
   struct {
     struct buf *b;
     char status;
+    proc::Task *waiting;
   } info[NUM];
   
   // struct spinlock vdisk_lock;
@@ -150,6 +144,7 @@ free_desc(int i)
   disk.free[i] = 1;
   // todo: 进程相关
   // wakeup(&disk.free[0]);
+  while(!waiting.empty())kGlobObjs.scheduler.wakeup(waiting.pop_front());
 }
 
 // free a chain of descriptors.
@@ -168,6 +163,7 @@ free_chain(int i)
 static int
 alloc3_desc(int *idx)
 {
+  Log(debug,"alloc3_desc");
   for(int i = 0; i < 3; i++){
     idx[i] = alloc_desc();
     if(idx[i] < 0){
@@ -198,6 +194,8 @@ virtio_disk_rw(struct buf *b, int write)
     }
     // todo: 进程相关
     // sleep(&disk.free[0], &disk.vdisk_lock);
+    waiting.push_back(kHartObjs.curtask);
+    syscall::sleep();
   }
   
   // format the three descriptors.
@@ -247,21 +245,22 @@ virtio_disk_rw(struct buf *b, int write)
   // avail[2...] are desc[] indices the device should process.
   // we only tell device the first index in our chain of descriptors.
   disk.avail[2 + (disk.avail[1] % NUM)] = idx[0];
-  __sync_synchronize();
+  // __sync_synchronize();
   disk.avail[1] = disk.avail[1] + 1;
 
   mmio<platform::virtio::blk::MMIOInterface>(platform::virtio::blk::base)
     .queue.notify=0; // value is queue number
 
   // Wait for virtio_disk_intr() to say request has finished.
-  // while(b->disk == 1) {
-  //   // todo: 进程相关
-  //   // sleep(b, &disk.vdisk_lock);
-  //   // syscall::sleep();
-  // }
+  while(b->disk == 1) {
+    // todo: 进程相关
+    // sleep(b, &disk.vdisk_lock);
+    disk.info[idx[0]].waiting=kHartObjs.curtask;
+    syscall::sleep();
+  }
 
-  // disk.info[idx[0]].b = 0;
-  // free_chain(idx[0]);
+  disk.info[idx[0]].b = 0;
+  free_chain(idx[0]);
 
   // release(&disk.vdisk_lock);
 }
@@ -273,14 +272,14 @@ virtio_disk_intr()
   Log(debug,"virtio::blk interrupt handler");
 
   while((disk.used_idx % NUM) != (disk.used->id % NUM)){
-    int id = disk.used->elems[disk.used_idx].id;
+    auto &info=disk.info[disk.used->elems[disk.used_idx].id];
 
-    if(disk.info[id].status != 0)
+    if(info.status != 0)
       panic("virtio_disk_intr status");
     
-    disk.info[id].b->disk = 0;   // disk is done with buf
+    info.b->disk = 0;   // disk is done with buf
     // todo: 进程相关
-    // wakeup(disk.info[id].b);
+    kGlobObjs.scheduler.wakeup(info.waiting);
 
     disk.used_idx = (disk.used_idx + 1) % NUM;
   }
