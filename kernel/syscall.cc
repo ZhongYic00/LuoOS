@@ -179,12 +179,31 @@ namespace syscall
         proc::clone(kHartObjs.curtask);
         return statcode::ok;
     }
+    int testmount(){
+        int rt=fs::fat32_init();
+        SharedPtr<fs::File> shit;
+        auto testfile=fs::create2("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
+        assert(rt==0);
+        klib::string content="test ewrite";
+        rt=fs::ewrite(testfile,0,(xlen_t)content.c_str(),0,content.size());
+        assert(rt==content.size());
+        fs::eput(testfile);
+        testfile=fs::ename2("/testfile",shit);
+        char buf[20];
+        rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
+        assert(rt==content.size());
+        fs::eput(testfile);
+        testfile=fs::ename2("/test.txt",shit);
+        rt=fs::eread(testfile,0,(xlen_t)buf,0,15);
+        return rt;
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
         syscallPtrs[syscalls::testexit]=testexit;
         syscallPtrs[syscalls::testyield]=sysyield;
         syscallPtrs[syscalls::testwrite]=write;
+        syscallPtrs[syscalls::testmount]=testmount;
         // syscallPtrs[SYS_getcwd] = sys_getcwd;
         // syscallPtrs[SYS_dup] = sys_dup;
         // syscallPtrs[SYS_dup3] = sys_dup3;

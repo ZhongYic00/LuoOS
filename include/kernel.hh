@@ -19,6 +19,7 @@ namespace sys
         testexit,
         testyield,
         testwrite,
+        testmount,
         dup=23,
         dup3=24,
         openat=56,
@@ -67,7 +68,7 @@ namespace sys
     
 } // namespace sy
 namespace kernel{
-    constexpr int timerInterval=5000000;
+    constexpr int timerInterval=5000;
 
     struct KernelInfo{
         using segment_t=vm::segment_t;

@@ -17,6 +17,7 @@ int main(){
     printf("pipe2 result: rfd=%d wfd=%d\n",pipe[0],pipe[1]);
     if(sys::syscall(sys::syscalls::clone)==0){
         printf("parent return to here");
+        sys::syscall(sys::syscalls::testmount);
         ischild=false;
        }else{
         printf("child return to here");
@@ -45,9 +46,6 @@ int main(){
         printf("process write test");
         int pid=sys::syscall(sys::syscalls::getpid);
         printf("This is process[%d]",pid);
-        while(i--){
-            sys::syscall(0);
-        }
         if(sys::syscall(sys::syscalls::testexit)==-1){
             ExecInst(wfi);
         } else {

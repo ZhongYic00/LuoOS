@@ -4,6 +4,7 @@
 #include "kernel.hh"
 
 using namespace fs;
+#define moduleLevel LogLevel::trace
 
 ///////////////FAT依赖的其它接口，需要在FAT的代码中替换成等价接口/////////////////
 // todo: 实现原接口的等价功能并替换原接口
@@ -510,7 +511,7 @@ uint32 fs::get_byts_per_clus() { return fat.byts_per_clus; }
 /* like the original readi, but "reade" is odd, let alone "writee" */
 // Caller must hold entry->lock.
 // 读取偏移为off，长为n的数据到dst处，并将cur_clus移动到结束处所在的簇（off是相对于数据区起始位置的偏移）
-int eread(struct dirent *entry, int user_dst, uint64 dst, uint off, uint n) {
+int fs::eread(struct dirent *entry, int user_dst, uint64 dst, uint off, uint n) {
     if (off > entry->file_size || off + n < off || (entry->attribute & ATTR_DIRECTORY)) { return 0; }
     if (entry->attribute & ATTR_LINK){
         struct link li;
@@ -809,6 +810,7 @@ void fs::estat(struct dirent *de, struct stat *st) {
     count记录了向后遍历了几个目录项
 */
 int fs::enext(struct dirent *dp, struct dirent *ep, uint off, int *count) {
+    Log(trace,"enext(dp=%p,ep=%p)",dp);
     if (!(dp->attribute & ATTR_DIRECTORY)) { panic("enext not dir"); }
     if (ep->valid) { panic("enext ep valid"); }
     if (off % 32) { panic("enext not align"); }
