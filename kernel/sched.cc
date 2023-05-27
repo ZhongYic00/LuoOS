@@ -33,6 +33,7 @@ void Scheduler::sleep(Scheduable *task){
     cur=ready.begin();
 }
 void Scheduler::wakeup(Scheduable *task){
+    Log(info,"wakeup %s",static_cast<proc::Task*>(task)->toString().c_str());
     if(pending.find(task)==pending.end())return ;
     pending.remove(task);
     ready.push_back(task);

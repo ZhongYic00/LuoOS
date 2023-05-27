@@ -42,7 +42,7 @@ void plicComplete(int irq){
 
 void externalInterruptHandler(){
     int irq=plicClaim();
-    Log(debug,"externalInterruptHandler(irq=%d)\n",irq);
+    Log(debug,"externalInterruptHandler(irq=%d)",irq);
     switch(irq){
         case 0:{
             Log(debug,"irq 0???");
@@ -73,7 +73,7 @@ extern "C" void straphandler(){
     ptr_t sepc; csrRead(sepc,sepc);
     xlen_t scause; csrRead(scause,scause);
     xlen_t stval; csrRead(stval,stval);
-    Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
+    Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
     kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
 
     if(csr::mcause::isInterrupt(scause)){

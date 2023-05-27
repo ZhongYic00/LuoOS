@@ -153,7 +153,7 @@ void start_kernel(int hartid){
     // csrWrite(sscratch,ctx.gpr);
     csrWrite(stvec,strapwrapper);
     csrSet(sstatus,BIT(csr::mstatus::sum));
-    csrSet(sstatus,BIT(csr::mstatus::sie));
+    // csrSet(sstatus,BIT(csr::mstatus::sie));
     csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));
     // halt();
     // while(true);
