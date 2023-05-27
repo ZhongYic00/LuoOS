@@ -96,7 +96,7 @@ static uint32 read_fat(uint32 cluster) {
     }
     uint32 fat_sec = fat_sec_of_clus(cluster, 1);
     // here should be a cache layer for FAT table, but not implemented yet.
-    BlockRef &b = bread(0, fat_sec);
+    BlockRef b = bread(0, fat_sec);
     uint32 next_clus = b[fat_offset_of_clus(cluster)];
     brelse(b);
     return next_clus;
@@ -112,7 +112,7 @@ static int write_fat(uint32 cluster, uint32 content) {
         return -1;
     }
     uint32 fat_sec = fat_sec_of_clus(cluster, 1);
-    BlockRef &b = bread(0, fat_sec);
+    BlockRef b = bread(0, fat_sec);
     uint off = fat_offset_of_clus(cluster);
     b[off] = content;
     bwrite(b);
@@ -123,7 +123,7 @@ static int write_fat(uint32 cluster, uint32 content) {
 static void zero_clus(uint32 cluster) {
     uint32 sec = first_sec_of_clus(cluster);
     for (int i = 0; i < fat.bpb.sec_per_clus; i++) {
-        auto &b = bread(0, sec++);
+        auto b = bread(0, sec++);
         memset(b.buf.data, 0, BSIZE);
         bwrite(b);
         brelse(b);
@@ -135,7 +135,7 @@ static uint32 alloc_clus(uint8 dev) {
     uint32 sec = fat.bpb.rsvd_sec_cnt;
     uint32 const ent_per_sec = fat.bpb.byts_per_sec / sizeof(uint32);
     for (uint32 i = 0; i < fat.bpb.fat_sz; i++, sec++) {
-        auto &b = bread(dev, sec);
+        auto b = bread(dev, sec);
         for (uint32 j = 0; j < ent_per_sec; j++) {
             if (b[j] == 0) {
                 b[j] = FAT32_EOC + 7;
@@ -164,7 +164,7 @@ static uint rw_clus(uint32 cluster, int write, int user, uint64 data, uint off, 
     off = off % fat.bpb.byts_per_sec;
     int bad = 0;
     for (tot = 0; tot < n; tot += m, off += m, data += m, sec++) {
-        auto &bp = bread(0, sec);
+        auto bp = bread(0, sec);
         m = BSIZE - off % BSIZE;
         if (n - tot < m) { m = n - tot; }
         if (write) {
@@ -436,7 +436,7 @@ static struct dirent *lookup_path2(char *path, int parent, struct File *f ,char 
 
 /////////////////fs.hh中定义的函数///////////////////////////
 int fs::fat32_init() {
-    BlockRef &b = bread(0, 0);
+    BlockRef b = bread(0, 0);
     fat=b.buf;
     brelse(b);
     // make sure that byts_per_sec has the same value with BSIZE 
@@ -1065,7 +1065,7 @@ int fs::do_mount(struct dirent*mountpoint,struct dirent*dev) {
         mount_num++;
         mount_num=mount_num%8;
     }
-    BlockRef &b = bread(dev->dev, 0);
+    BlockRef b = bread(dev->dev, 0);
     static_cast<SuperBlock>(dev_fat[mount_num])=b.buf;
     brelse(b);
     // make sure that byts_per_sec has the same value with BSIZE 

@@ -107,7 +107,8 @@ namespace fs {
         SuperBlock()=default;
         SuperBlock(BlockBuf &other){
             auto &fat=*this;
-            if (strncmp(other.d<char const*>(82), "FAT32", 5)) { panic("not FAT32 volume"); }
+            auto str=&other.d<const char>(82);
+            if (strncmp(str, "FAT32", 5)) { panic("not FAT32 volume"); }
             memmove(&fat.bpb.byts_per_sec, other.data + 11, 2); // avoid misaligned load on k210
             fat.bpb.sec_per_clus = other.d<uint8>(13);
             fat.bpb.rsvd_sec_cnt = other.d<uint16>(14);

@@ -25,7 +25,7 @@ struct BlockRef{
 };
 
 void binit(void);
-BlockRef& bread(uint, uint);
+BlockRef bread(uint, uint);
 void brelse(BlockRef&);
 void bwrite(BlockRef&);
 

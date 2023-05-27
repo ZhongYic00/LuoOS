@@ -192,12 +192,20 @@ namespace syscall
         xlen_t wstatus=ctx.x(11);
         return waitpid(pid,wstatus,0);
     }
+    int testbio(){
+        for(int i=0;i<35;i++){
+            auto buf=bread(0,i);
+            bwrite(buf);
+            brelse(buf);
+        }
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
         syscallPtrs[syscalls::testexit]=testexit;
         syscallPtrs[syscalls::testyield]=sysyield;
         syscallPtrs[syscalls::testwrite]=write;
+        syscallPtrs[syscalls::testbio]=testbio;
         // syscallPtrs[SYS_getcwd] = sys_getcwd;
         // syscallPtrs[SYS_dup] = sys_dup;
         // syscallPtrs[SYS_dup3] = sys_dup3;

@@ -30,6 +30,7 @@
 
 using tinystl::unordered_map;
 using klib::pair;
+using klib::SharedPtr;
 
 template<typename K,typename V>
 class CacheMgr{
@@ -39,7 +40,9 @@ class CacheMgr{
       V d;
     };
     unordered_map<K,Piece> pool;
+    semaphore::Semaphore sema;
     void reserve(size_t capacity){
+        sema.req();
         while(pool.size()+capacity>nbufs){
             auto lacks=pool.size()+capacity-nbufs;
             /// @todo retire one piece
@@ -54,6 +57,7 @@ class CacheMgr{
         }
     }
 public:
+    CacheMgr():sema(nbufs){}
     template<typename Lambda>
     V& get(K key,Lambda refill){
         if(pool.find(key)==pool.end()){
@@ -64,6 +68,7 @@ public:
         return pool[key].d;
     }
     void release(K key){
+      sema.rel();
       pool[key].ref--;
     }
 };
@@ -72,10 +77,29 @@ public:
 typedef CacheMgr<secno_t,BlockBuf> BCacheMgr;
 unordered_map<dev_t,BCacheMgr> bcacheMgr;
 
+constexpr xlen_t diskPages=128,
+  diskBytes=diskPages*vm::pageSize;
+klib::ByteArray memdisk(nullptr,diskBytes);
+void disk_init(){
+  // memdisk.buff=(uint8_t*)vm::pn2addr(kGlobObjs.pageMgr->alloc(diskPages));
+  extern char _uimg_start;
+  memdisk.buff=(uint8_t*)((xlen_t)&_uimg_start);
+}
+BlockBuf disk_read(secno_t secno){
+  BlockBuf buf;
+  memcpy(buf.data,memdisk.buff+secno*BSIZE,BSIZE);
+  return buf;
+}
+void disk_write(BlockRef& ref){
+  memcpy(memdisk.buff+ref.secno*BSIZE,ref.buf.data,BSIZE);
+}
+
 void
 binit(void)
 {
+    new (&bcacheMgr) unordered_map<dev_t,BCacheMgr>();
     bcacheMgr[0]=BCacheMgr();
+    disk_init();
   // BlockRef *b;
   // // initlock(&freecache.lock, "freecache");
   // freecache.head.freeprev = &freecache.head;
@@ -174,26 +198,11 @@ bget(uint dev, uint sectorno) {
   // }
 }
 
-constexpr xlen_t diskPages=128,
-  diskBytes=diskPages*vm::pageSize;
-klib::ByteArray memdisk(nullptr,diskBytes);
-void disk_init(){
-  memdisk.buff=(uint8_t*)vm::pn2addr(kGlobObjs.pageMgr->alloc(diskPages));
-}
-BlockBuf disk_read(secno_t secno){
-  BlockBuf buf;
-  memcpy(buf.data,memdisk.buff+secno*BSIZE,BSIZE);
-  return buf;
-}
-void disk_write(BlockRef& ref){
-  memcpy(memdisk.buff+ref.secno*BSIZE,ref.buf.data,BSIZE);
-}
 
-BlockRef&
+BlockRef
 bread(uint dev, uint sectorno) {
   auto &buf=bcacheMgr[dev].get(sectorno,[=](){return disk_read(sectorno);});
-  auto rt=BlockRef{.secno=sectorno,.buf=buf};
-  return rt;
+  return BlockRef{.secno=sectorno,.buf=buf};
 }
 
 // Write b's contents to disk.  Must be locked.

@@ -122,9 +122,16 @@ void start_kernel(int hartid){
     for(int i=0;i<10;i++)
         printf("%d:Hello LuoOS!\n",i);
     extern char _uimg_start;
-    auto uproc=proc::createProcess();
-    uproc->name="uprog00";
-    uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
+    // auto uproc=proc::createProcess();
+    // uproc->name="uprog00";
+    // uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
+    binit();
+    for(int i=0;i<35;i++){
+        auto buf=bread(0,i);
+        bwrite(buf);
+        brelse(buf);
+    }
+    fs::fat32_init();
     // uproc=proc::createProcess();
     // uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
     // kGlobObjs.scheduler.add(uproc->defaultTask());
