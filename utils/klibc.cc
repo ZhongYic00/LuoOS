@@ -198,6 +198,15 @@ int strncmp(const char *s1, const char *s2, size_t n) {
   return *s1<*s2?-1:1;
 }
 
+int strncmpamb(const char *s1, const char *s2, size_t n) {
+  size_t cnt=1;
+  if(n==0)return 0;
+  for(;(*s1==*s2)||((*s1>='a')&&(*s1<='z')&&((*s2-*s1)==('A'-'a')))||((*s1>='A')&&(*s1<='Z')&&((*s1-*s2)==('A'-'a')));s1++,s2++,cnt++){
+    if(!*s1||cnt==n)return 0;
+  }
+  return *s1<*s2?-1:1;
+}
+
 char* strchr(const char *s, char c) {
   for(; *s; s++)
     if(*s == c)

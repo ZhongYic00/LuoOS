@@ -193,16 +193,15 @@ namespace syscall
         fs::eput(testfile);
         Log(info,"ewrite success\n---------------------------------------------------------");
         testfile=fs::ename2("/testfile",shit);
-        printf("0x%lx\n", testfile);
         char buf[2*(content.size())];
         rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
         assert(rt==content.size());
         fs::eput(testfile);
         Log(info,"eread success\n---------------------------------------------------------");
-        printf("%s, %d\n", buf, buf[content.size()]);
-        testfile=fs::ename("/test");
-        printf("0x%lx\n", testfile);
-        rt=fs::eread(testfile,0,(xlen_t)buf,0,15);
+        printf("%s\n", buf); // todo: printf字符串结尾会输出奇怪字符
+        content="Hello, world!";
+        testfile=fs::ename2("/test.txt", shit);
+        rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
         assert(rt==content.size());
         fs::eput(testfile);
         Log(info,"eread success\n---------------------------------------------------------");

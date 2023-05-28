@@ -7,44 +7,18 @@ using namespace fs;
 #define moduleLevel LogLevel::trace
 
 ///////////////FAT依赖的其它接口，需要在FAT的代码中替换成等价接口/////////////////
-// todo: 实现原接口的等价功能并替换原接口
-/*
-    Copy to either a user address, or kernel address,
-    depending on usr_dst.
-    Returns 0 on success, -1 on error.
-    来自xv6的proc.c，仅供替换时参考，完成替换后要删掉
-*/
+// todo: 改成更规范的接口？
 int either_copyout(int user_dst, uint64 dst, void *src, uint64 len) {
     if(user_dst) { kHartObjs.curtask->getProcess()->vmar.copyout(dst, klib::ByteArray((uint8_t*)src, len)); }
     else { memmove((void*)dst, src, len); }
     return 0;
 }
-/*
-    Copy from either a user address, or kernel address,
-    depending on usr_src.
-    Returns 0 on success, -1 on error.
-    来自xv6的proc.c，仅供替换时参考，完成替换后要删掉
-*/
+// todo: 改成更规范的接口？
 int either_copyin(void *dst, int user_src, uint64 src, uint64 len) {
     if(user_src) { memmove(dst, (const void*)(kHartObjs.curtask->getProcess()->vmar.copyin(src, len).buff), len); }
     else { memmove(dst, (void*)src, len); }
     return 0;
 }
-// 来自xv6的vm.c，仅供替换时参考，完成替换后要删掉
-// pte_t * walk(pagetable_t pagetable, uint64 va, int alloc) {
-// //   if(va >= MAXVA) { panic("walk"); }
-// //   for(int level = 2; level > 0; level--) {
-// //     pte_t *pte = &pagetable[PX(level, va)];
-// //     if(*pte & PTE_V) { pagetable = (pagetable_t)PTE2PA(*pte); }
-// //     else {
-// //       if(!alloc || (pagetable = (pde_t*)kalloc()) == NULL) { return NULL; }
-// //       memset(pagetable, 0, PGSIZE);
-// //       *pte = PA2PTE(pagetable) | PTE_V;
-// //     }
-// //   }
-// //   return &pagetable[PX(0, va)];
-//     return NULL;
-// }
 ///////////////////FAT////////////////////
 static struct {
     uint32 first_data_sec; // data所在的第一个扇区
@@ -354,15 +328,21 @@ static void read_entry_info(struct dirent *entry, union dentry *d) {
 }
 // 对于给定的path，读取路径的开头文件名，返回去掉了开头文件名的路径
 static char *skipelem(char *path, char *name) {
+    // 去掉第一个文件名前（即路径开头）的'/'
     while (*path == '/') { path++; }
     if (*path == 0) { return nullptr; }
+    // 读取第一个文件名
     char *s = path;
     while (*path != '/' && *path != 0) { path++; }
+    // 文件名长度
     int len = path - s;
     if (len > FAT32_MAX_FILENAME) { len = FAT32_MAX_FILENAME; }
+    // 文件名存进name里
     name[len] = 0;
     memmove(name, s, len);
+    // 去掉第二个文件名前的'/'
     while (*path == '/') { path++; }
+    // 返回去掉第一个文件名后的路径
     return path;
 }
 /*
@@ -409,17 +389,21 @@ static struct dirent *lookup_path2(char *path, int parent, SharedPtr<File> f ,ch
         printf("nothing in path\n");
         return nullptr;
     }
+    // 增加当前目录（或指定目录）的引用计数
     else if(*path == '/') { entry = edup(&root); }
     else if(!f) { entry = edup(kHartObjs.curtask->getProcess()->cwd); }
     else { entry = edup(f->obj.ep); }
-    while ((path = skipelem(path, name)) != 0) {
+    // 沿着路径依次搜索
+    while ((path = skipelem(path, name)) != 0) { // 读取一个文件名到name，并将其从path中去掉
         elock(entry);
+        // 当前搜索“目录”（name所属的目录）并非目录
         if (!(entry->attribute & ATTR_DIRECTORY)) {
             printf("not dir\n");
             eunlock(entry);
             eput(entry);
             return nullptr;
         }
+        // name是路径中的最后一个文件名
         if (parent && *path == '\0') {
             eunlock(entry);
             return entry;
@@ -805,10 +789,10 @@ void fs::estat(struct dirent *de, struct stat *st) {
 */
 int fs::enext(struct dirent *dp, struct dirent *ep, uint off, int *count) {
     Log(trace,"enext(dp=%p,ep=%p)",dp);
-    if (!(dp->attribute & ATTR_DIRECTORY)) { panic("enext not dir"); }
-    if (ep->valid) { panic("enext ep valid"); }
-    if (off % 32) { panic("enext not align"); }
-    if (dp->valid != 1) { return -1; }
+    if (!(dp->attribute & ATTR_DIRECTORY)) { panic("enext not dir"); } // 搜索“目录”非目录
+    if (ep->valid) { panic("enext ep valid"); } // 存放返回文件的结构无效
+    if (off % 32) { panic("enext not align"); } // 未对齐
+    if (dp->valid != 1) { return -1; } // 搜索目录无效
     if (dp->attribute & ATTR_LINK){
         struct link li;
         rw_clus(dp->first_clus, 0, 0, (uint64)&li, 0, 36);
@@ -818,16 +802,21 @@ int fs::enext(struct dirent *dp, struct dirent *ep, uint off, int *count) {
     union dentry de;
     int cnt = 0;
     memset(ep->filename, 0, FAT32_MAX_FILENAME + 1);
-    for (int off2; (off2 = reloc_clus(dp, off, 0)) != -1; off += 32) {
-        if (rw_clus(dp->cur_clus, 0, 0, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) { return -1; }
+    // 遍历dp的簇
+    for (int off2; (off2 = reloc_clus(dp, off, 0)) != -1; off += 32) { // off2: 簇内偏移 off: 目录内偏移
+        // 没对齐或在非"."和"..."目录的情形下到达结尾
+        if (rw_clus(dp->cur_clus, 0, 0, (uint64)&de, off2, 32) != 32 || (((char*)&de)[0]!='.' && de.lne.order==END_OF_ENTRY)) { return -1; }
+        // 当前目录为空目录
         if (de.lne.order == EMPTY_ENTRY) {
             cnt++;
             continue;
         }
+        // 文件已删除
         else if (cnt) {
             *count = cnt;
             return 0;
         }
+        // 长目录项
         if (de.lne.attr == ATTR_LONG_NAME) {
             int lcnt = de.lne.order & ~LAST_LONG_ENTRY;
             if (de.lne.order & LAST_LONG_ENTRY) {
@@ -836,6 +825,7 @@ int fs::enext(struct dirent *dp, struct dirent *ep, uint off, int *count) {
             }
             read_entry_name(ep->filename + (lcnt - 1) * CHAR_LONG_NAME, &de);
         }
+        // 短目录项
         else {
             if (count) {
                 *count = 1;
@@ -873,6 +863,7 @@ struct dirent *fs::dirlookup(struct dirent *dp, char *filename, uint *poff) {
         root=dev_fat[dp->dev].root;
         dp=&root;
     }
+    // 当前“目录”非目录
     if (!(dp->attribute & ATTR_DIRECTORY)) { panic("dirlookup not DIR"); }
     if (dp->attribute & ATTR_LINK){
         struct link li;
@@ -880,24 +871,29 @@ struct dirent *fs::dirlookup(struct dirent *dp, char *filename, uint *poff) {
         dp->first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         dp->attribute = li.de.sne.attr;
     }
+    // '.'表示当前目录，则增加当前目录引用计数并返回当前目录
     if (strncmp(filename, ".", FAT32_MAX_FILENAME) == 0) { return edup(dp); }
+    // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
     else if (strncmp(filename, "..", FAT32_MAX_FILENAME) == 0) {
         if (dp == &root) { return edup(&root); }
         return edup(dp->parent);
     }
+    // 当前目录无效
     if (dp->valid != 1) {
         printf("valid is not 1\n");
         return nullptr;
     }
-    struct dirent *ep = eget(dp, filename);
+    struct dirent *ep = eget(dp, filename); // 从缓冲区中找
     if (ep->valid == 1) { return ep; }                               // ecache hits
+    // 缓冲区找不到则往下执行
     int len = strlen(filename);
     int entcnt = (len + CHAR_LONG_NAME - 1) / CHAR_LONG_NAME + 1;   // count of l-n-entries, rounds up. plus s-n-e
     int count = 0; 
     int type;
     uint off = 0;
-    reloc_clus(dp, 0, 0);
-    while ((type = enext(dp, ep, off, &count) != -1)) {
+    reloc_clus(dp, 0, 0); // 将当前目录的cur_clus设为0
+    while ((type = enext(dp, ep, off, &count) != -1)) { // 每轮从off开始往后搜索
+        // 文件已被删除
         if (type == 0) {
             printf("%s has been deleted\n", ep->filename);
             if (poff && count >= entcnt) {
@@ -905,15 +901,18 @@ struct dirent *fs::dirlookup(struct dirent *dp, char *filename, uint *poff) {
                 poff = 0;
             }
         }
-        else if (strncmp(filename, ep->filename, FAT32_MAX_FILENAME) == 0) {
+        // 找到了一个有效文件
+        // todo: 不区分大小写？
+        else if (strncmpamb(filename, ep->filename, FAT32_MAX_FILENAME) == 0) {
             ep->parent = edup(dp);
             ep->off = off;
             ep->valid = 1;
             return ep;
         }
-        off += count << 5;
+        off += count << 5; // off += count*32
     }
-    if (poff) { *poff = off; }
+    // 没找到有效文件
+    if (poff) { *poff = off; } // 从未找到过同名文件（包括已删除的）
     eput(ep);
     return nullptr;
 }

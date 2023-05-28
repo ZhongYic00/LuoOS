@@ -142,8 +142,6 @@ free_desc(int i)
     panic("virtio_disk_intr 2");
   disk.desc[i].addr = 0;
   disk.free[i] = 1;
-  // todo: 进程相关
-  // wakeup(&disk.free[0]);
   while(!waiting.empty())kGlobObjs.scheduler.wakeup(waiting.pop_front());
 }
 
@@ -192,8 +190,6 @@ virtio_disk_rw(struct buf *b, int write)
     if(alloc3_desc(idx) == 0) {
       break;
     }
-    // todo: 进程相关
-    // sleep(&disk.free[0], &disk.vdisk_lock);
     waiting.push_back(kHartObjs.curtask);
     syscall::sleep();
   }
@@ -253,8 +249,6 @@ virtio_disk_rw(struct buf *b, int write)
 
   // Wait for virtio_disk_intr() to say request has finished.
   while(b->disk == 1) {
-    // todo: 进程相关
-    // sleep(b, &disk.vdisk_lock);
     disk.info[idx[0]].waiting=kHartObjs.curtask;
     syscall::sleep();
   }
@@ -273,12 +267,11 @@ virtio_disk_intr()
 
   while((disk.used_idx % NUM) != (disk.used->id % NUM)){
     auto &info=disk.info[disk.used->elems[disk.used_idx].id];
-
-    if(info.status != 0)
-      panic("virtio_disk_intr status");
+    // todo: 未知错误
+    // if(info.status != 0)
+    //   panic("virtio_disk_intr status");
     
     info.b->disk = 0;   // disk is done with buf
-    // todo: 进程相关
     kGlobObjs.scheduler.wakeup(info.waiting);
 
     disk.used_idx = (disk.used_idx + 1) % NUM;
