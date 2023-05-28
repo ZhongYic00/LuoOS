@@ -19,6 +19,7 @@ namespace sys
         testexit,
         testyield,
         testwrite,
+        testmount,
         getcwd=17,
         dup=23,
         dup3=24,
@@ -75,7 +76,7 @@ namespace sys
     
 } // namespace sy
 namespace kernel{
-    constexpr int timerInterval=5000000;
+    constexpr int timerInterval=500000;
 
     struct KernelInfo{
         using segment_t=vm::segment_t;
@@ -113,7 +114,7 @@ namespace kernel{
     struct KernelHartObjs{
         KernelTaskObjs *curtask;
     };
-    inline int readHartId(){register int hartid asm("t0"); return hartid;}
+    inline int readHartId(){register int hartid asm("tp"); return hartid;}
     void createKernelMapping(vm::VMAR &vmar);
     
 }

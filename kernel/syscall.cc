@@ -366,12 +366,42 @@ namespace syscall
         proc::clone(kHartObjs.curtask);
         return statcode::ok;
     }
+    int testmount(){
+        int rt=fs::fat32_init();
+        kHartObjs.curtask->getProcess()->cwd = fs::ename("/");
+        printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
+        SharedPtr<fs::File> shit;
+        auto testfile=fs::create2("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
+        assert(rt==0);
+        Log(info,"create2 success\n---------------------------------------------------------");
+        klib::string content="test write";
+        rt=fs::ewrite(testfile,0,(xlen_t)content.c_str(),0,content.size());
+        assert(rt==content.size());
+        fs::eput(testfile);
+        Log(info,"ewrite success\n---------------------------------------------------------");
+        testfile=fs::ename2("/testfile",shit);
+        char buf[2*(content.size())];
+        rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
+        assert(rt==content.size());
+        fs::eput(testfile);
+        Log(info,"eread success\n---------------------------------------------------------");
+        printf("%s\n", buf); // todo: printf字符串结尾会输出奇怪字符
+        content="Hello, world!";
+        testfile=fs::ename2("/test.txt", shit);
+        rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
+        assert(rt==content.size());
+        fs::eput(testfile);
+        Log(info,"eread success\n---------------------------------------------------------");
+        printf("%s\n", buf);
+        return rt;
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
         syscallPtrs[syscalls::testexit]=testexit;
         syscallPtrs[syscalls::testyield]=sysyield;
         syscallPtrs[syscalls::testwrite]=write;
+        syscallPtrs[syscalls::testmount]=testmount;
         // syscallPtrs[SYS_fcntl] = sys_fcntl;
         // syscallPtrs[SYS_ioctl] = sys_ioctl;
         // syscallPtrs[SYS_flock] = sys_flock;

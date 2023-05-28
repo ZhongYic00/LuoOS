@@ -36,6 +36,41 @@ static void timerInit(){
     nextTimeout();
 }
 
+void uartInitTest(){
+    using namespace platform::uart0::nonblocking;
+    for(int i=1024;i;i--)putc('_');
+    // 0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg
+}
+void uartInit(){
+    using namespace platform::uart0;
+    auto &ier=mmio<volatile uint8_t>(reg(IER));
+    ier=0x00;
+    puts("Hello Uart\n");
+    auto &lcr=mmio<volatile uint8_t>(reg(LCR));
+    lcr=lcr|(1<<7);
+    mmio<volatile uint8_t>(reg(DLL))=0x03;
+    mmio<volatile uint8_t>(reg(DLM))=0x00;
+    lcr=3;
+    mmio<volatile uint8_t>(reg(FCR))=0x7|(0x3<<6);
+    ier=0x01;
+    // puts=IO::_nonblockingputs;
+}
+static void plicInit(){
+    int hart=kernel::readHartId();
+    using namespace platform::plic;
+
+    uartInit();
+    mmio<word_t>(priorityOf(platform::uart0::irq))=1;
+    mmio<word_t>(enableOf(hart))=1<<platform::uart0::irq;
+
+    mmio<word_t>(priorityOf(platform::virtio::blk::irq))=1;
+    mmio<word_t>(enableOf(hart))|=1<<platform::virtio::blk::irq;
+
+    mmio<word_t>(thresholdOf(hart))=0;
+    
+    uartInitTest();
+}
+
 __attribute__((nacked, section("stub")))
 static void stub(){
     csrWrite(satp,kernelPageTableRoot);
@@ -118,8 +153,8 @@ void start_kernel(int hartid){
     // csrWrite(sscratch,ctx.gpr);
     csrWrite(stvec,strapwrapper);
     csrSet(sstatus,BIT(csr::mstatus::sum));
-    csrSet(sstatus,BIT(csr::mstatus::sie));
-    csrSet(sie,BIT(csr::mie::ssie));
+    // csrSet(sstatus,BIT(csr::mstatus::sie));
+    csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));
     // halt();
     // while(true);
     for(int i=0;i<10;i++)
@@ -131,12 +166,14 @@ void start_kernel(int hartid){
     // uproc=proc::createProcess();
     // uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
     // kGlobObjs.scheduler.add(uproc->defaultTask());
+    plicInit();
     timerInit();
     csrClear(sstatus,1l<<csr::mstatus::spp);
     csrSet(sstatus,BIT(csr::mstatus::spie));
-    // virtio_disk_init();
-    // printf("virtio disk init!\n");
-    // binit();
+    virtio_disk_init();
+    Log(info,"virtio disk init over\n");
+    binit();
+    // fs::fat32_init();
     // printf("buf init!\n");
     // fs::fat32_init();
     // printf("fat32 init!\n");

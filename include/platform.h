@@ -70,12 +70,20 @@ namespace platform{
     } // namespace uart0
     namespace plic
     {
-        constexpr auto base=0x0c000000l,
-            priority=base,
-            pending=base+0x1000,
-            enable=base+0x2000,
+        constexpr auto base=0x0c000000l;
+        namespace s{
+            constexpr auto enable=base+0x2080,
+                threshold=base+0x201000,
+                claim=base+0x201004;
+        }
+        namespace m{
+            constexpr auto enable=base+0x2000,
             threshold=base+0x200000,
             claim=base+0x200004;
+        }
+        using namespace s;
+        constexpr auto priority=base,
+            pending=base+0x1000;
         constexpr xlen_t priorityOf(int id) {return priority+id*4;}
         constexpr xlen_t enableOf(int hart) { return enable+hart*0x80; }
         constexpr xlen_t thresholdOf(int hart) { return threshold+hart*0x1000; }
@@ -96,6 +104,49 @@ namespace platform{
             size=128l*0x100000l,
             end=start+size;
     } // namespace ram
+    namespace virtio
+    {
+        namespace blk
+        {
+            constexpr auto irq=1;
+            constexpr xlen_t base=0x10001000l;
+            struct MMIOInterface{
+                struct Config{
+                    word_t magic,version,devId,venderId;
+                    xlen_t devFeatures;
+                    xlen_t:64;
+                    xlen_t driverFeatures,guestPageSize;
+                }config;
+                static_assert(sizeof(Config)==0x30);
+                struct Queue{
+                    ///@brief select queue, write-only
+                    word_t select;
+                    ///@brief max size of current queue, read-only
+                    const word_t maxSize;
+                    ///@brief size of current queue, write-only
+                    word_t size;
+                    ///@brief used ring alignment, write-only
+                    word_t align;
+                    ///@brief physical page number for queue, read/write
+                    word_t ppn;
+                    ///@brief ready bit
+                    word_t ready;
+                    xlen_t:48;
+                    ///@brief write-only
+                    word_t notify;
+                    xlen_t:48;
+                }queue;
+                static_assert(sizeof(Queue)==0x30);
+                struct Interrupt{
+                    word_t status;
+                    word_t ack;
+                    xlen_t:64;
+                }intr;
+                xlen_t status;
+            };
+        } // namespace blk
+        
+    } // namespace virtio
     
 }
 

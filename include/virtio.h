@@ -13,13 +13,11 @@
 // https://docs.oasis-open.org/virtio/virtio/v1.1/virtio-v1.1.pdf
 //
 
-#define VIRT_OFFSET             0x3F00000000L
 // virtio mmio interface
-#define VIRTIO0                 0x10001000
-#define VIRTIO0_V               (VIRTIO0 + VIRT_OFFSET)
 
 // virtio mmio control registers, mapped starting at 0x10001000.
 // from qemu virtio_mmio.h
+/*
 #define VIRTIO_MMIO_MAGIC_VALUE		0x000 // 0x74726976
 #define VIRTIO_MMIO_VERSION		0x004 // version; 1 is legacy
 #define VIRTIO_MMIO_DEVICE_ID		0x008 // device type; 1 is net, 2 is disk
@@ -37,7 +35,7 @@
 #define VIRTIO_MMIO_INTERRUPT_STATUS	0x060 // read-only
 #define VIRTIO_MMIO_INTERRUPT_ACK	0x064 // write-only
 #define VIRTIO_MMIO_STATUS		0x070 // read/write
-
+*/
 // status register bits, from qemu virtio_config.h
 #define VIRTIO_CONFIG_S_ACKNOWLEDGE	1
 #define VIRTIO_CONFIG_S_DRIVER		2

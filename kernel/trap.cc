@@ -3,6 +3,7 @@
 #include "rvcsr.hh"
 #include "sbi.hh"
 #include "kernel.hh"
+#include "virtio.h"
 
 // #define moduleLevel LogLevel::debug
 
@@ -12,6 +13,7 @@ static hook_t hooks[10]={schedule};
 extern void nextTimeout();
 void timerInterruptHandler(){
     nextTimeout();
+    schedule();
 }
 extern syscall_t syscallPtrs[];
 void uecallHandler(){
@@ -29,12 +31,50 @@ void uecallHandler(){
     }
     Log(debug,"uecall exit(id=%d,rtval=%d)",ecallId,rtval);
 }
+int plicClaim(){
+    int hart=kernel::readHartId();
+    int irq=mmio<int>(platform::plic::claimOf(hart));
+    return irq;
+}
+void plicComplete(int irq){
+    int hart=kernel::readHartId();
+    mmio<int>(platform::plic::claimOf(hart))=irq;
+}
+
+void externalInterruptHandler(){
+    int irq=plicClaim();
+    Log(debug,"externalInterruptHandler(irq=%d)",irq);
+    switch(irq){
+        case 0:{
+            Log(debug,"irq 0???");
+            break;
+        }
+        case platform::uart0::irq:{
+            using namespace platform::uart0;
+            int cnt=0;
+            while(mmio<volatile lsr>(reg(LSR)).rxnemp){
+                char c=mmio<volatile uint8_t>(reg(RHR));
+                cnt++;
+            }
+            if(cnt)Log(info,"uart: %d inputs",cnt);
+            break;
+        }
+        case platform::virtio::blk::irq:{
+            virtio_disk_intr();
+            break;
+        }
+        default:
+            panic("unknown irq!");
+    }
+    plicComplete(irq);
+}
+
 
 extern "C" void straphandler(){
     ptr_t sepc; csrRead(sepc,sepc);
     xlen_t scause; csrRead(scause,scause);
     xlen_t stval; csrRead(stval,stval);
-    Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
+    Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
     kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
 
     if(csr::mcause::isInterrupt(scause)){
@@ -51,7 +91,7 @@ extern "C" void straphandler(){
             // case mti: break;
 
             // case uei: break;
-            // case sei: break;
+            case sei: externalInterruptHandler(); break;
             // case hei: break;
             // case mei: break;
             default:
