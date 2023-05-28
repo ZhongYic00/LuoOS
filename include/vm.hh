@@ -171,13 +171,15 @@ namespace vm
         inline xlen_t satp(){return PageTable::toSATP(pagetable);}
         // @todo @bug what if region is on border?
         inline klib::ByteArray copyin(xlen_t addr,size_t len){
+            // todo: 检查用户源是否越界（addr+len来自用户进程大小之外的空间）
             xlen_t paddr=pagetable.transaddr(addr);
             klib::ByteArray buff((uint8_t*)paddr,len);
             return buff;
         }
         inline void copyout(xlen_t addr,const klib::ByteArray &buff){
+            // todo: 检查拷贝后是否会越界（addr+buff.len后超出用户进程大小）
             xlen_t paddr=pagetable.transaddr(addr);
-            memcpy((ptr_t)paddr,buff.buff,buff.len);
+            memmove((ptr_t)paddr,buff.buff,buff.len);
         }
         class Writer{
             xlen_t vaddr;

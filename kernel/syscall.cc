@@ -181,23 +181,32 @@ namespace syscall
     }
     int testmount(){
         int rt=fs::fat32_init();
+        kHartObjs.curtask->getProcess()->cwd = fs::ename("/");
+        printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
         SharedPtr<fs::File> shit;
         auto testfile=fs::create2("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
         assert(rt==0);
-        Log(info,"create2 success");
-        klib::string content="test ewrite";
+        Log(info,"create2 success\n---------------------------------------------------------");
+        klib::string content="test write";
         rt=fs::ewrite(testfile,0,(xlen_t)content.c_str(),0,content.size());
         assert(rt==content.size());
-        Log(info,"ewrite success");
         fs::eput(testfile);
+        Log(info,"ewrite success\n---------------------------------------------------------");
         testfile=fs::ename2("/testfile",shit);
-        char buf[20];
+        printf("0x%lx\n", testfile);
+        char buf[2*(content.size())];
         rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
         assert(rt==content.size());
         fs::eput(testfile);
-        Log(info,"eput success\n---------------------------------------------------------");
-        testfile=fs::ename2("/test.txt",shit);
+        Log(info,"eread success\n---------------------------------------------------------");
+        printf("%s, %d\n", buf, buf[content.size()]);
+        testfile=fs::ename("/test");
+        printf("0x%lx\n", testfile);
         rt=fs::eread(testfile,0,(xlen_t)buf,0,15);
+        assert(rt==content.size());
+        fs::eput(testfile);
+        Log(info,"eread success\n---------------------------------------------------------");
+        printf("%s\n", buf);
         return rt;
     }
     void init(){

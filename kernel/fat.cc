@@ -15,11 +15,8 @@ using namespace fs;
     来自xv6的proc.c，仅供替换时参考，完成替换后要删掉
 */
 int either_copyout(int user_dst, uint64 dst, void *src, uint64 len) {
-//   if(user_dst){ return copyout2(dst, src, len); }
-//   else {
-//     memmove((char *)dst, src, len);
-//     return 0;
-//   }
+    if(user_dst) { kHartObjs.curtask->getProcess()->vmar.copyout(dst, klib::ByteArray((uint8_t*)src, len)); }
+    else { memmove((void*)dst, src, len); }
     return 0;
 }
 /*
@@ -29,11 +26,8 @@ int either_copyout(int user_dst, uint64 dst, void *src, uint64 len) {
     来自xv6的proc.c，仅供替换时参考，完成替换后要删掉
 */
 int either_copyin(void *dst, int user_src, uint64 src, uint64 len) {
-//   if(user_src){ return copyin2(dst, src, len); }
-//   else {
-//     memmove(dst, (char*)src, len);
-//     return 0;
-//   }
+    if(user_src) { memmove(dst, (const void*)(kHartObjs.curtask->getProcess()->vmar.copyin(src, len).buff), len); }
+    else { memmove(dst, (void*)src, len); }
     return 0;
 }
 // 来自xv6的vm.c，仅供替换时参考，完成替换后要删掉
