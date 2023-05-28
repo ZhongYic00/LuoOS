@@ -179,6 +179,7 @@ void
 virtio_disk_rw(struct buf *b, int write)
 {
   uint64 sector = b->sectorno;
+  Log(debug,"diskrw sector=%ld",sector);
 
   // acquire(&disk.vdisk_lock);
 
@@ -272,6 +273,7 @@ virtio_disk_intr()
   Log(debug,"virtio::blk interrupt handler");
 
   while((disk.used_idx % NUM) != (disk.used->id % NUM)){
+    Log(debug,"read id=%d, used->id=%d",disk.used_idx,disk.used->id);
     auto &info=disk.info[disk.used->elems[disk.used_idx].id];
 
     if(info.status != 0)
