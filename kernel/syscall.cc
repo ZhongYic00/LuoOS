@@ -184,15 +184,18 @@ namespace syscall
         SharedPtr<fs::File> shit;
         auto testfile=fs::create2("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
         assert(rt==0);
+        Log(info,"create2 success");
         klib::string content="test ewrite";
         rt=fs::ewrite(testfile,0,(xlen_t)content.c_str(),0,content.size());
         assert(rt==content.size());
+        Log(info,"ewrite success");
         fs::eput(testfile);
         testfile=fs::ename2("/testfile",shit);
         char buf[20];
         rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
         assert(rt==content.size());
         fs::eput(testfile);
+        Log(info,"eput success\n---------------------------------------------------------");
         testfile=fs::ename2("/test.txt",shit);
         rt=fs::eread(testfile,0,(xlen_t)buf,0,15);
         return rt;

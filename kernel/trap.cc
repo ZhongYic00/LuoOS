@@ -13,6 +13,7 @@ static hook_t hooks[10]={schedule};
 extern void nextTimeout();
 void timerInterruptHandler(){
     nextTimeout();
+    schedule();
 }
 extern syscall_t syscallPtrs[];
 void uecallHandler(){

@@ -47,7 +47,7 @@ int main(){
         int pid=sys::syscall(sys::syscalls::getpid);
         printf("This is process[%d]",pid);
         if(sys::syscall(sys::syscalls::testexit)==-1){
-            ExecInst(wfi);
+            while(true);
         } else {
             sys::syscall(sys::syscalls::yield);
         }
