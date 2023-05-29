@@ -213,7 +213,7 @@ virtio_disk_rw(struct buf *b, int write)
 
   // buf0 is on a kernel stack, which is not direct mapped,
   // thus the call to kvmpa().
-  disk.desc[idx[0]].addr = (uint64) &buf0; // todo: 直映射？
+  disk.desc[idx[0]].addr = (uint64) &buf0; // @todo 直映射？
   disk.desc[idx[0]].len = sizeof(buf0);
   disk.desc[idx[0]].flags = VRING_DESC_F_NEXT;
   disk.desc[idx[0]].next = idx[1];
@@ -269,7 +269,7 @@ virtio_disk_intr()
   while((disk.used_idx % NUM) != (disk.used->id % NUM)){
     Log(debug,"read id=%d, used->id=%d",disk.used_idx,disk.used->id);
     auto &info=disk.info[disk.used->elems[disk.used_idx].id];
-    // todo: 未知错误
+    // @todo 未知错误
     // if(info.status != 0)
     //   panic("virtio_disk_intr status");
     

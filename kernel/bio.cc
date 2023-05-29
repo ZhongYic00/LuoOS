@@ -82,7 +82,7 @@ bget(uint dev, uint sectorno) {
       if(b->sectorno == sectorno && b->dev == dev){
         if(b->busy == 1){
           // release(&listcache[n].lock);
-          // todo: 进程相关
+          // @todo 进程相关
           // sleep(b, NULL);
           goto next;
         }
@@ -127,7 +127,7 @@ bget(uint dev, uint sectorno) {
       // release(&listcache[n].lock);
       return b;
     }
-    // todo: 进程相关
+    // @todo 进程相关
     // sleep(&freecache, NULL);
     goto next;
 
@@ -178,7 +178,7 @@ brelse(struct buf *b)
   }
   // release(&freecache.lock);
 
-  // todo: 进程相关
+  // @todo 进程相关
   // wakeup sleeping processes because of b is busy
   // wakeup(b);
   // wakeup sleeping processes because of NOFREEBUF

@@ -7,13 +7,13 @@ using namespace fs;
 #define moduleLevel LogLevel::trace
 
 ///////////////FAT依赖的其它接口，需要在FAT的代码中替换成等价接口/////////////////
-// todo: 改成更规范的接口？
+// @todo 改成更规范的接口？
 int either_copyout(int user_dst, uint64 dst, void *src, uint64 len) {
     if(user_dst) { kHartObjs.curtask->getProcess()->vmar.copyout(dst, klib::ByteArray((uint8_t*)src, len)); }
     else { memmove((void*)dst, src, len); }
     return 0;
 }
-// todo: 改成更规范的接口？
+// @todo 改成更规范的接口？
 int either_copyin(void *dst, int user_src, uint64 src, uint64 len) {
     if(user_src) { memmove(dst, (const void*)(kHartObjs.curtask->getProcess()->vmar.copyin(src, len).buff), len); }
     else { memmove(dst, (void*)src, len); }
@@ -902,7 +902,7 @@ struct dirent *fs::dirlookup(struct dirent *dp, char *filename, uint *poff) {
             }
         }
         // 找到了一个有效文件
-        // todo: 不区分大小写？
+        // @todo 不区分大小写？
         else if (strncmpamb(filename, ep->filename, FAT32_MAX_FILENAME) == 0) {
             ep->parent = edup(dp);
             ep->off = off;
@@ -1081,7 +1081,7 @@ int fs::syn_disk(uint64 start,long len) {
     long off;
     struct proc::Process*p=kHartObjs.curtask->getProcess();
     struct dirent *ep=p->mfile.mfile->obj.ep;
-    // todo: 内存相关
+    // @todo 内存相关
     // pagetable_t pagetable = p->pagetable;
     // if(start>p->mfile.baseaddr) { off=p->mfile.off+start-p->mfile.baseaddr; }
     // else { off=p->mfile.off; }

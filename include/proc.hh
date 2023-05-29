@@ -43,7 +43,7 @@ namespace proc
         tinystl::unordered_set<Task*> tasks;
         SharedPtr<File> files[MaxOpenFile];
         tinystl::string name;
-        // todo: 以下为临时的FAT接口，需要修改
+        // @todo 以下为临时的FAT接口，需要修改
         dirent *cwd;
         mapped_file mfile;    //映射的文件的范围
 

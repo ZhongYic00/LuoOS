@@ -22,7 +22,7 @@ namespace syscall
         char *a_buf = (char*)ctx.x(10);
         size_t a_len = ctx.x(11);
         if(a_buf == nullptr) {
-            // todo: 当a_buf == nullptr时改为由系统分配缓冲区
+            // @todo 当a_buf == nullptr时改为由系统分配缓冲区
             a_len = 0;
             return statcode::err;
         }
@@ -31,7 +31,7 @@ namespace syscall
         struct fs::dirent *de = curproc->cwd;
         char path[FAT32_MAX_PATH];
         char *s;  // s为path的元素指针
-        // todo: 路径处理过程考虑包装成类
+        // @todo 路径处理过程考虑包装成类
         if (de->parent == nullptr) { s = "/"; } // s为字符串指针，必须指向双引号字符串"/"
         else {
             s = path + FAT32_MAX_PATH - 1;
@@ -81,9 +81,9 @@ namespace syscall
     }
     xlen_t mkDirAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_dirfd = ctx.x(10); // todo: 需要兼容AT_FDCWD的情况(-100)
+        int a_dirfd = ctx.x(10); // @todo 需要兼容AT_FDCWD的情况(-100)
         const char *a_path = (const char*)ctx.x(11);
-        mode_t a_mode = ctx.x(12); // todo: 还没用上
+        mode_t a_mode = ctx.x(12); // @todo 还没用上
         if(fdOutRange(a_dirfd) || a_path == nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
@@ -104,7 +104,7 @@ namespace syscall
     }
     xlen_t unlinkAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_dirfd = ctx.x(10); // todo: 需要兼容AT_FDCWD的情况(-100)
+        int a_dirfd = ctx.x(10); // @todo 需要兼容AT_FDCWD的情况(-100)
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12); // 这玩意有什么用？
         if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
@@ -119,9 +119,9 @@ namespace syscall
     }
     xlen_t linkAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_olddirfd = ctx.x(10); // todo: 需要兼容AT_FDCWD的情况(-100)
+        int a_olddirfd = ctx.x(10); // @todo 需要兼容AT_FDCWD的情况(-100)
         const char *a_oldpath = (const char*)ctx.x(11);
-        int a_newdirfd = ctx.x(12); // todo: 需要兼容AT_FDCWD的情况(-100)
+        int a_newdirfd = ctx.x(12); // @todo 需要兼容AT_FDCWD的情况(-100)
         const char *a_newpath = (const char*)ctx.x(13);
         int a_flags = ctx.x(14);
         if(fdOutRange(a_olddirfd) || fdOutRange(a_newdirfd) || a_oldpath==nullptr || a_newpath==nullptr) { return statcode::err; }
@@ -223,7 +223,7 @@ namespace syscall
     }
     xlen_t openAt() {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_dirfd = ctx.x(10); // todo: 需要兼容AT_FDCWD的情况(-100)
+        int a_dirfd = ctx.x(10); // @todo 需要兼容AT_FDCWD的情况(-100)
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12);
         mode_t a_mode = ctx.x(13);
@@ -387,7 +387,7 @@ namespace syscall
         assert(rt==content.size());
         fs::eput(testfile);
         Log(info,"eread success\n---------------------------------------------------------");
-        printf("%s\n", buf); // todo: printf字符串结尾会输出奇怪字符
+        printf("%s\n", buf); // @todo printf字符串结尾会输出奇怪字符
         content="Hello, world!";
         testfile=fs::ename2("/test.txt", shit);
         rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
