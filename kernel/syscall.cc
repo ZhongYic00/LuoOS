@@ -87,8 +87,8 @@ namespace syscall
         if(fdOutRange(a_dirfd) || a_path == nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        char path[FAT32_MAX_PATH];
-        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
+        char *path = (char*)patharr.buff;
         SharedPtr<fs::File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; }
         struct fs::dirent *ep;
@@ -110,8 +110,8 @@ namespace syscall
         if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        char path[FAT32_MAX_PATH];
-        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
+        char *path = (char*)patharr.buff;
         SharedPtr<fs::File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; } // 非绝对路径
 
@@ -127,9 +127,10 @@ namespace syscall
         if(fdOutRange(a_olddirfd) || fdOutRange(a_newdirfd) || a_oldpath==nullptr || a_newpath==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        char oldpath[FAT32_MAX_PATH], newpath[FAT32_MAX_PATH];
-        strncpy(oldpath, a_oldpath, FAT32_MAX_PATH); // todo: 是否能这样copy？
-        strncpy(newpath, a_newpath, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        klib::ByteArray oldpatharr = curproc->vmar.copyinstr((xlen_t)a_oldpath, FAT32_MAX_PATH);
+        klib::ByteArray newpatharr = curproc->vmar.copyinstr((xlen_t)a_newpath, FAT32_MAX_PATH);
+        char *oldpath = (char*)oldpatharr.buff;
+        char *newpath = (char*)newpatharr.buff;
         SharedPtr<fs::File> f1, f2;
         if(*oldpath != '/') { f1 = curproc->files[a_olddirfd]; }
         if(*newpath != '/') { f2 = curproc->files[a_newdirfd]; }
@@ -142,8 +143,9 @@ namespace syscall
         int a_flags = ctx.x(11); // 没用上
         if(a_devpath == nullptr) { return statcode::err; }
 
-        char devpath[FAT32_MAX_PATH];
-        strncpy(devpath, a_devpath, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        auto curproc = kHartObjs.curtask->getProcess();
+        klib::ByteArray devpatharr = curproc->vmar.copyinstr((xlen_t)a_devpath, FAT32_MAX_PATH);
+        char *devpath = (char*)devpatharr.buff;
         if(strncmp("/",devpath,2) == 0) {
             printf("path error\n");
             return statcode::err;
@@ -202,8 +204,8 @@ namespace syscall
         if(a_path == nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        char path[FAT32_MAX_PATH];
-        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
+        char *path = (char*)patharr.buff;
         struct fs::dirent *ep = fs::ename(path);
         if(ep == nullptr) { return statcode::err; }
         fs::elock(ep);
@@ -228,8 +230,8 @@ namespace syscall
         if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        char path[FAT32_MAX_PATH];
-        strncpy(path, a_path, FAT32_MAX_PATH); // todo: 是否能这样copy？
+        klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
+        char *path = (char*)patharr.buff;
         SharedPtr<fs::File> f1, f2;
         if(a_path[0] != '/') { f2 = curproc->files[a_dirfd]; }
         struct fs::dirent *ep;
@@ -366,7 +368,7 @@ namespace syscall
         proc::clone(kHartObjs.curtask);
         return statcode::ok;
     }
-    int testmount(){
+    xlen_t testmount(){
         int rt=fs::fat32_init();
         kHartObjs.curtask->getProcess()->cwd = fs::ename("/");
         printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
