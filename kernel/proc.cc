@@ -23,6 +23,13 @@ xlen_t Process::newKstack(){
     return vm::pn2addr(kstackppn+1)-1;
 }
 
+Task* Process::newKTask(){
+    auto thrd=new (kGlobObjs.taskMgr) KTask(0,this->pid(),proc::UserStackDefault);
+    thrd->kctx.kstack=(ptr_t)newKstack();
+    thrd->kctx.sp()=(xlen_t)thrd->kctx.kstack;
+    addTask(thrd);
+    kGlobObjs.scheduler.add(thrd);
+}
 Task* Process::newTask(){
     // auto thrd=kGlobObjs.taskMgr.alloc(0,this->pid(),proc::UserStackDefault);
     auto thrd=new (kGlobObjs.taskMgr) Task(0,this->pid(),proc::UserStackDefault);
@@ -61,11 +68,14 @@ void Task::switchTo(){
         csrWrite(sepc,ctx.pc);
         auto proc=getProcess();
     } else {
-        lastpriv=Priv::User;
+        if(lastpriv!=Priv::AlwaysKernel)lastpriv=Priv::User;
         // csrWrite(satp,kctx.satp);
         // ExecInst(sfence.vma);
         register ptr_t t6 asm("t6")=kctx.gpr;
         restoreContext();
+        /// @bug suppose this swap has problem when switching process
+        csrSwap(sscratch,t6);
+        csrSet(sstatus,BIT(csr::mstatus::sie));
         ExecInst(ret);
     }
     // task->getProcess()->vmar.print();
@@ -80,6 +90,11 @@ void Process::print(){
     Log(info,"Process[%d]",pid());
     TRACE(vmar.print();)
     Log(info,"===========");
+}
+Process* proc::createKProcess(){
+    auto proc=new (kGlobObjs.procMgr) Process(0,0);
+    proc->newKTask();
+    return proc;
 }
 Process* proc::createProcess(){
     // auto proc=kGlobObjs.procMgr.alloc(0,0);
