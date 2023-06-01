@@ -28,7 +28,7 @@ namespace proc
         ptr_t kstack;
         xlen_t satp;
     };
-    
+
     class Tms {
         private:
             long m_tms_utime;
@@ -45,14 +45,6 @@ namespace proc
                 m_tms_cstime = a_tms.m_tms_cstime;
                 return *this;
             }
-    };
-    struct UtSName {
-        char sysname[65];
-        char nodename[65];
-        char release[65];
-        char version[65];
-        char machine[65];
-        char domainname[65];
     };
 
     struct Task;

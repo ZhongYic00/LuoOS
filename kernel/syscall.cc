@@ -357,31 +357,48 @@ namespace syscall
     xlen_t times(void) {
         auto &ctx = kHartObjs.curtask->ctx;
         proc::Tms *a_tms = (proc::Tms*)ctx.x(10);
-        // if(a_tms == nullptr) { return statcode::err; } // a_tms留空时不管tms只返回xticks？
+        // if(a_tms == nullptr) { return statcode::err; } // a_tms留空时不管tms只返回ticks？
 
         auto curproc = kHartObjs.curtask->getProcess();
         if(a_tms != nullptr) { curproc->vmar.copyout((xlen_t)a_tms, klib::ByteArray((uint8_t*)&curproc->ti, sizeof(proc::Tms))); }
         // acquire(&tickslock);
-        // int xticks = (int)(ticks/INTERVAL);
-        int xticks = 0; // todo@ timer相关
+        // todo@ timer相关
+        // int ticks = (int)(ticks/INTERVAL);
+        int ticks = 0;
         // release(&tickslock);
 
-        return xticks;
+        return ticks;
     }
     xlen_t uName(void) {
         auto &ctx = kHartObjs.curtask->ctx;
-        struct proc::UtSName *a_uts = (struct proc::UtSName*)ctx.x(10);
+        struct UtSName *a_uts = (struct UtSName*)ctx.x(10);
         if(a_uts == nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        static struct proc::UtSName uts = { "domainname", "machine", "nodename", "release", "sysname", "version" };
+        static struct UtSName uts = { "domainname", "machine", "nodename", "release", "sysname", "version" };
         curproc->vmar.copyout((xlen_t)a_uts, klib::ByteArray((uint8_t*)&uts, sizeof(uts)));
-        // todo@ 需不需要优化？
-        ExecInst(fence);
-        ExecInst(fence.i);
-        ExecInst(sfence.vma);
-        ExecInst(fence);
-        ExecInst(fence.i);
+        // todo@ 这里是干些啥？
+        // ExecInst(fence);
+        // ExecInst(fence.i);
+        // ExecInst(sfence.vma);
+        // ExecInst(fence);
+        // ExecInst(fence.i);
+
+        return statcode::ok;
+    }
+    xlen_t getTimeOfDay() {
+        auto &ctx = kHartObjs.curtask->ctx;
+        TimeSpec *a_ts = (TimeSpec*)ctx.x(10);
+        if(a_ts == nullptr) { return statcode::err; }
+    
+        auto curproc = kHartObjs.curtask->getProcess();
+        xlen_t ticks;
+        asm volatile("rdtime %0" : "=r" (ticks) ); // todo@ 优化
+        // todo@ timer相关
+        // #define CLK_FREQ 8900000
+        // TimeSpec ts(ticks/CLK_FREQ, ((ticks/(CLK_FREQ/100000))%100000)*10);
+        TimeSpec ts;
+        curproc->vmar.copyout((xlen_t)a_ts, klib::ByteArray((uint8_t*)&ts, sizeof(ts)));
 
         return statcode::ok;
     }
@@ -477,6 +494,7 @@ namespace syscall
         syscallPtrs[syscalls::yield] = syscall::sysyield;
         syscallPtrs[syscalls::times] = syscall::times;
         syscallPtrs[syscalls::uname] = syscall::uName;
+        syscallPtrs[syscalls::gettimeofday] = syscall::getTimeOfDay;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
         syscallPtrs[syscalls::clone] = syscall::clone;
     }

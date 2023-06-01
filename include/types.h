@@ -7,7 +7,7 @@ typedef __UINT32_TYPE__ word_t;
 typedef __UINT8_TYPE__ uint8_t;
 typedef void (*hook_t)(void);
 typedef xlen_t (*syscall_t)(void);
-
+// 搬FAT时顺便搬过来的
 typedef unsigned int   uint;
 typedef unsigned short ushort;
 typedef unsigned char  uchar;
@@ -23,18 +23,29 @@ typedef uint64 pid_t;
 typedef unsigned int mode_t;
 typedef uint32 uid_t;
 typedef uint32 gid_t;
-// typedef unsigned int size_t;
 typedef uint32 dev_t;
 typedef uint64 ino_t;
 typedef uint32 nlink_t;
 typedef uint32 off_t;
 typedef uint32 blkcnt_t;
 typedef uint32 blksize_t;
-typedef struct
-{
-    uint64 sec;  // 自 Unix 纪元起的秒数
-    uint64 usec; // 微秒数
-} TimeVal;
+typedef long time_t;
+struct UtSName {
+    char sysname[65];
+    char nodename[65];
+    char release[65];
+    char version[65];
+    char machine[65];
+    char domainname[65];
+};
+class TimeSpec {
+    private:
+        time_t m_tv_sec;  /* 秒 */
+        long m_tv_nsec; /* 纳秒, 范围在0~999999999 */
+    public:
+        TimeSpec():m_tv_sec(0), m_tv_nsec(0) {}
+        TimeSpec(time_t a_tv_sec, long a_tv_nsec):m_tv_sec(a_tv_sec), m_tv_nsec(a_tv_nsec) {}
+};
 #define NULL 0
 #define readb(addr) (*(volatile uint8 *)(addr))     
 #define readw(addr) (*(volatile uint16 *)(addr))    

@@ -39,6 +39,7 @@ namespace sys
         yield=124,
         times=153,
         uname=160,
+        gettimeofday=169,
         getpid=172,
         getppid=173,
         clone=220,
