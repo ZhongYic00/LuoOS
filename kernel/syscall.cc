@@ -376,6 +376,12 @@ namespace syscall
         auto curproc = kHartObjs.curtask->getProcess();
         static struct proc::UtSName uts = { "domainname", "machine", "nodename", "release", "sysname", "version" };
         curproc->vmar.copyout((xlen_t)a_uts, klib::ByteArray((uint8_t*)&uts, sizeof(uts)));
+        // todo@ 需不需要优化？
+        ExecInst(fence);
+        ExecInst(fence.i);
+        ExecInst(sfence.vma);
+        ExecInst(fence);
+        ExecInst(fence.i);
 
         return statcode::ok;
     }
