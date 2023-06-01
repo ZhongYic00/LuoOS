@@ -18,30 +18,30 @@ int main(){
     if(sys::syscall(sys::syscalls::clone)!=0){
         printf("parent return to here");
         ischild=false;
-        int ret=sys::syscall1(sys::syscalls::wait,0);
-        printf("wait ret=%d\n",ret);
+        // int ret=sys::syscall1(sys::syscalls::wait,-1);
+        // printf("wait ret=%d\n",ret);
     }else{
         printf("child return to here");
         ischild=true;
-        sys::syscall(sys::syscalls::exit);
+        // sys::syscall(sys::syscalls::exit);
     }
-    // if(sys::syscall(sys::syscalls::clone)==0){
-    //     printf("parent of %s return to here",!ischild?"parent":"child");
-    //     if(!ischild){
-    //         char str[500]="test pipe write";
-    //         for(int i=0;i<sizeof(str);i++)write(pipe[1],(xlen_t)str+i,1);
-    //         printf("pipe write success!");
-    //     } else {
-    //         for(int i=0;i<6;i++){
-    //             char readbuf[101];
-    //             read(pipe[0],(xlen_t)readbuf,sizeof(readbuf));
-    //             printf("pipe read '%s'",readbuf);
-    //         }
-    //         printf("pipe read success!");
-    //     }
-    //    }else{
-    //     printf("child of %s return to here",!ischild?"parent":"child");
-    // }
+    if(sys::syscall(sys::syscalls::clone)==0){
+        printf("parent of %s return to here",!ischild?"parent":"child");
+        if(!ischild){
+            char str[500]="test pipe write";
+            for(int i=0;i<sizeof(str);i++)write(pipe[1],(xlen_t)str+i,1);
+            printf("pipe write success!");
+        } else {
+            for(int i=0;i<6;i++){
+                char readbuf[101];
+                read(pipe[0],(xlen_t)readbuf,sizeof(readbuf));
+                printf("pipe read '%s'",readbuf);
+            }
+            printf("pipe read success!");
+        }
+       }else{
+        printf("child of %s return to here",!ischild?"parent":"child");
+    }
     // while(true)
     // {
     //     int i=10;

@@ -21,6 +21,7 @@ namespace proc
     {
         xlen_t gpr[30];
         constexpr inline xlen_t& x(int r){return gpr[r-1];}
+        inline xlen_t& ra(){return x(1);}
         inline xlen_t& a0(){return x(10);}
         inline xlen_t& sp(){return x(2);}
         xlen_t pc;
@@ -63,6 +64,7 @@ namespace proc
         inline SharedPtr<File> ofile(int fd){return files[fd];}
         Task* newTask();
         Task* newTask(const Task &other,bool allocStack=true);
+        Task* newKTask();
         void print();
         int fdAlloc(SharedPtr<File> a_file, int a_fd=-1);
         void exit(int status);
@@ -73,8 +75,8 @@ namespace proc
         inline void addTask(Task* task){ tasks.insert(task); }
     };
     struct Task:public IdManagable,public Scheduable{ // a.k.a. kthread
-        enum class Priv:bool{
-            User,Kernel
+        enum class Priv:uint8_t{
+            User,Kernel,AlwaysKernel
         };
         Context ctx;
         KContext kctx;
@@ -101,6 +103,10 @@ namespace proc
         inline klib::string toString() const{
             return klib::format("Task<%d>",id);
         }
+    };
+    struct KTask:public Task{
+        inline KTask(tid_t tid,prior_t pri,tid_t proc,xlen_t stack):Task(tid,pri,proc,stack){lastpriv=Priv::AlwaysKernel;}
+        inline KTask(prior_t pri,tid_t proc,xlen_t stack):KTask(id,pri,proc,stack){}
     };
     typedef ObjManager<Process> ProcManagerBase;
     typedef ObjManager<Task> TaskManager;

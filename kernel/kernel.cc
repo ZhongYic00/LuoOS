@@ -91,7 +91,9 @@ static void infoInit(){
         Log(info,"{0x%lx 0x%lx}",*(((vm::segment_t*)&kInfo.segments)+i));
     }
 }
-
+void idle(){
+    while(true)ExecInst(wfi);
+}
 extern void schedule();
 extern void program0();
 extern "C" void strapwrapper();
@@ -122,9 +124,13 @@ void start_kernel(int hartid){
     for(int i=0;i<10;i++)
         printf("%d:Hello LuoOS!\n",i);
     extern char _uimg_start;
+    auto kidle=proc::createKProcess();
+    kidle->defaultTask()->kctx.ra()=(xlen_t)idle;
     auto uproc=proc::createProcess();
     uproc->name="uprog00";
     uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
+    binit();
+    // fs::fat32_init();
     // uproc=proc::createProcess();
     // uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
     // kGlobObjs.scheduler.add(uproc->defaultTask());
