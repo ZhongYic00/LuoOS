@@ -368,6 +368,17 @@ namespace syscall
 
         return xticks;
     }
+    xlen_t uName(void) {
+        auto &ctx = kHartObjs.curtask->ctx;
+        struct proc::UtSName *a_uts = (struct proc::UtSName*)ctx.x(10);
+        if(a_uts == nullptr) { return statcode::err; }
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        static struct proc::UtSName uts = { "domainname", "machine", "nodename", "release", "sysname", "version" };
+        curproc->vmar.copyout((xlen_t)a_uts, klib::ByteArray((uint8_t*)&uts, sizeof(uts)));
+
+        return statcode::ok;
+    }
     xlen_t getPid(){
         return kHartObjs.curtask->getProcess()->pid();
     }
@@ -459,6 +470,7 @@ namespace syscall
         syscallPtrs[syscalls::fstat] = syscall::fStat;
         syscallPtrs[syscalls::yield] = syscall::sysyield;
         syscallPtrs[syscalls::times] = syscall::times;
+        syscallPtrs[syscalls::uname] = syscall::uName;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
         syscallPtrs[syscalls::clone] = syscall::clone;
     }
