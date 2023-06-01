@@ -37,6 +37,7 @@ namespace sys
         write=64,
         fstat=80,
         yield=124,
+        times=153,
         getpid=172,
         getppid=173,
         clone=220,

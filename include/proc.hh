@@ -28,6 +28,23 @@ namespace proc
         ptr_t kstack;
         xlen_t satp;
     };
+    class Tms {
+        private:
+            long m_tms_utime;
+            long m_tms_stime;
+            long m_tms_cutime;
+            long m_tms_cstime;
+        public:
+            Tms(): m_tms_utime(0), m_tms_stime(0), m_tms_cutime(0), m_tms_cstime(0) {}
+            Tms(const Tms &a_tms): m_tms_utime(a_tms.m_tms_utime), m_tms_stime(a_tms.m_tms_stime), m_tms_cutime(a_tms.m_tms_cutime), m_tms_cstime(a_tms.m_tms_cstime) {}
+            const Tms& operator=(const Tms &a_tms) {
+                m_tms_utime = a_tms.m_tms_utime;
+                m_tms_stime = a_tms.m_tms_stime;
+                m_tms_cutime = a_tms.m_tms_cutime;
+                m_tms_cstime = a_tms.m_tms_cstime;
+                return *this;
+            }
+    };
 
     struct Task;
     constexpr xlen_t UserStackDefault=0x7fffffff;
@@ -43,7 +60,8 @@ namespace proc
         tinystl::unordered_set<Task*> tasks;
         SharedPtr<File> files[MaxOpenFile];
         tinystl::string name;
-        // @todo 以下为临时的FAT接口，需要修改
+        // @todo 以下为临时的接口，需要修改
+        Tms ti;
         dirent *cwd;
         mapped_file mfile;    //映射的文件的范围
 

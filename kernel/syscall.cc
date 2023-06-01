@@ -354,6 +354,20 @@ namespace syscall
         yield();
         return statcode::ok;
     }
+    xlen_t times(void) {
+        auto &ctx = kHartObjs.curtask->ctx;
+        proc::Tms *a_tms = (proc::Tms*)ctx.x(10);
+        // if(a_tms == nullptr) { return statcode::err; } // a_tms留空时不管tms只返回xticks？
+
+        auto curproc = kHartObjs.curtask->getProcess();
+        if(a_tms != nullptr) { curproc->vmar.copyout((xlen_t)a_tms, klib::ByteArray((uint8_t*)&curproc->ti, sizeof(proc::Tms))); }
+        // acquire(&tickslock);
+        // int xticks = (int)(ticks/INTERVAL);
+        int xticks = 0; // todo@ timer相关
+        // release(&tickslock);
+
+        return xticks;
+    }
     xlen_t getPid(){
         return kHartObjs.curtask->getProcess()->pid();
     }
@@ -388,13 +402,14 @@ namespace syscall
         fs::eput(testfile);
         Log(info,"eread success\n---------------------------------------------------------");
         printf("%s\n", buf); // @todo printf字符串结尾会输出奇怪字符
-        content="Hello, world!";
-        testfile=fs::ename2("/test.txt", shit);
-        rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
-        assert(rt==content.size());
-        fs::eput(testfile);
-        Log(info,"eread success\n---------------------------------------------------------");
-        printf("%s\n", buf);
+        // 新的fat32.img装了比赛测例的riscv64文件夹，没有test.txt
+        // content="Hello, world!";
+        // testfile=fs::ename2("/test.txt", shit);
+        // rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
+        // assert(rt==content.size());
+        // fs::eput(testfile);
+        // Log(info,"eread success\n---------------------------------------------------------");
+        // printf("%s\n", buf);
         return rt;
     }
     void init(){
@@ -443,6 +458,7 @@ namespace syscall
         syscallPtrs[syscalls::write] = syscall::write;
         syscallPtrs[syscalls::fstat] = syscall::fStat;
         syscallPtrs[syscalls::yield] = syscall::sysyield;
+        syscallPtrs[syscalls::times] = syscall::times;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
         syscallPtrs[syscalls::clone] = syscall::clone;
     }
