@@ -135,7 +135,7 @@ void start_kernel(int hartid){
         bwrite(buf);
         brelse(buf);
     }
-    fs::fat32_init();
+    // fs::fat32_init();
     // uproc=proc::createProcess();
     // uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
     // kGlobObjs.scheduler.add(uproc->defaultTask());

@@ -3,7 +3,8 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/thirdparty/tinystl/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",
