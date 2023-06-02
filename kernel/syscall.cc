@@ -19,6 +19,46 @@ namespace syscall
         if(b)return 1;
         return -1;
     }
+    xlen_t testbio(){
+        for(int i=0;i<35;i++){
+            auto buf=bread(0,i);
+            bwrite(buf);
+            brelse(buf);
+        }
+    }
+    xlen_t testidle(){
+        sleep();
+    }
+    xlen_t testmount(){
+        int rt=fs::fat32_init();
+        kHartObjs.curtask->getProcess()->cwd = fs::ename("/");
+        printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
+        SharedPtr<fs::File> shit;
+        auto testfile=fs::create2("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
+        assert(rt==0);
+        Log(info,"create2 success\n---------------------------------------------------------");
+        klib::string content="test write";
+        rt=fs::ewrite(testfile,0,(xlen_t)content.c_str(),0,content.size());
+        assert(rt==content.size());
+        fs::eput(testfile);
+        Log(info,"ewrite success\n---------------------------------------------------------");
+        testfile=fs::ename2("/testfile",shit);
+        char buf[2*(content.size())];
+        rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
+        assert(rt==content.size());
+        fs::eput(testfile);
+        Log(info,"eread success\n---------------------------------------------------------");
+        printf("%s\n", buf); // @todo printf字符串结尾会输出奇怪字符
+        // 新的fat32.img装了比赛测例的riscv64文件夹，没有test.txt
+        // content="Hello, world!";
+        // testfile=fs::ename2("/test.txt", shit);
+        // rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
+        // assert(rt==content.size());
+        // fs::eput(testfile);
+        // Log(info,"eread success\n---------------------------------------------------------");
+        // printf("%s\n", buf);
+        return rt;
+    }
     xlen_t getCwd(void) {
         auto &ctx = kHartObjs.curtask->ctx;
         char *a_buf = (char*)ctx.x(10);
@@ -323,6 +363,11 @@ namespace syscall
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
         return file->write(uva,len);
     }
+    xlen_t exit(){
+        auto status=kHartObjs.curtask->ctx.a0();
+        kHartObjs.curtask->getProcess()->exit(status);
+        yield();
+    }
     xlen_t fStat() {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
@@ -416,41 +461,6 @@ namespace syscall
         auto pid=proc::clone(kHartObjs.curtask);
         return pid;
     }
-    xlen_t testmount(){
-        int rt=fs::fat32_init();
-        kHartObjs.curtask->getProcess()->cwd = fs::ename("/");
-        printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
-        SharedPtr<fs::File> shit;
-        auto testfile=fs::create2("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
-        assert(rt==0);
-        Log(info,"create2 success\n---------------------------------------------------------");
-        klib::string content="test write";
-        rt=fs::ewrite(testfile,0,(xlen_t)content.c_str(),0,content.size());
-        assert(rt==content.size());
-        fs::eput(testfile);
-        Log(info,"ewrite success\n---------------------------------------------------------");
-        testfile=fs::ename2("/testfile",shit);
-        char buf[2*(content.size())];
-        rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
-        assert(rt==content.size());
-        fs::eput(testfile);
-        Log(info,"eread success\n---------------------------------------------------------");
-        printf("%s\n", buf); // @todo printf字符串结尾会输出奇怪字符
-        // 新的fat32.img装了比赛测例的riscv64文件夹，没有test.txt
-        // content="Hello, world!";
-        // testfile=fs::ename2("/test.txt", shit);
-        // rt=fs::eread(testfile,0,(xlen_t)buf,0,content.size());
-        // assert(rt==content.size());
-        // fs::eput(testfile);
-        // Log(info,"eread success\n---------------------------------------------------------");
-        // printf("%s\n", buf);
-        return rt;
-    }
-    xlen_t exit(){
-        auto status=kHartObjs.curtask->ctx.a0();
-        kHartObjs.curtask->getProcess()->exit(status);
-        yield();
-    }
     int waitpid(tid_t pid,xlen_t wstatus,int options){
         Log(info,"waitpid(pid=%d,options=%d)",pid,options);
         auto curproc=kHartObjs.curtask->getProcess();
@@ -492,16 +502,6 @@ namespace syscall
         pid_t pid=ctx.x(10);
         xlen_t wstatus=ctx.x(11);
         return waitpid(pid,wstatus,0);
-    }
-    xlen_t testbio(){
-        for(int i=0;i<35;i++){
-            auto buf=bread(0,i);
-            bwrite(buf);
-            brelse(buf);
-        }
-    }
-    xlen_t testidle(){
-        sleep();
     }
     int execve(klib::ByteArray buf,char **argv,char **envp){
         /// @todo reset cur proc vmar, refer to man 2 execve for details
