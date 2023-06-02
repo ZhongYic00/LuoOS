@@ -8,6 +8,7 @@ namespace sched
         Init,Ready,Running,Pending,Zombie,
     };
     typedef short prior_t;
+    constexpr int maxPrior=1;
     struct Scheduable{
         prior_t prior;
         State state;
@@ -15,9 +16,9 @@ namespace sched
     };
     using klib::list;
     class Scheduler{
-        list<Scheduable*,true> ready;
+        list<Scheduable*,true> ready[maxPrior+1];
         list<Scheduable*> pending;
-        klib::list<Scheduable*,true>::iterator cur;
+        klib::list<Scheduable*,true>::iterator cur[maxPrior+1];
     public:
         Scheduable *next();
         Scheduler();

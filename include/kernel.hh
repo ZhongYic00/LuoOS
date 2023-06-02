@@ -21,6 +21,7 @@ namespace sys
         testyield,
         testwrite,
         testbio,
+        testidle,
         testmount,
         getcwd=17,
         dup=23,

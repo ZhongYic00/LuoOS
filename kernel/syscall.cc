@@ -3,6 +3,7 @@
 #include "stat.h"
 #include "fat.hh"
 #include "buf.h"
+#include "ld.hh"
 
 syscall_t syscallPtrs[sys::syscalls::nSyscalls];
 extern void _strapexit();
@@ -499,6 +500,18 @@ namespace syscall
             brelse(buf);
         }
     }
+    xlen_t testidle(){
+        sleep();
+    }
+    int execve(klib::ByteArray buf,char **argv,char **envp){
+        /// @todo reset cur proc vmar, refer to man 2 execve for details
+        //kHartObjs.curtask->getProcess()->vmar.reset();
+        /// @todo destroy other threads
+        kHartObjs.curtask->ctx.pc=
+            ld::loadElf(buf.buff,kHartObjs.curtask->getProcess()->vmar);
+        /// @todo reset curtask cpu context
+    }
+    int execve(){}
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -506,6 +519,7 @@ namespace syscall
         syscallPtrs[syscalls::testyield]=sysyield;
         syscallPtrs[syscalls::testwrite]=write;
         syscallPtrs[syscalls::testbio]=testbio;
+        syscallPtrs[syscalls::testidle]=testidle;
         syscallPtrs[syscalls::testmount]=testmount;
         // syscallPtrs[SYS_fcntl] = sys_fcntl;
         // syscallPtrs[SYS_ioctl] = sys_ioctl;

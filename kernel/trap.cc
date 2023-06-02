@@ -12,18 +12,19 @@ static hook_t hooks[]={schedule};
 
 extern void nextTimeout();
 void timerInterruptHandler(){
-    for(auto hook:hooks)hook();
     nextTimeout();
-    schedule();
+    for(auto hook:hooks)hook();
 }
 extern syscall_t syscallPtrs[];
 void uecallHandler(){
+    /// @bug should get from ctx
     register int ecallId asm("a7");
     xlen_t &rtval=kHartObjs.curtask->ctx.x(10);
     kHartObjs.curtask->ctx.pc+=4;
     Log(debug,"uecall [%d]",ecallId);
     using namespace sys;
     if(ecallId<nSyscalls){
+        csrSet(sstatus,BIT(csr::mstatus::sie));
         rtval=syscallPtrs[ecallId]();
         Log(info,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
     } else {
