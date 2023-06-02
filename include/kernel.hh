@@ -11,6 +11,7 @@
 extern "C" void start_kernel(int hartid);
 namespace syscall{
     void init();
+    int sleep();
 }
 namespace sys
 {
@@ -19,6 +20,7 @@ namespace sys
         testexit,
         testyield,
         testwrite,
+        testbio,
         testmount,
         getcwd=17,
         dup=23,
@@ -36,6 +38,7 @@ namespace sys
         read=63,
         write=64,
         fstat=80,
+        exit=93,
         yield=124,
         times=153,
         uname=160,
@@ -43,6 +46,7 @@ namespace sys
         getpid=172,
         getppid=173,
         clone=220,
+        wait=260,
         nSyscalls,
     };
     enum statcode{

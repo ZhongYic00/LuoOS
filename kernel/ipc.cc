@@ -1,8 +1,7 @@
 #include "ipc.hh"
 #include "kernel.hh"
-namespace syscall{
-extern int sleep();
-}
+// #define moduleLevel LogLevel::debug
+
 namespace pipe
 {
 

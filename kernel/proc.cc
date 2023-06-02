@@ -4,7 +4,7 @@
 
 using namespace proc;
 // using klib::make_shared;
-#define moduleLevel LogLevel::debug
+// #define moduleLevel LogLevel::debug
 Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
 }
@@ -23,6 +23,13 @@ xlen_t Process::newKstack(){
     return vm::pn2addr(kstackppn+1)-1;
 }
 
+Task* Process::newKTask(){
+    auto thrd=new (kGlobObjs.taskMgr) KTask(0,this->pid(),proc::UserStackDefault);
+    thrd->kctx.kstack=(ptr_t)newKstack();
+    thrd->kctx.sp()=(xlen_t)thrd->kctx.kstack;
+    addTask(thrd);
+    kGlobObjs.scheduler.add(thrd);
+}
 Task* Process::newTask(){
     // auto thrd=kGlobObjs.taskMgr.alloc(0,this->pid(),proc::UserStackDefault);
     auto thrd=new (kGlobObjs.taskMgr) Task(0,this->pid(),proc::UserStackDefault);
@@ -61,11 +68,14 @@ void Task::switchTo(){
         csrWrite(sepc,ctx.pc);
         auto proc=getProcess();
     } else {
-        lastpriv=Priv::User;
+        if(lastpriv!=Priv::AlwaysKernel)lastpriv=Priv::User;
         // csrWrite(satp,kctx.satp);
         // ExecInst(sfence.vma);
         register ptr_t t6 asm("t6")=kctx.gpr;
         restoreContext();
+        /// @bug suppose this swap has problem when switching process
+        csrSwap(sscratch,t6);
+        csrSet(sstatus,BIT(csr::mstatus::sie));
         ExecInst(ret);
     }
     // task->getProcess()->vmar.print();
@@ -81,6 +91,11 @@ void Process::print(){
     TRACE(vmar.print();)
     Log(info,"===========");
 }
+Process* proc::createKProcess(){
+    auto proc=new (kGlobObjs.procMgr) Process(0,0);
+    proc->newKTask();
+    return proc;
+}
 Process* proc::createProcess(){
     // auto proc=kGlobObjs.procMgr.alloc(0,0);
     auto proc=new (kGlobObjs.procMgr) Process(0,0);
@@ -94,19 +109,44 @@ Process* proc::createProcess(){
     return proc;
 }
 Process* Task::getProcess(){ return kGlobObjs.procMgr[proc]; }
-void proc::clone(Task *task){
+proc::pid_t proc::clone(Task *task){
     auto proc=task->getProcess();
     Log(info,"clone(src=%p:[%d])",proc,proc->pid());
     TRACE(Log(info,"src proc VMAR:\n");proc->vmar.print();)
     auto newproc=new (kGlobObjs.procMgr) Process(*proc);
     newproc->newTask(*task,false);
-    newproc->defaultTask()->ctx.a0()=1;
+    newproc->defaultTask()->ctx.a0()=sys::statcode::ok;
     TRACE(newproc->vmar.print();)
+    return newproc->pid();
 }
 
-Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar){
+Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id){
     for(int i=0;i<MaxOpenFile;i++)files[i]=other.files[i];
 }
+void Process::exit(int status){
+    Log(info,"Proc[%d] exit(%d)",pid(),status);
+    
+    this->exitstatus=status;
+    /// @todo resource recycle
+
+    for(auto task:tasks){
+        kGlobObjs.scheduler.remove(task);
+    }
+
+    state=sched::Zombie;
+
+    auto task=parentProc()->defaultTask();
+    kGlobObjs.scheduler.wakeup(task);
+}
+void Process::zombieExit(){
+    Log(info,"Proc[%d] zombie exit",pid());
+    kGlobObjs.procMgr.del(this);
+}
+Process::~Process(){
+    for(auto task:tasks)kGlobObjs.taskMgr.del(task);
+    tasks.clear();
+}
+Process *Process::parentProc(){return kGlobObjs.procMgr[parent];}
 
 int Process::fdAlloc(SharedPtr<File> a_file, int a_fd){ // fd缺省值为-1，在头文件中定义
     if(a_fd < 0) {
