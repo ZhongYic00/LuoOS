@@ -1128,8 +1128,8 @@ int fs::do_mount(struct dirent *mountpoint,struct dirent *dev) {
     // initlock(&ecache.lock, "ecache");
     memset(&dev_fat[mount_num].root, 0, sizeof(dev_fat[mount_num].root));
     // initsleeplock(&root.lock, "entry");
-    dev_fat[mount_num]. root.attribute = (ATTR_DIRECTORY | ATTR_SYSTEM); 
-    dev_fat[mount_num].root.first_clus =dev_fat[mount_num]. root.cur_clus = dev_fat[mount_num].bpb.root_clus;
+    dev_fat[mount_num].root.attribute = (ATTR_DIRECTORY | ATTR_SYSTEM); 
+    dev_fat[mount_num].root.first_clus =dev_fat[mount_num].root.cur_clus = dev_fat[mount_num].bpb.root_clus;
     dev_fat[mount_num].root.valid = 1; 
     dev_fat[mount_num].root.prev = &dev_fat[mount_num].root;
     dev_fat[mount_num].root.next = &dev_fat[mount_num].root;
