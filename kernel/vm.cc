@@ -116,8 +116,7 @@ xlen_t PageTable::toSATP(PageTable &table){
 }
 
 VMO vm::VMO::clone() const{
-    PageMapping mapping=this->mapping;
-    PageNum &ppn=mapping.first.second,pages=mapping.second;
+    PageNum ppn=this->ppn(),pages=this->pages();
     switch(cloneType){
         case CloneType::shared:
             break;
@@ -128,6 +127,12 @@ VMO vm::VMO::clone() const{
         case CloneType::alloc:
             ppn=kGlobObjs.pageMgr->alloc(pages);
             break;
+        default:
+            panic("unknown cloneType!");
     }
-    return VMO(mapping,perm,cloneType);
+    return VMO{ppn,pages,cloneType};
+}
+VMO vm::VMO::alloc(PageNum pages,CloneType type){
+    PageNum ppn=kGlobObjs.pageMgr->alloc(pages);
+    return VMO{ppn,pages};
 }
