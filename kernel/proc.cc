@@ -5,7 +5,7 @@
 using namespace proc;
 // using klib::make_shared;
 // #define moduleLevel LogLevel::debug
-Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
+Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}),cwd(fs::ename("/")){
     kernel::createKernelMapping(vmar);
 }
 Process::Process(prior_t prior,tid_t parent):Process(id,prior,parent){}

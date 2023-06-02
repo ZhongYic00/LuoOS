@@ -12,6 +12,8 @@ namespace syscall
     using sys::statcode;
     using klib::SharedPtr;
     // using klib::make_shared;
+    // 前向引用
+    void yield();
     xlen_t none(){return 0;}
     xlen_t testexit(){
         static bool b=false;
