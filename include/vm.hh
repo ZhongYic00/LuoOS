@@ -4,6 +4,7 @@
 #include "common.h"
 #include "klib.hh"
 
+#define moduleLevel LogLevel::debug
 namespace vm
 {
     // struct alignas(4096) Page{char raw[4096];};
@@ -83,26 +84,35 @@ namespace vm
         }
     };
 
-    typedef klib::pair<klib::pair<PageNum,PageNum>,PageNum> PageMapping;
     class VMO{
+        const PageNum ppn_,pages_;
     public:
         enum class CloneType:uint8_t{
             clone,alloc,shared,
         };
-        const perm_t perm;
         const CloneType cloneType;
         
-        /**
-         * @brief {{vpn,ppn},pages}
-         */
-        const PageMapping mapping;
-        VMO(const PageMapping &mapping,perm_t perm,CloneType cloneType=CloneType::clone):mapping(mapping),perm(perm),cloneType(cloneType){}
+        VMO(PageNum ppn,PageNum pages,CloneType cloneType=CloneType::clone):ppn_(ppn),pages_(pages),cloneType(cloneType){}
         VMO clone() const;
-        inline PageNum pages() const{return mapping.second;}
-        inline PageNum vpn() const{return mapping.first.first;}
-        inline PageNum ppn() const{return mapping.first.second;}
-        inline klib::string toString() const{return klib::format("<VMO>{0x%lx=>0x%lx@%lx}\n",vpn(),ppn(),pages());}
+        inline PageNum pages() const{return pages_;}
+        inline PageNum ppn() const{return ppn_;}
+        inline klib::string toString() const{return klib::format("<VMO>@0x%lx[%lx]\n",ppn(),pages());}
+        static VMO alloc(PageNum pages,CloneType type=CloneType::clone);
     private:
+    };
+
+    struct PageMapping{
+        enum class MappingType:uint8_t{
+            Normal,MMap,
+        };
+        PageNum vpn;
+        VMO vmo;
+        const perm_t perm;
+        const MappingType type=MappingType::Normal;
+        inline PageNum ppn() const{return vmo.ppn();}
+        inline PageNum pages() const{return vmo.pages();}
+        inline klib::string toString() const{return klib::format("%lx=>%s",vpn,vmo.toString());}
+        inline PageMapping clone() const{return PageMapping{vpn,vmo.clone(),perm};}
     };
 
     class PageTable{
@@ -114,25 +124,24 @@ namespace vm
             if(root==nullptr)this->root=createPTNode();
             else this->root=root;
         }
-        inline PageTable(std::initializer_list<VMO> vmos,pgtbl_t root=nullptr):PageTable(root){
-            for(auto vmo:vmos){
-                switch(vmo.cloneType){
-                    case VMO::CloneType::clone:
-                        createMapping(vmo.mapping,vmo.perm); break;
-                    default:
-                        ;
-                }
-            }
-        }
+        // inline PageTable(std::initializer_list<VMO> vmos,pgtbl_t root=nullptr):PageTable(root){
+        //     for(auto vmo:vmos){
+        //         switch(vmo.cloneType){
+        //             case VMO::CloneType::clone:
+        //                 createMapping(vmo.mapping,vmo.perm); break;
+        //             default:
+        //                 ;
+        //         }
+        //     }
+        // }
         inline ptr_t getRoot(){ return root; }
         void createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm,int level=2);
         inline void createMapping(PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm){
             createMapping(root,vpn,ppn,pages,perm);
         }
-        inline void createMapping(const PageMapping &mapping,perm_t perm){
-            createMapping(mapping.first.first,mapping.first.second,mapping.second,perm);
+        inline void createMapping(const PageMapping &mapping){
+            createMapping(mapping.vpn,mapping.ppn(),mapping.pages(),mapping.perm);
         }
-        inline void createMapping(const VMO &vmo){createMapping(vmo.mapping,vmo.perm);}
         PageNum trans(PageNum vpn);
         inline xlen_t transaddr(xlen_t addr){
             return pn2addr(trans(addr2pn(addr)))+addr2offset(addr);
@@ -149,23 +158,23 @@ namespace vm
     public:
         using CloneType=VMO::CloneType;
         // @todo check initialize order
-        inline VMAR(const std::initializer_list<VMO> &vmos,pgtbl_t root=nullptr):vmos(vmos),pagetable(vmos,root){}
-        inline VMAR(const VMAR &other):vmos(),pagetable(){
-            for(const auto &vmo:other.vmos)map(vmo.clone());
+        inline VMAR(const std::initializer_list<PageMapping> &mappings,pgtbl_t root=nullptr):mappings(mappings),pagetable(root){for(auto &mapping:mappings)map(mapping);}
+        inline VMAR(const VMAR &other):pagetable(){
+            for(const auto &mapping:other.mappings)map(mapping.clone());
         }
-        inline void alloc(PageNum vpn,PageNum pages,perm_t perm){
-            PageNum ppn=0l;
-            VMO vmo((PageMapping){{vpn,ppn},pages},perm);
-            vmos.push_back(vmo);
-            pagetable.createMapping(vmo);
+        // inline void alloc(PageNum vpn,PageNum pages,perm_t perm){
+        //     PageNum ppn=0l;
+        //     // VMO vmo((PageMapping){{vpn,ppn},pages},perm);
+        //     // vmos.push_back(vmo);
+        //     // pagetable.createMapping(vmo);
+        // }
+        inline void map(const PageMapping& mapping){
+            Log(debug,"map %s",mapping.toString().c_str());
+            mappings.push_back(mapping);
+            pagetable.createMapping(mapping);
+            Log(debug,"after map, VMAR:%s",mappings.toString().c_str());
         }
-        inline void map(const VMO& vmo){
-            Log(debug,"map %s",vmo.toString().c_str());
-            vmos.push_back(vmo);
-            pagetable.createMapping(vmo);
-            Log(trace,"after map, VMAR:",vmos.toString().c_str());
-        }
-        inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm,CloneType ct=CloneType::clone){map(VMO({{vpn,ppn},pages},perm,ct));}
+        inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm,CloneType ct=CloneType::clone){map(PageMapping{vpn,VMO{ppn,pages,ct},perm});}
         inline void unmap();
         inline xlen_t satp(){return PageTable::toSATP(pagetable);}
         // @todo @bug what if region is on border?
@@ -194,11 +203,12 @@ namespace vm
         };
         inline Writer operator[](xlen_t vaddr){return Writer(vaddr,*this);}
         inline void print(){
-            Log(trace,"VMOs:\t%s",vmos.toString());
-            pagetable.print();
+            Log(trace,"Mappings:\t%s",mappings.toString().c_str());
+            TRACE(pagetable.print();)
         }
     private:
-        klib::list<VMO> vmos;
+        // klib::list<VMAR> children;
+        klib::list<PageMapping> mappings;
         PageTable pagetable;
     };
 
