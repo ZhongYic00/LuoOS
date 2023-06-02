@@ -11,8 +11,8 @@ static hook_t hooks[]={schedule};
 
 extern void nextTimeout();
 void timerInterruptHandler(){
-    for(auto hook:hooks)hook();
     nextTimeout();
+    for(auto hook:hooks)hook();
 }
 extern syscall_t syscallPtrs[];
 void uecallHandler(){

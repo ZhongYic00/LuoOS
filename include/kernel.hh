@@ -21,6 +21,7 @@ namespace sys
         testyield,
         testwrite,
         testbio,
+        testidle,
         dup=23,
         dup3=24,
         openat=56,

@@ -64,7 +64,7 @@ namespace proc
         inline SharedPtr<File> ofile(int fd){return files[fd];}
         Task* newTask();
         Task* newTask(const Task &other,bool allocStack=true);
-        Task* newKTask();
+        Task* newKTask(prior_t prior=0);
         void print();
         int fdAlloc(SharedPtr<File> a_file, int a_fd=-1);
         void exit(int status);
@@ -123,7 +123,7 @@ namespace proc
         }
     };
     Process* createProcess();
-    Process* createKProcess();
+    Process* createKProcess(prior_t prior);
     pid_t clone(Task* task);
 } // namespace proc
 

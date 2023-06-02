@@ -1,5 +1,6 @@
 #include "kernel.hh"
 #include "sched.hh"
+#include "ld.hh"
 
 syscall_t syscallPtrs[sys::syscalls::nSyscalls];
 extern void _strapexit();
@@ -199,6 +200,18 @@ namespace syscall
             brelse(buf);
         }
     }
+    int testidle(){
+        sleep();
+    }
+    int execve(klib::ByteArray buf,char **argv,char **envp){
+        /// @todo reset cur proc vmar, refer to man 2 execve for details
+        //kHartObjs.curtask->getProcess()->vmar.reset();
+        /// @todo destroy other threads
+        kHartObjs.curtask->ctx.pc=
+            ld::loadElf(buf.buff,kHartObjs.curtask->getProcess()->vmar);
+        /// @todo reset curtask cpu context
+    }
+    int execve(){}
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -206,6 +219,7 @@ namespace syscall
         syscallPtrs[syscalls::testyield]=sysyield;
         syscallPtrs[syscalls::testwrite]=write;
         syscallPtrs[syscalls::testbio]=testbio;
+        syscallPtrs[syscalls::testidle]=testidle;
         // syscallPtrs[SYS_getcwd] = sys_getcwd;
         // syscallPtrs[SYS_dup] = sys_dup;
         // syscallPtrs[SYS_dup3] = sys_dup3;

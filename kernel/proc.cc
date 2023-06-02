@@ -23,8 +23,8 @@ xlen_t Process::newKstack(){
     return vm::pn2addr(kstackppn+1)-1;
 }
 
-Task* Process::newKTask(){
-    auto thrd=new (kGlobObjs.taskMgr) KTask(0,this->pid(),proc::UserStackDefault);
+Task* Process::newKTask(prior_t prior){
+    auto thrd=new (kGlobObjs.taskMgr) KTask(prior,this->pid(),proc::UserStackDefault);
     thrd->kctx.kstack=(ptr_t)newKstack();
     thrd->kctx.sp()=(xlen_t)thrd->kctx.kstack;
     addTask(thrd);
@@ -67,6 +67,9 @@ void Task::switchTo(){
         csrWrite(sscratch,ctx.gpr);
         csrWrite(sepc,ctx.pc);
         auto proc=getProcess();
+        /// @todo chaos
+        csrClear(sstatus,1l<<csr::mstatus::spp);
+        csrSet(sstatus,BIT(csr::mstatus::spie));
     } else {
         if(lastpriv!=Priv::AlwaysKernel)lastpriv=Priv::User;
         // csrWrite(satp,kctx.satp);
@@ -91,9 +94,9 @@ void Process::print(){
     TRACE(vmar.print();)
     Log(info,"===========");
 }
-Process* proc::createKProcess(){
+Process* proc::createKProcess(prior_t prior){
     auto proc=new (kGlobObjs.procMgr) Process(0,0);
-    proc->newKTask();
+    proc->newKTask(prior);
     return proc;
 }
 Process* proc::createProcess(){

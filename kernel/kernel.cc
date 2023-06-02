@@ -8,6 +8,8 @@
 #include "sched.hh"
 #include "proc.hh"
 
+// #define moduleLevel LogLevel::info
+
 extern char _kstack_end;
 xlen_t kstack_end=(xlen_t)&_kstack_end;
 kernel::KernelGlobalObjs kGlobObjs;
@@ -92,7 +94,11 @@ static void infoInit(){
     }
 }
 void idle(){
-    while(true)ExecInst(wfi);
+    while(true){
+        Log(info,"kidle...");
+        /// @bug after interrupt, sepc not +4, always return to instr wfi ?
+        ExecInst(wfi);
+    }
 }
 extern void schedule();
 extern void program0();
@@ -124,7 +130,7 @@ void start_kernel(int hartid){
     for(int i=0;i<10;i++)
         printf("%d:Hello LuoOS!\n",i);
     extern char _uimg_start;
-    auto kidle=proc::createKProcess();
+    auto kidle=proc::createKProcess(sched::maxPrior);
     kidle->defaultTask()->kctx.ra()=(xlen_t)idle;
     auto uproc=proc::createProcess();
     uproc->name="uprog00";
@@ -135,8 +141,6 @@ void start_kernel(int hartid){
     // uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
     // kGlobObjs.scheduler.add(uproc->defaultTask());
     timerInit();
-    csrClear(sstatus,1l<<csr::mstatus::spp);
-    csrSet(sstatus,BIT(csr::mstatus::spie));
     schedule();
     volatile register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
     _strapexit();
