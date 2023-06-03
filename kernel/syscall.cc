@@ -7,6 +7,7 @@
 
 syscall_t syscallPtrs[sys::syscalls::nSyscalls];
 extern void _strapexit();
+extern char _uimg_start;
 namespace syscall
 {
     using sys::statcode;
@@ -507,13 +508,22 @@ namespace syscall
     }
     int execve(klib::ByteArray buf,char **argv,char **envp){
         /// @todo reset cur proc vmar, refer to man 2 execve for details
-        //kHartObjs.curtask->getProcess()->vmar.reset();
+        kHartObjs.curtask->getProcess()->vmar.reset();
         /// @todo destroy other threads
+        /// @todo reset curtask cpu context
+        kHartObjs.curtask->ctx=proc::Context();
+        static_cast<proc::Context>(kHartObjs.curtask->kctx)=proc::Context();
+        kHartObjs.curtask->ctx.sp()=proc::UserStackDefault;
+        /// load elf
         kHartObjs.curtask->ctx.pc=
             ld::loadElf(buf.buff,kHartObjs.curtask->getProcess()->vmar);
-        /// @todo reset curtask cpu context
+        return statcode::ok;
     }
-    int execve(){}
+    int execve(){
+        auto buf=klib::ByteArray{0};
+        buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
+        return execve(buf,0,0);
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -568,6 +578,7 @@ namespace syscall
         syscallPtrs[syscalls::gettimeofday] = syscall::getTimeOfDay;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
         syscallPtrs[syscalls::clone] = syscall::clone;
+        syscallPtrs[syscalls::execve] = syscall::execve;
         syscallPtrs[syscalls::wait] = syscall::wait;
     }
 } // namespace syscall
