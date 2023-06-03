@@ -31,7 +31,7 @@ xlen_t fs::File::write(xlen_t addr,size_t len){
     }
     return rt;
 }
-xlen_t fs::File::read(xlen_t addr,size_t len){
+klib::ByteArray fs::File::read(size_t len){
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.r)return rt;
     switch(type){
@@ -39,16 +39,14 @@ xlen_t fs::File::read(xlen_t addr,size_t len){
             panic("unimplementd!");
             break;
         case FileType::pipe:
-            {
-                auto bytes=obj.pipe->read(len);
-                kHartObjs.curtask->getProcess()->vmar[addr]=bytes;
-                rt=bytes.len;
-            }
+            return obj.pipe->read(len);
+        case FileType::entry:
+            /// @todo
             break;
         default:
             break;
     }
-    return rt;
+    return klib::ByteArray{0};
 }
 
 fs::File::~File() {

@@ -358,7 +358,9 @@ namespace syscall
         int fd=ctx.x(10);
         xlen_t uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObjs.curtask->getProcess()->ofile(fd);
-        return file->read(uva,len);
+        auto bytes=file->read(len);
+        kHartObjs.curtask->getProcess()->vmar[uva]=bytes;
+        return bytes.len;
     }
     xlen_t write(){
         auto &ctx=kHartObjs.curtask->ctx;
@@ -520,8 +522,17 @@ namespace syscall
         return statcode::ok;
     }
     xlen_t execve(){
-        auto buf=klib::ByteArray{0};
-        buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
+        auto &cur=kHartObjs.curtask;
+        auto &ctx=cur->ctx;
+        klib::ByteArray pathbuf = cur->getProcess()->vmar.copyinstr(ctx.x(10), FAT32_MAX_PATH);
+        // klib::string path((char*)pathbuf.buff,pathbuf.len);
+        char *path=(char*)pathbuf.buff;
+        klib::SharedPtr<fs::File> what;
+        auto dentry=fs::ename2(path,what);
+        klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
+        auto buf=file->read(dentry->file_size);
+        // auto buf=klib::ByteArray{0};
+        // buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
         return execve(buf,0,0);
     }
     void init(){
