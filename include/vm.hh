@@ -3,7 +3,9 @@
 
 #include "common.h"
 #include "klib.hh"
+#include "TINYSTL/vector.h"
 
+#define moduleLevel LogLevel::debug
 namespace vm
 {
     // struct alignas(4096) Page{char raw[4096];};
@@ -48,6 +50,7 @@ namespace vm
         };
         inline bool isValid(){ return fields.v; }
         inline void setValid(){ fields.v=1; }
+        inline void setInvalid(){ raw.perm=0; }
         inline void setPTNode(){ fields.r=fields.w=fields.x=0; }
         inline bool isLeaf(){ return fields.r|fields.w|fields.x; }
         inline perm_t perm(){ return raw.perm; }
@@ -84,56 +87,91 @@ namespace vm
         }
     };
 
-    typedef klib::pair<klib::pair<PageNum,PageNum>,PageNum> PageMapping;
     class VMO{
+        const PageNum ppn_,pages_;
     public:
         enum class CloneType:uint8_t{
             clone,alloc,shared,
         };
-        const perm_t perm;
         const CloneType cloneType;
         
-        /**
-         * @brief {{vpn,ppn},pages}
-         */
-        const PageMapping mapping;
-        VMO(const PageMapping &mapping,perm_t perm,CloneType cloneType=CloneType::clone):mapping(mapping),perm(perm),cloneType(cloneType){}
+        VMO(PageNum ppn,PageNum pages,CloneType cloneType=CloneType::clone):ppn_(ppn),pages_(pages),cloneType(cloneType){}
         VMO clone() const;
-        inline PageNum pages() const{return mapping.second;}
-        inline PageNum vpn() const{return mapping.first.first;}
-        inline PageNum ppn() const{return mapping.first.second;}
-        inline klib::string toString() const{return klib::format("<VMO>{0x%lx=>0x%lx@%lx}\n",vpn(),ppn(),pages());}
+        inline PageNum pages() const{return pages_;}
+        inline PageNum ppn() const{return ppn_;}
+        inline klib::string toString() const{return klib::format("<VMO>@0x%lx[%lx]\n",ppn(),pages());}
+        static VMO alloc(PageNum pages,CloneType=CloneType::clone);
+        bool operator==(const VMO& other){return ppn_==other.ppn_&&pages_==other.pages_;}
     private:
+    };
+
+    struct PageMapping{
+        enum Prot{
+            none=0x0,read=0x4,write=0x2,exec=0x1
+        };
+        enum class MappingType:uint8_t{
+            normal=0x0,file=0x1,anon=0x2
+        };
+        enum class SharingType:uint8_t{
+            /// @brief changes aren't visible to others, copy on write
+            privt=0x0,
+            /// @brief not implemented
+            copy=0x1,
+            /// @brief changes are shared
+            shared=0x2
+        };
+        PageNum vpn;
+        VMO vmo;
+        const perm_t perm;
+        const MappingType mapping=MappingType::normal;
+        const SharingType sharing=SharingType::privt;
+        inline PageNum ppn() const{return vmo.ppn();}
+        inline PageNum pages() const{return vmo.pages();}
+        inline klib::string toString() const{return klib::format("%lx=>%s",vpn,vmo.toString());}
+        inline PageMapping clone() const{return PageMapping{vpn,vmo.clone(),perm};}
+        inline static perm_t prot2perm(Prot prot){
+            perm_t rt=0;
+            using masks=PageTableEntry::fieldMasks;
+            if(prot&read)rt|=masks::r;
+            if(prot&write)rt|=masks::w;
+            if(prot&exec)rt|=masks::x;
+            return rt;
+        }
+        bool operator==(const PageMapping &other){return vpn==other.vpn&&vmo==other.vmo&&perm==other.perm&&mapping==other.mapping&&sharing==other.sharing;}
     };
 
     class PageTable{
     private:
         pgtbl_t root;
         static pgtbl_t createPTNode();
+        static bool freePTNode(pgtbl_t);
     public:
         inline PageTable(pgtbl_t root=nullptr){
             if(root==nullptr)this->root=createPTNode();
             else this->root=root;
         }
-        inline PageTable(std::initializer_list<VMO> vmos,pgtbl_t root=nullptr):PageTable(root){
-            for(auto vmo:vmos){
-                switch(vmo.cloneType){
-                    case VMO::CloneType::clone:
-                        createMapping(vmo.mapping,vmo.perm); break;
-                    default:
-                        ;
-                }
-            }
-        }
+        // inline PageTable(std::initializer_list<VMO> vmos,pgtbl_t root=nullptr):PageTable(root){
+        //     for(auto vmo:vmos){
+        //         switch(vmo.cloneType){
+        //             case VMO::CloneType::clone:
+        //                 createMapping(vmo.mapping,vmo.perm); break;
+        //             default:
+        //                 ;
+        //         }
+        //     }
+        // }
         inline ptr_t getRoot(){ return root; }
         void createMapping(pgtbl_t table,PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm,int level=2);
         inline void createMapping(PageNum vpn,PageNum ppn,xlen_t pages,perm_t perm){
             createMapping(root,vpn,ppn,pages,perm);
         }
-        inline void createMapping(const PageMapping &mapping,perm_t perm){
-            createMapping(mapping.first.first,mapping.first.second,mapping.second,perm);
+        inline void createMapping(const PageMapping &mapping){
+            createMapping(mapping.vpn,mapping.ppn(),mapping.pages(),mapping.perm);
         }
-        inline void createMapping(const VMO &vmo){createMapping(vmo.mapping,vmo.perm);}
+        void removeMapping(pgtbl_t table,PageNum vpn,xlen_t pages,int level=2);
+        inline void removeMapping(const PageMapping &mapping){
+            removeMapping(root,mapping.vpn,mapping.pages());
+        }
         PageNum trans(PageNum vpn);
         inline xlen_t transaddr(xlen_t addr){
             return pn2addr(trans(addr2pn(addr)))+addr2offset(addr);
@@ -150,24 +188,39 @@ namespace vm
     public:
         using CloneType=VMO::CloneType;
         // @todo check initialize order
-        inline VMAR(const std::initializer_list<VMO> &vmos,pgtbl_t root=nullptr):vmos(vmos),pagetable(vmos,root){}
-        inline VMAR(const VMAR &other):vmos(),pagetable(){
-            for(const auto &vmo:other.vmos)map(vmo.clone());
+        inline VMAR(const std::initializer_list<PageMapping> &mappings,pgtbl_t root=nullptr):mappings(mappings),pagetable(root){for(auto &mapping:mappings)map(mapping);}
+        inline VMAR(const VMAR &other):pagetable(){
+            for(const auto &mapping:other.mappings)map(mapping.clone());
         }
-        inline void alloc(PageNum vpn,PageNum pages,perm_t perm){
-            PageNum ppn=0l;
-            VMO vmo((PageMapping){{vpn,ppn},pages},perm);
-            vmos.push_back(vmo);
-            pagetable.createMapping(vmo);
+        // inline void alloc(PageNum vpn,PageNum pages,perm_t perm){
+        //     PageNum ppn=0l;
+        //     // VMO vmo((PageMapping){{vpn,ppn},pages},perm);
+        //     // vmos.push_back(vmo);
+        //     // pagetable.createMapping(vmo);
+        // }
+        inline void map(const PageMapping& mapping){
+            Log(debug,"map %s",mapping.toString().c_str());
+            mappings.push_back(mapping);
+            pagetable.createMapping(mapping);
+            Log(debug,"after map, VMAR:%s",mappings.toString().c_str());
         }
-        inline void map(const VMO& vmo){
-            Log(debug,"map %s",vmo.toString().c_str());
-            vmos.push_back(vmo);
-            pagetable.createMapping(vmo);
-            Log(trace,"after map, VMAR:",vmos.toString().c_str());
-        }
-        inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm,CloneType ct=CloneType::clone){map(VMO({{vpn,ppn},pages},perm,ct));}
+        inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm,CloneType ct=CloneType::clone){map(PageMapping{vpn,VMO{ppn,pages,ct},perm});}
         inline void unmap();
+        inline void reset(){
+            Log(debug,"before reset, VMAR:%s",mappings.toString().c_str());
+            tinystl::vector<PageMapping> toremove;
+            for(auto mapping:mappings){
+                if(mapping.mapping!=PageMapping::MappingType::normal){
+                    Log(info,"unmap %s",mapping.toString().c_str());
+                    toremove.push_back(mapping);
+                    pagetable.removeMapping(mapping);
+                }
+            }
+            /// @todo better efficiency
+            for(auto &mapping:toremove)
+                mappings.remove(mapping);
+            Log(debug,"after reset, VMAR:%s",mappings.toString().c_str());
+        }
         inline xlen_t satp(){return PageTable::toSATP(pagetable);}
         // @todo @bug what if region is on border?
         inline klib::ByteArray copyinstr(xlen_t addr, size_t len) {
@@ -204,11 +257,12 @@ namespace vm
         };
         inline Writer operator[](xlen_t vaddr){return Writer(vaddr,*this);}
         inline void print(){
-            Log(trace,"VMOs:\t%s",vmos.toString());
-            pagetable.print();
+            Log(trace,"Mappings:\t%s",mappings.toString().c_str());
+            TRACE(pagetable.print();)
         }
     private:
-        klib::list<VMO> vmos;
+        // klib::list<VMAR> children;
+        klib::list<PageMapping> mappings;
         PageTable pagetable;
     };
 
