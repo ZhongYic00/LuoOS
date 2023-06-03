@@ -17,7 +17,7 @@ HeapMgr::~HeapMgr(){}
 
 void HeapMgrGrowable::growHeap(){
     DBG(
-        printf("%s(growsize=%d)\n",__func__,growsize);
+        Log(debug,"%s(growsize=%d)\n",__func__,growsize);
     )
     Span newSpan={pmgr.alloc(growsize),growsize};
     reservedNode->data=newSpan;
@@ -26,7 +26,7 @@ void HeapMgrGrowable::growHeap(){
     dynPages.push_back(reservedNode);
     reservedNode=(klib::ListNode<Span>*)(alloc(sizeof(klib::ListNode<Span>)));
     DBG(
-        printf("newPool=%p reservedNode=%p\n",newPool,reservedNode);
+        Log(debug,"newPool=%p reservedNode=%p\n",newPool,reservedNode);
         tlsf_walk_pool(newPool);
     )
 }
@@ -37,9 +37,9 @@ HeapMgrGrowable::HeapMgrGrowable(HeapMgr &other,PageMgr &pmgr):pmgr(pmgr),HeapMg
     reservedNode=(klib::ListNode<Span>*)(alloc(sizeof(klib::ListNode<Span>)));
 }
 HeapMgrGrowable::~HeapMgrGrowable(){
-    DBG(printf("%s()\n",__func__);)
+    DBG(Log(debug,"%s()\n",__func__);)
     // DBG(
-        printf("pool=%p\n",pool);
+        Log(debug,"pool=%p\n",pool);
         tlsf_walk_pool(pool);
         if(!dynPages.empty())for(auto node=dynPages.head;node->iter.next!=nullptr;node=node->iter.next){
             tlsf_walk_pool((ptr_t)vm::pn2addr(node->data.first));
@@ -48,7 +48,7 @@ HeapMgrGrowable::~HeapMgrGrowable(){
     while(!dynPages.empty()){
         auto span=dynPages.pop_front();
         // pmgr.free(span.first,klib::log2up(span.second));
-        DBG(printf("0x%lx %d\n",span.first,span.second);)
+        DBG(Log(debug,"0x%lx %d\n",span.first,span.second);)
     }
 }
 
@@ -73,15 +73,15 @@ void HeapMgr::free(ptr_t ptr){ tlsf_free(ptr); }
 
 PageMgr::PageMgr(PageNum start,PageNum end):start(start),end(end){
     DBG(
-        printf("PageMgr(start=%lx,end=%lx)\n",start,end);
+        Log(debug,"PageMgr(start=%lx,end=%lx)\n",start,end);
     )
     xlen_t pages=end-start;
 /* freelist+pageheap version, not accomplished
     for(int k=0;k<maxOrder && pages;pages>>=1,k++){
-        DBG(printf("k=%d,pages=0x%lx\n",k,pages);)
+        DBG(Log(debug,"k=%d,pages=0x%lx\n",k,pages);)
         if(pages&1){
             auto node=reinterpret_cast<klib::ListNode<Span>*>(vm::pn2addr(start));
-            DBG(printf("node@0x%lx\n",start);)
+            DBG(Log(debug,"node@0x%lx\n",start);)
             node->data=(Span){start,1l<<k};
             freelist[k].push_back(node);
             start+=1l<<k;
@@ -89,14 +89,14 @@ PageMgr::PageMgr(PageNum start,PageNum end):start(start),end(end){
     }
     DBG(
     for(int k=0;k<maxOrder;k++){
-        printf("freelist[%d]:\n",k);
+        Log(debug,"freelist[%d]:\n",k);
         freelist[k].print(printSpan);
     })
     assert(start==end);
 */
     rootOrder=klib::log2up(pages);
     buddyTreeSize=(1l<<rootOrder)*2-1;
-    // DBG(printf("pages=%d order=%d rootOrder=%ld buddyTreeSize=%ld\n",pages,rootOrder,rootOrder,buddyTreeSize);)
+    // DBG(Log(debug,"pages=%d order=%d rootOrder=%ld buddyTreeSize=%ld\n",pages,rootOrder,rootOrder,buddyTreeSize);)
     buddyNodes=new uint8_t[buddyTreeSize];
     for(xlen_t i=1;i<buddyTreeSize;i++)buddyNodes[i]=0;
     {xlen_t base=start;
@@ -108,7 +108,7 @@ PageMgr::PageMgr(PageNum start,PageNum end):start(start),end(end){
     }}
     DBG(
         // this->print();
-        printf("PageMgr::PageMgr() over\n");
+        Log(debug,"PageMgr::PageMgr() over\n");
     )
 }
 PageMgr::~PageMgr(){ delete[] buddyNodes; }
@@ -118,7 +118,7 @@ PageNum PageMgr::alloc(size_t pages){
     if(buddyNodes[0]<rounded) return 0;
     xlen_t node=0;
     for(xlen_t nd=0,size=rootOrder+1;rounded<=size;size-=1){ // find suitable node; size is biased size
-        DBG(printf("nd=%ld ",nd);)
+        DBG(Log(debug,"nd=%ld ",nd);)
         if(buddyNodes[nd]==size && buddyNodes[nd]==rounded) node=nd;
         else {
             if(buddyNodes[nd]==size){ // split to smaller
@@ -140,14 +140,14 @@ PageNum PageMgr::alloc(size_t pages){
     
     PageNum ppn=start+(node+1-(1l<<(rootOrder+1-rounded)))*(1l<<(rounded-1));//((node+1)*rounded-(1l<<rootOrder));
     DBG(
-        printf("node=0x%lx ppn=0x%lx\n",node,ppn);
+        Log(debug,"node=0x%lx ppn=0x%lx\n",node,ppn);
     )
     assert(ppn<end);
     return ppn;
 }
 PageNum PageMgr::free(PageNum ppn,int order){
     xlen_t idx=pos2node(ppn-start,order);
-    DBG(printf("PageMgr::free(pos=%ld order=%d) idx=0x%lx\n",ppn-start,order,idx);)
+    DBG(Log(debug,"PageMgr::free(pos=%ld order=%d) idx=0x%lx\n",ppn-start,order,idx);)
     // xlen_t idx=ppn-start+(1l<<rootOrder);
     buddyNodes[idx]=order+1;
     for(idx=prnt(idx);idx>0;idx=prnt(idx)){
