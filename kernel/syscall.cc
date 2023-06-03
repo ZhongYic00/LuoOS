@@ -544,6 +544,7 @@ namespace syscall
         syscallPtrs[syscalls::testbio]=testbio;
         syscallPtrs[syscalls::testidle]=testidle;
         syscallPtrs[syscalls::testmount]=testmount;
+        syscallPtrs[syscalls::testfatinit]=testFATInit;
         // syscallPtrs[SYS_fcntl] = sys_fcntl;
         // syscallPtrs[SYS_ioctl] = sys_ioctl;
         // syscallPtrs[SYS_flock] = sys_flock;

@@ -41,6 +41,7 @@ static void timerInit(){
 void uartInitTest(){
     using namespace platform::uart0::nonblocking;
     for(int i=1024;i;i--)putc('_');
+    putc('\n');
     // 0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg0123456789abcdefg
 }
 void uartInit(){

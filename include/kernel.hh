@@ -23,6 +23,7 @@ namespace sys
         testbio,
         testidle,
         testmount,
+        testfatinit=7,
         getcwd=17,
         dup=23,
         dup3=24,
