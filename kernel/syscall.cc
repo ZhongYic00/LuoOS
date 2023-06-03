@@ -519,7 +519,7 @@ namespace syscall
             ld::loadElf(buf.buff,kHartObjs.curtask->getProcess()->vmar);
         return statcode::ok;
     }
-    int execve(){
+    xlen_t execve(){
         auto buf=klib::ByteArray{0};
         buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
         return execve(buf,0,0);
