@@ -33,17 +33,28 @@ xlen_t fs::File::write(xlen_t addr,size_t len){
 }
 klib::ByteArray fs::File::read(size_t len){
     xlen_t rt=sys::statcode::err;
-    if(!ops.fields.r)return rt;
+    if(!ops.fields.r) { return rt; }
     switch(type){
         case FileType::stdin:
             panic("unimplementd!");
             break;
         case FileType::pipe:
             return obj.pipe->read(len);
-        case FileType::entry:
-            /// @todo
             break;
+        case FileType::dev:
+            panic("unimplementd!");
+            break;
+        case FileType::entry: {
+            int rdbytes = 0;
+            klib::ByteArray buf(len);
+            elock(obj.ep);
+            if((rdbytes = eread(obj.ep, 0, (uint64)buf.buff, off, len)) > 0) { off += rdbytes; }
+            eunlock(obj.ep);
+            return buf;
+            break;
+        }
         default:
+            panic("File::read(): unknown file type");
             break;
     }
     return klib::ByteArray{0};
