@@ -16,7 +16,7 @@ namespace alloc
         xlen_t alloc(size_t pages);
         xlen_t free(PageNum ppn,int order);
         inline void print(){
-            printf("buddy: |"); for(xlen_t i=0;i<buddyTreeSize;i++)printf("%d | ",buddyNodes[i]-1);printf("\n");
+            Log(debug,"buddy: |"); for(xlen_t i=0;i<buddyTreeSize;i++)Log(debug,"%d | ",buddyNodes[i]-1);Log(debug,"\n");
         }
     private:
         // void split();
@@ -46,7 +46,7 @@ namespace alloc
         // constexpr static int maxOrder=32;
         // klib::list<Span> freelist[maxOrder]; // listnode should be stored in each span's head
     };
-    inline void printSpan(const alloc::Span &d){printf("0x%lx[%lx] ",d.first,d.second);}
+    inline void printSpan(const alloc::Span &d){Log(debug,"0x%lx[%lx] ",d.first,d.second);}
 
     class HeapMgr{
     protected:
