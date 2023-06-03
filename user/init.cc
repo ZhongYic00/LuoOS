@@ -12,19 +12,19 @@ int main(){
     // char *testsuits[] = {
     //     "brk",
     //     "chdir",
-    //     "clone",
+    //     "clone", 失败
     //     "close",
-    //     "dup",
-    //     "dup2",
+    //     "dup", 成功
+    //     "dup2", 成功
     //     "execve",
-    //     "exit",
-    //     "fork",
+    //     "exit", 成功
+    //     "fork", 成功
     //     "fstat",
-    //     "getcwd",
+    //     "getcwd", 成功
     //     "getdents",
-    //     "getpid",
-    //     "getppid",
-    //     "gettimeofday",
+    //     "getpid", 成功
+    //     "getppid", 失败
+    //     "gettimeofday", 成功
     //     "mkdir_",
     //     "mmap",
     //     "mount",
@@ -33,16 +33,15 @@ int main(){
     //     "openat",
     //     "pipe",
     //     "read",
-    //     "sleep",
-    //     "test_echo",
-    //     "times",
+    //     "sleep", 成功
+    //     "times", 成功
     //     "umount",
-    //     "uname",
+    //     "uname", 成功
     //     "unlink",
-    //     "wait",
-    //     "waitpid",
+    //     "wait", 成功
+    //     "waitpid", 失败
     //     "write",
-    //     "yield"
+    //     "yield" 失败
     // };
     // const int tsn = sizeof(testsuits) / sizeof(char const*);
 	// for (int i = 0; i < tsn; ++i) {

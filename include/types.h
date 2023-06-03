@@ -43,7 +43,7 @@ class TimeSpec {
         time_t m_tv_sec;  /* 秒 */
         long m_tv_nsec; /* 纳秒, 范围在0~999999999 */
     public:
-        TimeSpec():m_tv_sec(0), m_tv_nsec(0) {}
+        TimeSpec():m_tv_sec(1), m_tv_nsec(1) {}
         TimeSpec(time_t a_tv_sec, long a_tv_nsec):m_tv_sec(a_tv_sec), m_tv_nsec(a_tv_nsec) {}
 };
 #define NULL 0

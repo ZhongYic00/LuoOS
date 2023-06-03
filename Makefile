@@ -53,7 +53,7 @@ usersrcs = $(shell find user/ -name "*.cc")
 # userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))
 # userprogs := obj/riscv64/yield
 # userprogs := obj/user/init.elf
-userprogs := user/testsuits/getcwd
+userprogs := user/testsuits/gettimeofday
 $(info utilobjs=$(utilobjs))
 $(objdir)/user/%.elf : user/%.cc obj/utils/klibc.o
 	@echo +CC $^

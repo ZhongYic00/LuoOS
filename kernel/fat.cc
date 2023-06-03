@@ -391,7 +391,7 @@ static struct dirent *lookup_path2(char *path, int parent, SharedPtr<File> f ,ch
     }
     // 增加当前目录（或指定目录）的引用计数
     else if(*path == '/') { entry = edup(&root); }
-    else if(!f) { entry = edup(kHartObjs.curtask->getProcess()->cwd); }
+    else if(f == nullptr) { entry = edup(kHartObjs.curtask->getProcess()->cwd); }
     else { entry = edup(f->obj.ep); }
     // 沿着路径依次搜索
     while ((path = skipelem(path, name)) != 0) { // 读取一个文件名到name，并将其从path中去掉

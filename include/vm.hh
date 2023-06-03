@@ -174,7 +174,7 @@ namespace vm
             // @todo 检查用户源是否越界（addr+len来自用户进程大小之外的空间）
             xlen_t paddr = pagetable.transaddr(addr);
             char buff[len];
-            strncpy(buff, (char*)addr, len);
+            strncpy(buff, (char*)paddr, len);
             return klib::ByteArray((uint8_t*)buff, strlen(buff));
         }
         inline klib::ByteArray copyin(xlen_t addr,size_t len){
