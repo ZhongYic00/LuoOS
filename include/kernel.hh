@@ -34,6 +34,7 @@ namespace sys
         getpid=172,
         getppid=173,
         clone=220,
+        execve=221,
         wait=260,
         nSyscalls,
     };

@@ -23,8 +23,14 @@ void uecallHandler(){
     Log(debug,"uecall [%d]",ecallId);
     using namespace sys;
     if(ecallId<nSyscalls){
-        csrSet(sstatus,BIT(csr::mstatus::sie));
+        /// @bug is this needed??
+        // kHartObjs.curtask->lastpriv=proc::Task::Priv::Kernel;
+        // csrSet(sscratch,kHartObjs.curtask->kctx.gpr);
+        // csrSet(sstatus,BIT(csr::mstatus::sie));
         rtval=syscallPtrs[ecallId]();
+        // csrClear(sstatus,BIT(csr::mstatus::sie));
+        // csrSet(sscratch,kHartObjs.curtask->ctx.gpr);
+        // kHartObjs.curtask->lastpriv=proc::Task::Priv::User;
         Log(info,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
     } else {
         Log(warning,"syscall num exceeds valid range");
@@ -38,7 +44,8 @@ extern "C" void straphandler(){
     xlen_t scause; csrRead(scause,scause);
     xlen_t stval; csrRead(stval,stval);
     Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
-    kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
+    if(kHartObjs.curtask->lastpriv==proc::Task::Priv::User)kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
+    else kHartObjs.curtask->kctx.pc=(xlen_t)sepc;
 
     if(csr::mcause::isInterrupt(scause)){
         switch(scause<<1>>1){
