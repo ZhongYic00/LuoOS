@@ -204,6 +204,31 @@ namespace syscall
     int testidle(){
         sleep();
     }
+    int mmap(){
+        auto &curproc=*kHartObjs.curtask->getProcess();
+        auto &ctx=kHartObjs.curtask->ctx;
+        xlen_t addr=ctx.x(10),len=ctx.x(11);
+        int prot=ctx.x(12),flags=ctx.x(13),fd=ctx.x(14),offset=ctx.x(15);
+        using namespace vm;
+        // determine target
+        const auto align=[](xlen_t addr){return addr2pn(addr);};
+        /// @todo impl choose
+        const auto choose=[&](){return PageNum(0);};
+        PageNum vpn,pages;
+        if(addr)vpn=align(addr);
+        else vpn=choose();
+        // initialize vmo
+        auto vmo=VMO::alloc(pages);
+        /// @todo copy content to vmo
+        // actual map
+        auto mappingType= fd==-1 ?PageMapping::MappingType::file : PageMapping::MappingType::anon;
+        auto sharingType=(PageMapping::SharingType)(flags>>8);
+        curproc.vmar.map(PageMapping{vpn,vmo,PageMapping::prot2perm((PageMapping::Prot)prot),mappingType,sharingType});
+        // return val
+        return pn2addr(vpn);
+    }
+    int munmap(){}
+    int mprotect(){}
     int execve(klib::ByteArray buf,char **argv,char **envp){
         /// @todo reset cur proc vmar, refer to man 2 execve for details
         kHartObjs.curtask->getProcess()->vmar.reset();

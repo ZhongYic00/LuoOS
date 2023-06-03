@@ -42,6 +42,7 @@ namespace proc
         using mapped_file=fs::mapped_file;
         tid_t parent;
         VMAR vmar;
+        xlen_t heapBottom;
         tinystl::unordered_set<Task*> tasks;
         SharedPtr<File> files[MaxOpenFile];
         tinystl::string name;
