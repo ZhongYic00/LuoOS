@@ -239,6 +239,10 @@ struct list:public Seq<T>{
     ArrayBuff(T* addr,size_t len):ArrayBuff(len){
       memcpy(buff,addr,len*sizeof(T));
     }
+    template<typename T1>
+    ArrayBuff<T1> toArrayBuff(){
+      return ArrayBuff<T1>{reinterpret_cast<T1*>(buff),len*(sizeof(T)/sizeof(T1))};
+    }
     class iterator{
       T* ptr;
     public:

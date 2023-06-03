@@ -4,6 +4,9 @@
 #include "fat.hh"
 #include "buf.h"
 #include "ld.hh"
+#include "TINYSTL/vector.h"
+
+// #define moduleLevel LogLevel::debug
 
 syscall_t syscallPtrs[sys::syscalls::nSyscalls];
 extern void _strapexit();
@@ -508,32 +511,69 @@ namespace syscall
         xlen_t wstatus=ctx.x(11);
         return waitpid(pid,wstatus,0);
     }
-    int execve(klib::ByteArray buf,char **argv,char **envp){
+    int execve(klib::ByteArray buf,tinystl::vector<klib::ByteArray> &args,char **envp){
+        auto &ctx=kHartObjs.curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
         kHartObjs.curtask->getProcess()->vmar.reset();
         /// @todo destroy other threads
         /// @todo reset curtask cpu context
-        kHartObjs.curtask->ctx=proc::Context();
+        ctx=proc::Context();
         static_cast<proc::Context>(kHartObjs.curtask->kctx)=proc::Context();
-        kHartObjs.curtask->ctx.sp()=proc::UserStackDefault;
+        ctx.sp()=proc::UserStackDefault;
         /// load elf
-        kHartObjs.curtask->ctx.pc=
+        ctx.pc=
             ld::loadElf(buf.buff,kHartObjs.curtask->getProcess()->vmar);
-        return statcode::ok;
+        /// setup stack
+        auto &vmar=kHartObjs.curtask->getProcess()->vmar;
+        klib::ArrayBuff<xlen_t> argv(args.size()+1);
+        int argc=0;
+        for(auto arg:args){
+            ctx.sp()-=arg.len;
+            vmar[ctx.sp()]=arg;
+            argv.buff[argc++]=ctx.sp();
+        }
+        argv.buff[argc]=0;
+        ctx.sp()-=argv.len*sizeof(xlen_t);
+        ctx.sp()-=ctx.sp()%16;
+        auto argvsp=ctx.sp();
+        vmar[ctx.sp()]=argv.toArrayBuff<uint8_t>();
+        /// @bug alignment?
+        ctx.sp()-=8;
+        auto argcsp=ctx.sp();
+        vmar[ctx.sp()]=argc;
+        Log(debug,"$sp=%x, argc@%x, argv@%x",ctx.sp(),argcsp,argvsp);
+        /// setup argc, argv
+        return ctx.sp();
     }
     xlen_t execve(){
         auto &cur=kHartObjs.curtask;
         auto &ctx=cur->ctx;
-        klib::ByteArray pathbuf = cur->getProcess()->vmar.copyinstr(ctx.x(10), FAT32_MAX_PATH);
-        // klib::string path((char*)pathbuf.buff,pathbuf.len);
-        char *path=(char*)pathbuf.buff;
-        klib::SharedPtr<fs::File> what;
-        auto dentry=fs::ename2(path,what);
-        klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
-        auto buf=file->read(dentry->file_size);
-        // auto buf=klib::ByteArray{0};
-        // buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
-        return execve(buf,0,0);
+        auto curproc=cur->getProcess();
+        xlen_t pathuva=ctx.x(10),argv=ctx.x(11),envp=ctx.x(12);
+
+        // /// @brief get executable from path
+        // klib::ByteArray pathbuf = curproc->vmar.copyinstr(pathuva, FAT32_MAX_PATH);
+        // // klib::string path((char*)pathbuf.buff,pathbuf.len);
+        // char *path=(char*)pathbuf.buff;
+        // klib::SharedPtr<fs::File> what;
+        // auto dentry=fs::ename2(path,what);
+        // klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
+        // auto buf=file->read(dentry->file_size);
+        auto buf=klib::ByteArray{0};
+        buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
+
+        /// @brief get args
+        tinystl::vector<klib::ByteArray> args;
+        xlen_t str;
+        do{
+            curproc->vmar[argv]>>str;
+            if(!str)break;
+            auto buff=curproc->vmar.copyinstr(str,100);
+            args.push_back(buff);
+            argv+=sizeof(char*);
+        }while(str!=0);
+        /// @brief get envs
+        return execve(buf,args,0);
     }
     void init(){
         using sys::syscalls;

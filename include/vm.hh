@@ -227,8 +227,8 @@ namespace vm
             // @todo 检查用户源是否越界（addr+len来自用户进程大小之外的空间）
             xlen_t paddr = pagetable.transaddr(addr);
             char buff[len];
-            strncpy(buff, (char*)addr, len);
-            return klib::ByteArray((uint8_t*)buff, strlen(buff));
+            strncpy(buff, (char*)paddr, len);
+            return klib::ByteArray((uint8_t*)buff, strlen(buff)+1);
         }
         inline klib::ByteArray copyin(xlen_t addr,size_t len){
             // @todo 检查用户源是否越界（addr+len来自用户进程大小之外的空间）
@@ -253,6 +253,11 @@ namespace vm
             }
             inline void operator=(const klib::ByteArray &bytes){
                 parent.copyout(vaddr,bytes);
+            }
+            template<typename T>
+            void operator>>(T &d){
+                auto buf=parent.copyin(vaddr,sizeof(T));
+                d=*reinterpret_cast<T*>(buf.buff);
             }
         };
         inline Writer operator[](xlen_t vaddr){return Writer(vaddr,*this);}

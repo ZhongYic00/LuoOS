@@ -34,6 +34,7 @@ Task* Process::newTask(){
     // auto thrd=kGlobObjs.taskMgr.alloc(0,this->pid(),proc::UserStackDefault);
     auto thrd=new (kGlobObjs.taskMgr) Task(0,this->pid(),proc::UserStackDefault);
     thrd->ctx.sp()=newUstack();
+    thrd->ctx.a0()=0;
     thrd->kctx.kstack=(ptr_t)newKstack();
     addTask(thrd);
     kGlobObjs.scheduler.add(thrd);

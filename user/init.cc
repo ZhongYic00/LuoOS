@@ -1,7 +1,13 @@
 #include "kernel.hh"
 int main(){
+    register long *p asm("a0");
+    if(p){
+        int argc = p[0];
+	    char **argv = reinterpret_cast<char**>((void *)(p+1));
+    }
+    char *execargv[]={"abcd","efgh",nullptr};
     if(sys::syscall(sys::syscalls::clone)){
-        sys::syscall(sys::syscalls::execve);
+        sys::syscall2(sys::syscalls::execve,0,(xlen_t)execargv);
     }
     sys::syscall(sys::syscalls::exit);
     while(true){
