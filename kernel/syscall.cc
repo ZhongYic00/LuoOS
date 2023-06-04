@@ -65,6 +65,11 @@ namespace syscall
         // printf("%s\n", buf);
         return rt;
     }
+    xlen_t testFATInit() {
+        if(fs::fat32_init() != 0) { panic("fat init failed\n"); }
+        kHartObjs.curtask->getProcess()->cwd = fs::ename("/");
+        return statcode::ok;
+    }
     xlen_t getCwd(void) {
         auto &ctx = kHartObjs.curtask->ctx;
         char *a_buf = (char*)ctx.x(10);
@@ -129,9 +134,10 @@ namespace syscall
     }
     xlen_t mkDirAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_dirfd = ctx.x(10); // @todo 需要兼容AT_FDCWD的情况(-100)
+        int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         mode_t a_mode = ctx.x(12); // @todo 还没用上
+        if(a_dirfd == AT_FDCWD) { a_dirfd = 3; };
         if(fdOutRange(a_dirfd) || a_path == nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
@@ -152,9 +158,10 @@ namespace syscall
     }
     xlen_t unlinkAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_dirfd = ctx.x(10); // @todo 需要兼容AT_FDCWD的情况(-100)
+        int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12); // 这玩意有什么用？
+        if(a_dirfd == AT_FDCWD) { a_dirfd = 3; };
         if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
@@ -167,11 +174,13 @@ namespace syscall
     }
     xlen_t linkAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_olddirfd = ctx.x(10); // @todo 需要兼容AT_FDCWD的情况(-100)
+        int a_olddirfd = ctx.x(10);
         const char *a_oldpath = (const char*)ctx.x(11);
-        int a_newdirfd = ctx.x(12); // @todo 需要兼容AT_FDCWD的情况(-100)
+        int a_newdirfd = ctx.x(12);
         const char *a_newpath = (const char*)ctx.x(13);
         int a_flags = ctx.x(14);
+        if(a_olddirfd == AT_FDCWD) { a_olddirfd = 3; };
+        if(a_newdirfd == AT_FDCWD) { a_newdirfd = 3; };
         if(fdOutRange(a_olddirfd) || fdOutRange(a_newdirfd) || a_oldpath==nullptr || a_newpath==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
@@ -266,22 +275,24 @@ namespace syscall
 
         fs::eput(curproc->cwd);
         curproc->cwd = ep;
+        curproc->files[3]=new fs::File(curproc->cwd, O_RDWR);
 
         return statcode::ok;
     }
     xlen_t openAt() {
         auto &ctx = kHartObjs.curtask->ctx;
-        int a_dirfd = ctx.x(10); // @todo 需要兼容AT_FDCWD的情况(-100)
+        int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12);
         mode_t a_mode = ctx.x(13);
+        if(a_dirfd == AT_FDCWD) { a_dirfd = 3; };
         if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
         SharedPtr<fs::File> f1, f2;
-        if(a_path[0] != '/') { f2 = curproc->files[a_dirfd]; }
+        if(path[0] != '/') { f2 = curproc->files[a_dirfd]; }
         struct fs::dirent *ep;
         int fd;
 
@@ -584,6 +595,7 @@ namespace syscall
         syscallPtrs[syscalls::testbio]=testbio;
         syscallPtrs[syscalls::testidle]=testidle;
         syscallPtrs[syscalls::testmount]=testmount;
+        syscallPtrs[syscalls::testfatinit]=testFATInit;
         // syscallPtrs[SYS_fcntl] = sys_fcntl;
         // syscallPtrs[SYS_ioctl] = sys_ioctl;
         // syscallPtrs[SYS_flock] = sys_flock;
