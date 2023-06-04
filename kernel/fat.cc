@@ -721,13 +721,13 @@ void fs::etrunc(struct dirent *entry) {
 }
 // 请求睡眠锁，要求引用数大于0
 void fs::elock(struct dirent *entry) {
-    if (entry == 0 || entry->ref < 1) { panic("elock"); }
+    // if (entry == 0 || entry->ref < 1) { panic("elock"); }
     // acquiresleep(&entry->lock);
 }
 // 释放睡眠锁
 void fs::eunlock(struct dirent *entry) {
     // if (entry == 0 || !holdingsleep(&entry->lock) || entry->ref < 1) { panic("eunlock"); }
-    if (entry == 0 || entry->ref < 1) { panic("eunlock"); }
+    // if (entry == 0 || entry->ref < 1) { panic("eunlock"); }
     // releasesleep(&entry->lock);
 }
 // 将entry引用数减少1，如果entry的引用数减少为0，则将entry放置缓冲区最前面，并执行eput(entry->parent)
@@ -1151,6 +1151,31 @@ int fs::do_umount(struct dirent *mountpoint) {
     memset(&dev_fat[mountpoint->dev],0,sizeof(dev_fat[0]));
     mountpoint->dev=0;
     return 0;
+}
+struct dirent *fs::create(char *path, short type, int mode) {
+    struct dirent *ep, *dp;
+    char name[FAT32_MAX_FILENAME + 1];
+    if((dp = enameparent(path, name)) == nullptr) { return nullptr; }
+    if (type == T_DIR) { mode = ATTR_DIRECTORY; }
+    else if (mode & O_RDONLY) { mode = ATTR_READ_ONLY; }
+    else { mode = 0; }
+    elock(dp);
+    if ((ep = ealloc(dp, name, mode)) == nullptr) {
+        eunlock(dp);
+        eput(dp);
+        return nullptr;
+    }
+    if ((type == T_DIR && !(ep->attribute & ATTR_DIRECTORY)) ||
+        (type == T_FILE && (ep->attribute & ATTR_DIRECTORY))) {
+        eunlock(dp);
+        eput(ep);
+        eput(dp);
+        return nullptr;
+    }
+    eunlock(dp);
+    eput(dp);
+    elock(ep);
+    return ep;
 }
 struct dirent *fs::create2(char *path, short type, int mode, SharedPtr<File> f) {
     struct dirent *ep, *dp;

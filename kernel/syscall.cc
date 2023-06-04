@@ -70,6 +70,10 @@ namespace syscall
         auto curproc = kHartObjs.curtask->getProcess();
         curproc->cwd = fs::ename("/");
         curproc->files[3] = new fs::File(curproc->cwd,0);
+        struct fs::dirent *ep = fs::create("/dev", T_DIR, 0);
+        if(ep == nullptr) { panic("create /dev failed\n"); }
+        ep = fs::create("/dev/vda2", T_DIR, 0);
+        if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
         return statcode::ok;
     }
     xlen_t getCwd(void) {
@@ -156,7 +160,7 @@ namespace syscall
         fs::eunlock(ep);
         fs::eput(ep);
 
-        return statcode::err;
+        return statcode::ok;
     }
     xlen_t unlinkAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -226,26 +230,28 @@ namespace syscall
         const void *a_data = (const void*)ctx.x(14); // 手册表示可为NULL
         if(a_devpath==nullptr || a_mountpath==nullptr || a_fstype==nullptr) { return statcode::err; }
         // 错误输出可以合并
-        char devpath[FAT32_MAX_PATH];
-        strncpy(devpath, a_devpath, FAT32_MAX_PATH);
-        char mountpath[FAT32_MAX_PATH];
-        strncpy(mountpath, a_mountpath, FAT32_MAX_PATH);
+        auto curproc = kHartObjs.curtask->getProcess();
+        klib::ByteArray devpatharr = curproc->vmar.copyinstr((xlen_t)a_devpath, FAT32_MAX_PATH);
+        klib::ByteArray mountpatharr = curproc->vmar.copyinstr((xlen_t)a_mountpath, FAT32_MAX_PATH);
+        klib::ByteArray fstypearr = curproc->vmar.copyinstr((xlen_t)a_fstype, FAT32_MAX_PATH);
+        char *devpath = (char*)devpatharr.buff;
+        char *mountpath = (char*)mountpatharr.buff;
+        char *fstype = (char*)fstypearr.buff;
         if(strncmp("/",mountpath,2) == 0) { //mountpoint not allowed the root
             printf("not allowed\n");
             return statcode::err;
         }
-        char fstype[10];
-        strncpy(fstype, a_fstype, FAT32_MAX_PATH);
         if ((strncmp("vfat",fstype,5)!=0) && (strncmp("fat32",fstype,6)!=0)) {
             printf("the fstype is not fat32\n");
             return statcode::err;
         }
+
         struct fs::dirent *dev_ep = fs::ename(devpath);
+        struct fs::dirent *ep = fs::ename(mountpath);
         if(dev_ep == nullptr) {
             printf("dev not found file\n");
             return statcode::err;
         }
-        struct fs::dirent *ep = fs::ename(mountpath);
         if(ep == nullptr) {
             printf("mount not found file\n");
             return statcode::err;

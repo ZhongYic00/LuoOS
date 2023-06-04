@@ -46,7 +46,7 @@ klib::ByteArray fs::File::read(size_t len){
             break;
         case FileType::entry: {
             int rdbytes = 0;
-            klib::ByteArray buf(len);
+            klib::ByteArray buf(len); // @todo 第二次execve的时候buf分到了空指针
             elock(obj.ep);
             if((rdbytes = eread(obj.ep, 0, (uint64)buf.buff, off, len)) > 0) { off += rdbytes; }
             eunlock(obj.ep);

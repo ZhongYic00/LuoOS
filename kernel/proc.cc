@@ -3,7 +3,6 @@
 #include "kernel.hh"
 
 using namespace proc;
-// using klib::make_shared;
 // #define moduleLevel LogLevel::debug
 Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
@@ -131,7 +130,7 @@ proc::pid_t proc::clone(Task *task){
     return newproc->pid();
 }
 
-Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id){
+Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd){
     for(int i=0;i<MaxOpenFile;i++)files[i]=other.files[i];
 }
 void Process::exit(int status){
