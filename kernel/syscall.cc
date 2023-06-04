@@ -566,8 +566,7 @@ namespace syscall
         klib::ByteArray pathbuf = curproc->vmar.copyinstr(pathuva, FAT32_MAX_PATH);
         // klib::string path((char*)pathbuf.buff,pathbuf.len);
         char *path=(char*)pathbuf.buff;
-        klib::SharedPtr<fs::File> what;
-        auto dentry=fs::ename2(path,what);
+        auto dentry=fs::ename(path);
         klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
         auto buf=file->read(dentry->file_size);
         // auto buf=klib::ByteArray{0};

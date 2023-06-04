@@ -1,6 +1,7 @@
 #include "kernel.hh"
 int main(){
     register long *p asm("a0");
+    // printf("init.elf\n");
     if(p){
         int argc = p[0];
 	    char **argv = reinterpret_cast<char**>((void *)(p+1));

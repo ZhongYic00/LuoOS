@@ -789,7 +789,9 @@ void fs::estat(struct dirent *de, struct stat *st) {
 */
 int fs::enext(struct dirent *dp, struct dirent *ep, uint off, int *count) {
     Log(trace,"enext(dp=%p,ep=%p)",dp);
-    if (!(dp->attribute & ATTR_DIRECTORY)) { panic("enext not dir"); } // 搜索“目录”非目录
+    if (!(dp->attribute & ATTR_DIRECTORY)) {
+        panic("enext not dir");
+    } // 搜索“目录”非目录
     if (ep->valid) { panic("enext ep valid"); } // 存放返回文件的结构无效
     if (off % 32) { panic("enext not align"); } // 未对齐
     if (dp->valid != 1) { return -1; } // 搜索目录无效
@@ -805,7 +807,11 @@ int fs::enext(struct dirent *dp, struct dirent *ep, uint off, int *count) {
     // 遍历dp的簇
     for (int off2; (off2 = reloc_clus(dp, off, 0)) != -1; off += 32) { // off2: 簇内偏移 off: 目录内偏移
         // 没对齐或在非"."和"..."目录的情形下到达结尾
-        if (rw_clus(dp->cur_clus, 0, 0, (uint64)&de, off2, 32) != 32 || (((char*)&de)[0]!='.' && de.lne.order==END_OF_ENTRY)) { return -1; }
+        auto bytes = rw_clus(dp->cur_clus, 0, 0, (uint64)&de, off2, 32);
+        auto fchar = ((char*)&de)[0];
+        auto leorder = de.lne.order;
+        static bool first = true;
+        if ( bytes!= 32 || leorder==END_OF_ENTRY) { return -1; }
         // 当前目录为空目录
         if (de.lne.order == EMPTY_ENTRY) {
             cnt++;
