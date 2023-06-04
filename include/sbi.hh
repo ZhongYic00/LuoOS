@@ -3,6 +3,8 @@
 typedef __UINT64_TYPE__ uint64_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
 
+#define CONFIG_RISCV_SBI_V01
+
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) 2015 Regents of the University of California

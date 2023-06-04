@@ -442,3 +442,7 @@ struct sbiret sbi_debug_console_write(unsigned long num_bytes,
 		sbi_console_putchar(*(char*)(base_addr_lo++));
 	return sbiret{.error=0};
 }
+void sbi_shutdown(void)
+{
+	sbi_ecall(SBI_EXT_0_1_SHUTDOWN, 0, 0, 0, 0, 0, 0, 0);
+}
