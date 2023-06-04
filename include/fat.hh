@@ -50,14 +50,14 @@ namespace fs {
     } __attribute__((packed, aligned(4))) short_name_entry_t;
     // 长文件名(32bytes)
     typedef struct long_name_entry {
-        wchar name1[5]; // 第1~5个字符的unicode码
-        wchar name2[6]; // 第6~11个字符的unicode码
-        wchar name3[2]; // 第12~13个字符的unicode码
         uint8 order; // 目录项序列号
+        wchar name1[5]; // 第1~5个字符的unicode码
         uint8 attr; // 长目录项的属性标志，一定是0x0F。
         uint8 _type; // 系统保留
         uint8 checksum; // 校验和
+        wchar name2[6]; // 第6~11个字符的unicode码
         uint16 _fst_clus_lo; // 文件起始簇号 保留 目前常置0
+        wchar name3[2]; // 第12~13个字符的unicode码
     } __attribute__((packed, aligned(4))) long_name_entry_t;
     // disk entry
     union dentry {

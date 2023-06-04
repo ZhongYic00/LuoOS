@@ -21,9 +21,11 @@
 // #include "include/printf.h"
 // #include "disk.h"
 #include "virtio.h"
+#include "alloc.hh"
 // #include "include/proc.h"
+#include "klib.h"
 
-struct buf buf[NBUF];
+struct buf blockBufs[NBUF];
 
 int listhash(uint dev, uint sectorno){
   return (dev+sectorno) & (NBUFLIST - 1);
@@ -36,6 +38,7 @@ struct {
 
 struct {
   // struct spinlock lock;
+  semaphore::Semaphore sema;
   struct buf head;
 } freecache;
 
@@ -43,6 +46,7 @@ void
 binit(void)
 {
   struct buf *b;
+  new ((ptr_t)&freecache.sema) semaphore::Semaphore(0);
   // initlock(&freecache.lock, "freecache");
   freecache.head.freeprev = &freecache.head;
   freecache.head.freenext = &freecache.head;
@@ -52,13 +56,15 @@ binit(void)
     listcache[i].head.next = &listcache[i].head;
   }
   int i;
-  for(b = buf, i = 2; b < buf+NBUF; b++, i++){
+  for(b = blockBufs, i = 2; b < blockBufs+NBUF; b++, i++){
+    new ((ptr_t)&b->sema) semaphore::Semaphore(1);
     b->busy = 0;
     b->dev = 0;
     b->sectorno = i;
     b->vaild = 0;
     b->freenext = freecache.head.freenext;
     b->freeprev = &freecache.head;
+    freecache.sema.rel();
     freecache.head.freenext->freeprev = b;
     freecache.head.freenext = b;
     int n = listhash(b->dev, b->sectorno);
@@ -74,16 +80,21 @@ binit(void)
 // In either case, return locked buffer.
 static struct buf*
 bget(uint dev, uint sectorno) {
+  Log(debug,"bget dev=%d, secno=%d",dev,sectorno);
   while(1){
     struct buf *b;
     int n = listhash(dev, sectorno);
+    Log(debug, "hashed bufno=%d",n);
     // acquire(&listcache[n].lock);
     for(b = listcache[n].head.next; b != &listcache[n].head; b = b->next){
+      Log(trace, "n=%d, &listcache[n].head=0x%lx, b=0x%lx, b->next=0x%lx\n", n, &listcache[n].head, b, b->next);
       if(b->sectorno == sectorno && b->dev == dev){
         if(b->busy == 1){
           // release(&listcache[n].lock);
           // @todo 进程相关
           // sleep(b, NULL);
+          // @bug 缺sleep导致死循环
+          b->sema.req();
           goto next;
         }
         else{
@@ -103,7 +114,9 @@ bget(uint dev, uint sectorno) {
     }
     // release(&listcache[n].lock);
     // acquire(&freecache.lock);
+    freecache.sema.req();
     for(b = freecache.head.freenext; b != &freecache.head; b = b->freenext){
+      b->sema.req();
       b->busy = 1;
       b->vaild = 0;
       b->freenext->freeprev = b->freeprev;
@@ -181,6 +194,8 @@ brelse(struct buf *b)
   // @todo 进程相关
   // wakeup sleeping processes because of b is busy
   // wakeup(b);
+  b->sema.rel();
+  freecache.sema.rel();
   // wakeup sleeping processes because of NOFREEBUF
   // wakeup(&freecache);
 }

@@ -2,8 +2,8 @@
 #define __BUF_H
 
 #define BSIZE 512
-// #include "sleeplock.h"
 #include "common.h"
+#include "lock.hh"
 
 struct buf {
   uint8 busy;
@@ -12,6 +12,7 @@ struct buf {
   uint dev;
   uint sectorno;	// sector number 
   // struct sleeplock lock;
+  semaphore::Semaphore sema;
   // uint refcnt;
   struct buf *freeprev;
   struct buf *freenext;

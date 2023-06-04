@@ -4,7 +4,9 @@
 #include "fat.hh"
 #include "buf.h"
 #include "ld.hh"
+#include "sbi.hh"
 #include "TINYSTL/vector.h"
+#include "linux/reboot.h"
 
 // #define moduleLevel LogLevel::debug
 
@@ -67,7 +69,9 @@ namespace syscall
     }
     xlen_t testFATInit() {
         if(fs::fat32_init() != 0) { panic("fat init failed\n"); }
-        kHartObjs.curtask->getProcess()->cwd = fs::ename("/");
+        auto curproc = kHartObjs.curtask->getProcess();
+        curproc->cwd = fs::ename("/");
+        curproc->files[3] = new fs::File(curproc->cwd,0);
         return statcode::ok;
     }
     xlen_t getCwd(void) {
@@ -411,7 +415,6 @@ namespace syscall
     void yield(){
         Log(info,"yield!");
         auto &cur=kHartObjs.curtask;
-        cur->lastpriv=proc::Task::Priv::Kernel;
         sleepSave(cur->kctx.gpr);
     }
     xlen_t sysyield(){
@@ -607,8 +610,7 @@ namespace syscall
         klib::ByteArray pathbuf = curproc->vmar.copyinstr(pathuva, FAT32_MAX_PATH);
         // klib::string path((char*)pathbuf.buff,pathbuf.len);
         char *path=(char*)pathbuf.buff;
-        klib::SharedPtr<fs::File> what;
-        auto dentry=fs::ename2(path,what);
+        auto dentry=fs::ename(path);
         klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
         auto buf=file->read(dentry->file_size);
         // auto buf=klib::ByteArray{0};
@@ -627,6 +629,15 @@ namespace syscall
         /// @brief get envs
         return execve(buf,args,0);
     }
+    xlen_t reboot(){
+        auto &ctx=kHartObjs.curtask->ctx;
+        int magic=ctx.x(10),magic2=ctx.x(11),cmd=ctx.x(12);
+        if(!(magic==LINUX_REBOOT_MAGIC1 && magic2==LINUX_REBOOT_MAGIC2))return statcode::err;
+        if(cmd==LINUX_REBOOT_CMD_POWER_OFF){
+            Log(error,"LuoOS Shutdown! Bye-Bye");
+            sbi_shutdown();
+        }
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -637,6 +648,7 @@ namespace syscall
         syscallPtrs[syscalls::testidle]=testidle;
         syscallPtrs[syscalls::testmount]=testmount;
         syscallPtrs[syscalls::testfatinit]=testFATInit;
+        syscallPtrs[syscalls::reboot]=reboot;
         // syscallPtrs[SYS_fcntl] = sys_fcntl;
         // syscallPtrs[SYS_ioctl] = sys_ioctl;
         // syscallPtrs[SYS_flock] = sys_flock;

@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.h"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::info
 
 extern void schedule();
 static hook_t hooks[]={schedule};
@@ -18,11 +18,12 @@ void timerInterruptHandler(){
 extern syscall_t syscallPtrs[];
 void uecallHandler(){
     /// @bug should get from ctx
-    register int ecallId asm("a7");
+    int ecallId=kHartObjs.curtask->ctx.x(17);
     xlen_t &rtval=kHartObjs.curtask->ctx.x(10);
     kHartObjs.curtask->ctx.pc+=4;
     Log(debug,"uecall [%d]",ecallId);
     using namespace sys;
+    kHartObjs.curtask->lastpriv=proc::Task::Priv::Kernel;
     if(ecallId<nSyscalls){
         /// @bug is this needed??
         // kHartObjs.curtask->lastpriv=proc::Task::Priv::Kernel;
@@ -37,6 +38,7 @@ void uecallHandler(){
         Log(warning,"syscall num exceeds valid range");
         rtval=1;
     }
+    kHartObjs.curtask->lastpriv=proc::Task::Priv::User;
     Log(debug,"uecall exit(id=%d,rtval=%d)",ecallId,rtval);
 }
 int plicClaim(){
@@ -83,6 +85,7 @@ extern "C" void straphandler(){
     xlen_t scause; csrRead(scause,scause);
     xlen_t stval; csrRead(stval,stval);
     Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
+    Log(trace,"strap enter, saved context=%s",kHartObjs.curtask->toString(true).c_str());
     if(kHartObjs.curtask->lastpriv==proc::Task::Priv::User)kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
     else kHartObjs.curtask->kctx.pc=(xlen_t)sepc;
 
@@ -120,7 +123,9 @@ extern "C" void straphandler(){
         csrWrite(sepc,kHartObjs.curtask->ctx.pc);
     }
     // printf("mtraphandler over\n");
-    if(kHartObjs.curtask->lastpriv!=proc::Task::Priv::User)kHartObjs.curtask->switchTo();
+    // if(kHartObjs.curtask->lastpriv!=proc::Task::Priv::User)kHartObjs.curtask->switchTo();
+
+    Log(trace,"strap exit, restore context=%s",kHartObjs.curtask->toString(true).c_str());
 }
 __attribute__((always_inline))
 void _strapenter(){
@@ -152,7 +157,6 @@ void _strapexit(){
         csrSwap(sscratch,t6);
         ExecInst(sret);
     } else {
-        if(cur->lastpriv!=proc::Task::Priv::AlwaysKernel)cur->lastpriv=proc::Task::Priv::User;
         // csrWrite(satp,kctx.satp);
         // ExecInst(sfence.vma);
         kHartObjs.trapstack=(ptr_t)kInfo.segments.kstack.first+0x1000;

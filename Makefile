@@ -11,6 +11,7 @@ depflags = -MMD -MP -MF $(depdir)/$*.d
 OS := $(objdir)/os.elf
 
 UCFLAGS = $(CFLAGS) -T user/user.ld
+# linuxheaders = /usr/src/linux-headers-$(shell uname -r)/include/
 CFLAGS += -Iinclude/ -Ithirdparty/tinystl/include -O0 -g
 compile = $(CC) $(depflags) $(CFLAGS)
 
@@ -53,7 +54,7 @@ usersrcs = $(shell find user/ -name "*.cc")
 # userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))
 # userprogs := obj/riscv64/yield
 userprogs := obj/user/init.elf
-# userprogs := user/testsuits/gettimeofday
+# userprogs := user/testsuits/clone
 $(info utilobjs=$(utilobjs))
 $(objdir)/user/%.elf : user/%.cc obj/utils/klibc.o
 	@echo +CC $^

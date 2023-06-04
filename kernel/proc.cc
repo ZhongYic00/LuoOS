@@ -105,12 +105,16 @@ Process* proc::createProcess(){
     // auto proc=kGlobObjs.procMgr.alloc(0,0);
     auto proc=new (kGlobObjs.procMgr) Process(0,0);
     proc->newTask();
-    if(proc->cwd == nullptr) { proc->cwd = fs::ename("/"); }
+    static bool inited = false;
+    if(inited) {
+        if(proc->cwd == nullptr) { proc->cwd = fs::ename("/"); };
+        proc->files[3]=new fs::File(proc->cwd,0);
+    }
+    else { inited = true; }
     using op=fs::File::FileOp;
     proc->files[0]=new fs::File(fs::File::stdin,op::read);
     proc->files[1]=new fs::File(fs::File::stdout,op::write);
     proc->files[2]=new fs::File(fs::File::stderr,op::write);
-    proc->files[3]=new fs::File(proc->cwd,O_RDWR);
     DBG(proc->print();)
     Log(info,"proc created. pid=%d\n",proc->id);
     return proc;

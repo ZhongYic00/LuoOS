@@ -173,9 +173,20 @@ alloc3_desc(int *idx)
   return 0;
 }
 
+class IntGuard{
+public:
+    IntGuard(){
+        csrClear(sstatus,BIT(csr::mstatus::sie));
+    }
+    ~IntGuard(){
+        csrSet(sstatus,BIT(csr::mstatus::sie));
+    }
+};
+
 void
 virtio_disk_rw(struct buf *b, int write)
 {
+  IntGuard guard;
   uint64 sector = b->sectorno;
   Log(debug,"diskrw sector=%ld",sector);
 

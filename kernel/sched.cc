@@ -3,7 +3,7 @@
 #include "rvcsr.hh"
 #include "kernel.hh"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::info
 
 using namespace sched;
 
@@ -28,6 +28,10 @@ void sched::Scheduler::add(Scheduable *task){
     if(ready.empty()){
         ready.push_back(task);
         cur=ready.begin();
+        if(kHartObjs.curtask && kHartObjs.curtask->prior>task->prior){
+            // issue an immediate schedule
+            csrSet(sip,BIT(csr::mip::stip));
+        }
     } else {
         ready.push_back(task);
     }

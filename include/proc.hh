@@ -26,6 +26,12 @@ namespace proc
         inline xlen_t& sp(){return x(2);}
         inline xlen_t& tp(){return x(4);}
         xlen_t pc;
+        inline klib::string toString() const{
+            klib::string rt;
+            for(int i=0;i<30;i++)
+                rt+=klib::format("%x,",gpr[i-1]);
+            return klib::format("{gpr={%s},pc=%x}",rt.c_str(),pc);
+        }
     };
     struct KContext:public Context{
         ptr_t kstack;
@@ -142,8 +148,9 @@ namespace proc
         void switchTo();
         void sleep();
 
-        inline klib::string toString() const{
-            return klib::format("Task<%d>",id);
+        inline klib::string toString(bool detail=false) const{
+            if(detail)return klib::format("Task<%d> priv=%d ctx=%s kctx=%s",id,lastpriv,ctx.toString(),kctx.toString());
+            else return klib::format("Task<%d>",id);
         }
     };
     struct KTask:public Task{

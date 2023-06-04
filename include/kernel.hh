@@ -42,6 +42,7 @@ namespace sys
         fstat=80,
         exit=93,
         yield=124,
+        reboot=142,
         times=153,
         uname=160,
         gettimeofday=169,
