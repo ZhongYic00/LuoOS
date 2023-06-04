@@ -411,7 +411,6 @@ namespace syscall
     void yield(){
         Log(info,"yield!");
         auto &cur=kHartObjs.curtask;
-        cur->lastpriv=proc::Task::Priv::Kernel;
         sleepSave(cur->kctx.gpr);
     }
     xlen_t sysyield(){

@@ -118,7 +118,7 @@ PageNum PageMgr::alloc(size_t pages){
     if(buddyNodes[0]<rounded) return 0;
     xlen_t node=0;
     for(xlen_t nd=0,size=rootOrder+1;rounded<=size;size-=1){ // find suitable node; size is biased size
-        DBG(Log(debug,"nd=%ld ",nd);)
+        Log(trace,"nd=%ld ",nd);
         if(buddyNodes[nd]==size && buddyNodes[nd]==rounded) node=nd;
         else {
             if(buddyNodes[nd]==size){ // split to smaller
@@ -139,9 +139,7 @@ PageNum PageMgr::alloc(size_t pages){
     buddyNodes[0]=klib::max(buddyNodes[lsub(0)],buddyNodes[rsub(0)]);
     
     PageNum ppn=start+(node+1-(1l<<(rootOrder+1-rounded)))*(1l<<(rounded-1));//((node+1)*rounded-(1l<<rootOrder));
-    DBG(
-        Log(debug,"node=0x%lx ppn=0x%lx\n",node,ppn);
-    )
+    Log(debug,"node=0x%lx ppn=0x%lx\n",node,ppn);
     assert(ppn<end);
     return ppn;
 }
