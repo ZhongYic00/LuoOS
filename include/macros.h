@@ -16,9 +16,9 @@ enum LogLevel{
 #define TRACE(x) IFDEF(moduleLevel<=LogLevel::trace,x)
 #define IFTEST(x) IFDEF(GUEST,x)
 
-#define outputLevel LogLevel::error
+#define outputLevel LogLevel::debug
 #ifndef moduleLevel
-    #define moduleLevel LogLevel::error
+    #define moduleLevel LogLevel::info
 #endif
 #define Log(level,fmt,...) \
     if(level>=outputLevel && level>=moduleLevel){printf((__FILE__":%d:%s::\t" fmt "\n"),__LINE__,__PRETTY_FUNCTION__,##__VA_ARGS__);}

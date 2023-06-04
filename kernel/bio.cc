@@ -22,6 +22,7 @@
 // #include "disk.h"
 #include "virtio.h"
 // #include "include/proc.h"
+#include "klib.h"
 
 struct buf buf[NBUF];
 
@@ -79,6 +80,7 @@ bget(uint dev, uint sectorno) {
     int n = listhash(dev, sectorno);
     // acquire(&listcache[n].lock);
     for(b = listcache[n].head.next; b != &listcache[n].head; b = b->next){
+      Log(info, "n=%d, &listcache[n].head=0x%lx, b=0x%lx, b->next=0x%lx\n", n, &listcache[n].head, b, b->next);
       if(b->sectorno == sectorno && b->dev == dev){
         if(b->busy == 1){
           // release(&listcache[n].lock);
