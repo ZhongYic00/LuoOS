@@ -1,4 +1,5 @@
 #include "kernel.hh"
+#include "linux/reboot.h"
 int main(){
     register long *p asm("a0");
     // printf("init.elf\n");
@@ -7,15 +8,15 @@ int main(){
 	    char **argv = reinterpret_cast<char**>((void *)(p+1));
     }
     sys::syscall(sys::syscalls::testfatinit);
-    char path[]="/fstat";
+    char path[]="/clone";
     char *execargv[]={"abcd","efgh",nullptr};
-    if(sys::syscall(sys::syscalls::clone)){
+    if(!sys::syscall(sys::syscalls::clone)){
         sys::syscall2(sys::syscalls::execve,(xlen_t)path,(xlen_t)execargv);
     }
-    sys::syscall(sys::syscalls::exit);
-    while(true){
-        sys::syscall2(sys::syscalls::wait,-1,0);
+    for(pid_t rt=0;rt!=-1;){
+        rt=sys::syscall2(sys::syscalls::wait,-1,0);
     }
+    sys::syscall3(sys::syscalls::reboot,LINUX_REBOOT_MAGIC1,LINUX_REBOOT_MAGIC2,LINUX_REBOOT_CMD_POWER_OFF);
     // 测例代码
     /*
         FAT32初始化

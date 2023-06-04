@@ -80,12 +80,14 @@ binit(void)
 // In either case, return locked buffer.
 static struct buf*
 bget(uint dev, uint sectorno) {
+  Log(debug,"bget dev=%d, secno=%d",dev,sectorno);
   while(1){
     struct buf *b;
     int n = listhash(dev, sectorno);
+    Log(debug, "hashed bufno=%d",n);
     // acquire(&listcache[n].lock);
     for(b = listcache[n].head.next; b != &listcache[n].head; b = b->next){
-      Log(debug, "n=%d, &listcache[n].head=0x%lx, b=0x%lx, b->next=0x%lx\n", n, &listcache[n].head, b, b->next);
+      Log(trace, "n=%d, &listcache[n].head=0x%lx, b=0x%lx, b->next=0x%lx\n", n, &listcache[n].head, b, b->next);
       if(b->sectorno == sectorno && b->dev == dev){
         if(b->busy == 1){
           // release(&listcache[n].lock);
