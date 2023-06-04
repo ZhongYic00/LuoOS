@@ -51,7 +51,9 @@ namespace proc
     };
 
     struct Task;
-    constexpr xlen_t UserStackDefault=0x7ffffff0;
+    constexpr xlen_t UserStackDefault=0x7ffffff0,
+        UserHeapTop=(UserStackDefault-(1l<<29)),
+        UserHeapBottom=vm::ceil(UserHeapTop-(1l<<30));
     constexpr int MaxOpenFile = 101; // 官网测例往fd=100中写东西
 
     typedef tid_t pid_t;
@@ -61,6 +63,7 @@ namespace proc
         using mapped_file=fs::mapped_file;
         tid_t parent;
         VMAR vmar;
+        xlen_t heapTop=UserHeapBottom;
         tinystl::unordered_set<Task*> tasks;
         SharedPtr<File> files[MaxOpenFile];
         tinystl::string name;
@@ -87,6 +90,25 @@ namespace proc
         Task* newKTask(prior_t prior=0);
         void print();
         int fdAlloc(SharedPtr<File> a_file, int a_fd=-1);
+        /// @todo rtval
+        inline xlen_t brk(xlen_t addr){
+            Log(info,"brk %lx",addr);
+            if(addr>=UserHeapTop||addr<=UserHeapBottom)return heapTop;
+            if(vmar.contains(addr))return heapTop=addr;
+            else {
+                /// @todo free redundant vmar
+                /// @brief alloc new vmar
+                using namespace vm;
+                xlen_t curtop=bytes2pages(heapTop),
+                    destop=bytes2pages(addr),
+                    pages=destop-curtop;
+                Log(info,"curtop=%x,destop=%x, needs to alloc %d pages",curtop,destop,pages);
+                auto vmo=VMO::alloc(pages);
+                using perm=PageTableEntry::fieldMasks;
+                vmar.map(PageMapping{curtop,vmo,perm::r|perm::w|perm::x,PageMapping::MappingType::anon});
+                return heapTop=addr;
+            }
+        }
         void exit(int status);
         void zombieExit();
     private:
