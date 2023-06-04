@@ -86,6 +86,7 @@ bget(uint dev, uint sectorno) {
           // release(&listcache[n].lock);
           // @todo 进程相关
           // sleep(b, NULL);
+          // @bug 缺sleep导致死循环
           goto next;
         }
         else{

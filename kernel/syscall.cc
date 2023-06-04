@@ -67,7 +67,9 @@ namespace syscall
     }
     xlen_t testFATInit() {
         if(fs::fat32_init() != 0) { panic("fat init failed\n"); }
-        kHartObjs.curtask->getProcess()->cwd = fs::ename("/");
+        auto curproc = kHartObjs.curtask->getProcess();
+        curproc->cwd = fs::ename("/");
+        curproc->files[3] = new fs::File(curproc->cwd,0);
         return statcode::ok;
     }
     xlen_t getCwd(void) {
