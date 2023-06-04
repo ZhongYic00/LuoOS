@@ -4,7 +4,9 @@
 #include "fat.hh"
 #include "buf.h"
 #include "ld.hh"
+#include "sbi.hh"
 #include "TINYSTL/vector.h"
+#include "linux/reboot.h"
 
 // #define moduleLevel LogLevel::debug
 
@@ -592,6 +594,15 @@ namespace syscall
         /// @brief get envs
         return execve(buf,args,0);
     }
+    xlen_t reboot(){
+        auto &ctx=kHartObjs.curtask->ctx;
+        int magic=ctx.x(10),magic2=ctx.x(11),cmd=ctx.x(12);
+        if(!(magic==LINUX_REBOOT_MAGIC1 && magic2==LINUX_REBOOT_MAGIC2))return statcode::err;
+        if(cmd==LINUX_REBOOT_CMD_POWER_OFF){
+            Log(error,"LuoOS Shutdown! Bye-Bye");
+            sbi_shutdown();
+        }
+    }
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
@@ -602,6 +613,7 @@ namespace syscall
         syscallPtrs[syscalls::testidle]=testidle;
         syscallPtrs[syscalls::testmount]=testmount;
         syscallPtrs[syscalls::testfatinit]=testFATInit;
+        syscallPtrs[syscalls::reboot]=reboot;
         // syscallPtrs[SYS_fcntl] = sys_fcntl;
         // syscallPtrs[SYS_ioctl] = sys_ioctl;
         // syscallPtrs[SYS_flock] = sys_flock;

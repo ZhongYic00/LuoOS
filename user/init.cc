@@ -1,4 +1,5 @@
 #include "kernel.hh"
+#include "linux/reboot.h"
 int main(){
     register long *p asm("a0");
     // printf("init.elf\n");

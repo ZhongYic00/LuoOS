@@ -11,6 +11,7 @@ depflags = -MMD -MP -MF $(depdir)/$*.d
 OS := $(objdir)/os.elf
 
 UCFLAGS = $(CFLAGS) -T user/user.ld
+# linuxheaders = /usr/src/linux-headers-$(shell uname -r)/include/
 CFLAGS += -Iinclude/ -Ithirdparty/tinystl/include -O0 -g
 compile = $(CC) $(depflags) $(CFLAGS)
 
