@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.h"
 
-#define moduleLevel LogLevel::trace
+#define moduleLevel LogLevel::info
 
 extern void schedule();
 static hook_t hooks[]={schedule};

@@ -3,7 +3,7 @@
 #include "rvcsr.hh"
 #include "kernel.hh"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::info
 
 using namespace sched;
 

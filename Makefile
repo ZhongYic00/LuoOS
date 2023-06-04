@@ -52,8 +52,8 @@ $(OS): $(kobjs) $(uimg)
 usersrcs = $(shell find user/ -name "*.cc")
 # userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))
 # userprogs := obj/riscv64/yield
-# userprogs := obj/user/init.elf
-userprogs := user/testsuits/clone
+userprogs := obj/user/init.elf
+# userprogs := user/testsuits/clone
 $(info utilobjs=$(utilobjs))
 $(objdir)/user/%.elf : user/%.cc obj/utils/klibc.o
 	@echo +CC $^
