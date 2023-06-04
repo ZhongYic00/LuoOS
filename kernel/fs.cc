@@ -59,6 +59,16 @@ klib::ByteArray fs::File::read(size_t len){
     }
     return klib::ByteArray{0};
 }
+klib::ByteArray fs::File::readAll(){
+    switch(type){
+        case FileType::entry:{
+            size_t size=obj.ep->file_size;
+            return read(size);
+        }
+        default:
+            panic("readAll doesn't support this type");
+    }
+}
 
 fs::File::~File() {
     switch(type){
