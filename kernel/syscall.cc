@@ -529,7 +529,7 @@ namespace syscall
         /// @todo destroy other threads
         /// @todo reset curtask cpu context
         ctx=proc::Context();
-        static_cast<proc::Context>(kHartObjs.curtask->kctx)=proc::Context();
+        // static_cast<proc::Context>(kHartObjs.curtask->kctx)=proc::Context();
         ctx.sp()=proc::UserStackDefault;
         /// load elf
         ctx.pc=
@@ -562,16 +562,16 @@ namespace syscall
         auto curproc=cur->getProcess();
         xlen_t pathuva=ctx.x(10),argv=ctx.x(11),envp=ctx.x(12);
 
-        // /// @brief get executable from path
-        // klib::ByteArray pathbuf = curproc->vmar.copyinstr(pathuva, FAT32_MAX_PATH);
-        // // klib::string path((char*)pathbuf.buff,pathbuf.len);
-        // char *path=(char*)pathbuf.buff;
-        // klib::SharedPtr<fs::File> what;
-        // auto dentry=fs::ename2(path,what);
-        // klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
-        // auto buf=file->read(dentry->file_size);
-        auto buf=klib::ByteArray{0};
-        buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
+        /// @brief get executable from path
+        klib::ByteArray pathbuf = curproc->vmar.copyinstr(pathuva, FAT32_MAX_PATH);
+        // klib::string path((char*)pathbuf.buff,pathbuf.len);
+        char *path=(char*)pathbuf.buff;
+        klib::SharedPtr<fs::File> what;
+        auto dentry=fs::ename2(path,what);
+        klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
+        auto buf=file->read(dentry->file_size);
+        // auto buf=klib::ByteArray{0};
+        // buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
 
         /// @brief get args
         tinystl::vector<klib::ByteArray> args;

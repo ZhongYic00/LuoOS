@@ -5,9 +5,11 @@ int main(){
         int argc = p[0];
 	    char **argv = reinterpret_cast<char**>((void *)(p+1));
     }
+    sys::syscall(sys::syscalls::testfatinit);
+    char path[]="/fstat";
     char *execargv[]={"abcd","efgh",nullptr};
     if(sys::syscall(sys::syscalls::clone)){
-        sys::syscall2(sys::syscalls::execve,0,(xlen_t)execargv);
+        sys::syscall2(sys::syscalls::execve,(xlen_t)path,(xlen_t)execargv);
     }
     sys::syscall(sys::syscalls::exit);
     while(true){
