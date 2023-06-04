@@ -123,6 +123,7 @@ namespace kernel{
     typedef proc::Task KernelTaskObjs;
     struct KernelHartObjs{
         KernelTaskObjs *curtask;
+        ptr_t trapstack;
     };
     inline int readHartId(){register int hartid asm("tp"); return hartid;}
     void createKernelMapping(vm::VMAR &vmar);

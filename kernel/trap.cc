@@ -120,26 +120,50 @@ extern "C" void straphandler(){
         csrWrite(sepc,kHartObjs.curtask->ctx.pc);
     }
     // printf("mtraphandler over\n");
+    if(kHartObjs.curtask->lastpriv!=proc::Task::Priv::User)kHartObjs.curtask->switchTo();
 }
 __attribute__((always_inline))
 void _strapenter(){
     csrSwap(sscratch,t6);
     saveContext();
     extern xlen_t kstack_end;
-    volatile register ptr_t sp asm("sp");
-    // sp=(ptr_t)kstack_end;
-    sp=kHartObjs.curtask->kctx.kstack;
     csrWrite(satp,kGlobObjs.ksatp);
     ExecInst(sfence.vma);
+    volatile register ptr_t sp asm("sp");
+    // sp=(ptr_t)kstack_end;
+    sp=kHartObjs.trapstack;
+    volatile register xlen_t tp asm("tp");
+    tp=kHartObjs.curtask->kctx.tp();
 }
-__attribute__((naked))
+__attribute__((always_inline))
 void _strapexit(){
-    csrWrite(satp,kHartObjs.curtask->kctx.satp);
-    ExecInst(sfence.vma);
-    register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
-    restoreContext();
-    csrSwap(sscratch,t6);
-    ExecInst(sret);
+    auto cur=kHartObjs.curtask;
+    /// @todo chaos
+    if(cur->lastpriv==proc::Task::Priv::User){
+        kHartObjs.trapstack=cur->kctx.kstack;
+        csrWrite(sscratch,cur->ctx.gpr);
+        csrWrite(sepc,cur->ctx.pc);
+        csrClear(sstatus,1l<<csr::mstatus::spp);
+        csrSet(sstatus,BIT(csr::mstatus::spie));
+        csrWrite(satp,kHartObjs.curtask->kctx.satp);
+        ExecInst(sfence.vma);
+        register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
+        restoreContext();
+        csrSwap(sscratch,t6);
+        ExecInst(sret);
+    } else {
+        if(cur->lastpriv!=proc::Task::Priv::AlwaysKernel)cur->lastpriv=proc::Task::Priv::User;
+        // csrWrite(satp,kctx.satp);
+        // ExecInst(sfence.vma);
+        kHartObjs.trapstack=(ptr_t)kInfo.segments.kstack.first+0x1000;
+        csrWrite(sscratch,cur->kctx.gpr);
+        volatile register ptr_t t6 asm("t6")=cur->kctx.gpr;
+        restoreContext();
+        /// @bug suppose this swap has problem when switching process
+        csrSwap(sscratch,t6);
+        csrSet(sstatus,BIT(csr::mstatus::sie));
+        ExecInst(ret);
+    }
 }
 extern "C" __attribute__((naked)) void strapwrapper(){
     _strapenter();

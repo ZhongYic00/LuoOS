@@ -24,6 +24,7 @@ namespace proc
         inline xlen_t& ra(){return x(1);}
         inline xlen_t& a0(){return x(10);}
         inline xlen_t& sp(){return x(2);}
+        inline xlen_t& tp(){return x(4);}
         xlen_t pc;
     };
     struct KContext:public Context{
