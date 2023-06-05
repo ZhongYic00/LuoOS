@@ -4,7 +4,7 @@
 #include "kernel.hh"
 
 using namespace fs;
-#define moduleLevel LogLevel::trace
+// #define moduleLevel LogLevel::trace
 
 ///////////////FAT依赖的其它接口，需要在FAT的代码中替换成等价接口/////////////////
 // @todo 改成更规范的接口？
