@@ -5,7 +5,8 @@
 #include "klib.hh"
 #include "TINYSTL/vector.h"
 
-#define moduleLevel LogLevel::info
+// #define moduleLevel LogLevel::info
+
 namespace vm
 {
     // struct alignas(4096) Page{char raw[4096];};

@@ -58,6 +58,7 @@ namespace proc
 
     struct Task;
     constexpr xlen_t UserStackDefault=0x7ffffff0,
+        TrapframePages=2,
         UserHeapTop=(UserStackDefault-(1l<<29)),
         UserHeapBottom=vm::ceil(UserHeapTop-(1l<<30));
     constexpr int MaxOpenFile = 101; // 官网测例往fd=100中写东西
@@ -119,7 +120,7 @@ namespace proc
         void zombieExit();
     private:
         xlen_t newUstack();
-        xlen_t newKstack();
+        xlen_t newTrapframe();
         inline void addTask(Task* task){ tasks.insert(task); }
     };
     struct Task:public IdManagable,public Scheduable{ // a.k.a. kthread
@@ -131,32 +132,43 @@ namespace proc
         const pid_t proc;
         Priv lastpriv;
         Process *getProcess();
-        inline Task(tid_t tid,prior_t pri,tid_t proc,xlen_t stack):IdManagable(tid),Scheduable(pri),proc(proc),lastpriv(Priv::User){
-            ctx.x(2)=stack; //x2, sp
+        inline Task(tid_t tid,prior_t pri,tid_t proc):IdManagable(tid),Scheduable(pri),proc(proc),lastpriv(Priv::User){
+            ctx.x(2)=UserStackDefault; //x2, sp
             kctx.satp=getProcess()->satp();
+            kctx.kstack=reinterpret_cast<ptr_t>(this)+TrapframePages*vm::pageSize;
         }
-        inline Task(prior_t pri,tid_t proc,xlen_t stack):Task(id,pri,proc,stack){}
-        inline Task(const Task &other,tid_t tid,pid_t proc):IdManagable(tid),Scheduable(other.prior),proc(proc),lastpriv(Priv::User){
+        inline Task(prior_t pri,tid_t proc):Task(id,pri,proc){}
+        inline Task(tid_t tid,const Task &other,pid_t proc):IdManagable(tid),Scheduable(other.prior),proc(proc),lastpriv(Priv::User){
             ctx=other.ctx;
             kctx=other.kctx;
             kctx.satp=getProcess()->satp();
+            kctx.kstack=reinterpret_cast<ptr_t>(this)+TrapframePages*vm::pageSize;
         }
-        inline Task(const Task &other,pid_t proc):Task(other,id,proc){}
-        inline Task(const Task &other,tid_t tid,pid_t proc,ptr_t kstack):IdManagable(tid),Scheduable(other.prior),proc(proc),lastpriv(Priv::User){
-            kctx.kstack=kstack;
-        }
+        inline Task(const Task &other,pid_t proc):Task(id,other,proc){}
+
         void switchTo();
         void sleep();
 
         inline klib::string toString(bool detail=false) const{
             if(detail)return klib::format("Task<%d> priv=%d ctx=%s kctx=%s",id,lastpriv,ctx.toString(),kctx.toString());
-            else return klib::format("Task<%d>",id);
+            else return klib::format("Task<%d> priv=%d sp=%x ksp=%x",id,lastpriv,ctx.gpr[1],kctx.gpr[1]);
         }
+
+        template<typename ...Ts>
+        static Task* createTask(ObjManager<Task> &mgr,xlen_t buff,Ts&& ...args){
+            /**
+             * @brief mem layout. low -> high
+             * | task struct | kstack |
+             */
+            Task* task=reinterpret_cast<Task*>(buff);
+            auto id=mgr.newId();
+            new (task) Task(id,args...);
+            mgr.addObj(id,task);
+            return task;
+        }
+        void operator delete(ptr_t task){}
     };
-    struct KTask:public Task{
-        inline KTask(tid_t tid,prior_t pri,tid_t proc,xlen_t stack):Task(tid,pri,proc,stack){lastpriv=Priv::AlwaysKernel;}
-        inline KTask(prior_t pri,tid_t proc,xlen_t stack):KTask(id,pri,proc,stack){}
-    };
+    struct KTask:public Task{};
     typedef ObjManager<Process> ProcManagerBase;
     typedef ObjManager<Task> TaskManager;
     class ProcManager:public ProcManagerBase{

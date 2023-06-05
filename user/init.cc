@@ -8,12 +8,12 @@ int main(){
 	    char **argv = reinterpret_cast<char**>((void *)(p+1));
     }
     sys::syscall(sys::syscalls::testfatinit);
-    // char path[]="mkdir_";
-    // char *execargv[]={ nullptr };
-    // if(sys::syscall(sys::syscalls::clone)){
-    //     sys::syscall2(sys::syscalls::execve,(xlen_t)path,(xlen_t)execargv);
-    // }
-    // sys::syscall(sys::syscalls::exit);
+    char path[]="clone";
+    char *execargv[]={ nullptr };
+    if(sys::syscall(sys::syscalls::clone)){
+        sys::syscall2(sys::syscalls::execve,(xlen_t)path,(xlen_t)execargv);
+    }
+    sys::syscall(sys::syscalls::exit);
     // while(true){
     //     sys::syscall2(sys::syscalls::wait,-1,0);
     // }

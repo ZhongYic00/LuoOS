@@ -68,6 +68,7 @@ namespace alloc
         int growsize;
         void growHeap();
     public:
+        ptr_t alloc(xlen_t size);
         HeapMgrGrowable(HeapMgr &other,PageMgr &pmgr);
         HeapMgrGrowable(ptr_t addr,xlen_t len,PageMgr &pmgr);
         ~HeapMgrGrowable();
