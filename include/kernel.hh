@@ -90,7 +90,7 @@ namespace sys
     
 } // namespace sy
 namespace kernel{
-    constexpr int timerInterval=500000;
+    constexpr int timerInterval=100000;
 
     struct KernelInfo{
         using segment_t=vm::segment_t;

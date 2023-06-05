@@ -150,7 +150,7 @@ namespace proc
         void sleep();
 
         inline klib::string toString(bool detail=false) const{
-            if(detail)return klib::format("Task<%d> priv=%d ctx=%s kctx=%s",id,lastpriv,ctx.toString(),kctx.toString());
+            if(detail)return klib::format("Task<%d> priv=%d kctx=%s",id,lastpriv,kctx.toString());
             else return klib::format("Task<%d> priv=%d sp=%x ksp=%x pc=%x kra=%x",id,lastpriv,ctx.gpr[1],kctx.gpr[1],ctx.pc,kctx.gpr[0]);
         }
 
