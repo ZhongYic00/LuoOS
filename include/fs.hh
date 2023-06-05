@@ -55,8 +55,10 @@ namespace fs{
         File(FileType a_type): type(a_type), obj(a_type) {}
         File(FileType a_type, FileOp a_ops=FileOp::none): type(a_type), obj(a_type), ops(a_ops) {}
         File(FileType a_type, int a_flags): type(a_type), obj(a_type), ops(a_flags) {}
-        File(const SharedPtr<Pipe> &a_pipe, FileOp a_ops): type(FileType::pipe), obj(a_pipe), ops(a_ops) {}
-        File(const SharedPtr<Pipe> &a_pipe, int a_flags): type(FileType::pipe), obj(a_pipe), ops(a_flags) {}
+        File(const SharedPtr<Pipe> &a_pipe, FileOp a_ops): type(FileType::pipe), obj(a_pipe), ops(a_ops) {
+            if(ops.fields.r)obj.pipe->addReader();
+            if(ops.fields.w)obj.pipe->addWriter();
+        }
         File(struct dirent *a_ep, FileOp a_ops): type(FileType::entry), obj(a_ep), ops(a_ops) {}
         File(struct dirent *a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags) {}
         ~File();

@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.h"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::debug
 
 extern void schedule();
 static hook_t hooks[]={schedule};
@@ -27,7 +27,8 @@ void uecallHandler(){
     if(ecallId<nSyscalls){
         /// @bug is this needed??
         // kHartObjs.curtask->lastpriv=proc::Task::Priv::Kernel;
-        // csrSet(sscratch,kHartObjs.curtask->kctx.gpr);
+        kHartObjs.trapstack=(ptr_t)kInfo.segments.kstack.first+0x1000;
+        csrWrite(sscratch,kHartObjs.curtask->kctx.gpr);
         // csrSet(sstatus,BIT(csr::mstatus::sie));
         rtval=syscallPtrs[ecallId]();
         csrClear(sstatus,BIT(csr::mstatus::sie));
@@ -83,7 +84,7 @@ extern "C" void straphandler(){
     xlen_t scause; csrRead(scause,scause);
     xlen_t stval; csrRead(stval,stval);
     Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
-    Log(trace,"strap enter, saved context=%s",kHartObjs.curtask->toString(true).c_str());
+    Log(debug,"strap enter, saved context=%s",kHartObjs.curtask->toString(true).c_str());
     if(kHartObjs.curtask->lastpriv==proc::Task::Priv::User)kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
     else kHartObjs.curtask->kctx.ra()=(xlen_t)sepc;
 
@@ -116,14 +117,15 @@ extern "C" void straphandler(){
             case storeAccessFault:break;
             default:
                 Log(error,"exception[%d] sepc=%x stval=%x",scause,sepc,stval);
+                kHartObjs.curtask->kctx.ra()=(xlen_t)sepc+4;
+                break;
                 panic("unhandled exception!");
         }
-        csrWrite(sepc,kHartObjs.curtask->ctx.pc);
     }
     // printf("mtraphandler over\n");
     // if(kHartObjs.curtask->lastpriv!=proc::Task::Priv::User)kHartObjs.curtask->switchTo();
 
-    Log(debug,"strap exit, restore context=%s",kHartObjs.curtask->toString().c_str());
+    Log(debug,"strap exit, restore context=%s",kHartObjs.curtask->toString(true).c_str());
 }
 __attribute__((always_inline))
 void _strapenter(){

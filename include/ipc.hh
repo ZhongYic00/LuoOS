@@ -14,9 +14,15 @@ namespace pipe{
         klib::ringbuf<uint8_t> buff;
         semaphore::Semaphore wsem,rsem;
         klib::list<Task*> waiting;
-        Pipe():wsem(64),rsem(0){}
+        int wcnt,rcnt;
+        Pipe():wsem(64),rsem(0),wcnt(0),rcnt(0){}
+        inline void addReader(){rcnt++;}
+        inline void decReader(){rcnt--;}
+        inline void addWriter(){wcnt++;}
+        inline void decWriter(){wcnt--;}
         inline void write(klib::ByteArray bytes){
             auto n=bytes.len;
+            if(rcnt==0)return ;
             // TODO parallelize, copy avai bytes at once
             for(auto b:bytes){
                 wsem.req();
@@ -35,10 +41,13 @@ namespace pipe{
         inline klib::ByteArray read(int n){
             klib::ByteArray bytes(n);
             // while(buff.empty())sleep();
-            for(auto i=bytes.begin();!buff.empty()&&n;n--,i++){
+            /// @todo error handling
+            if(buff.empty()&&wcnt==0)return 0;
+            for(auto i=bytes.begin();n;n--,i++){
                 rsem.req();
                 *i=buff.get();buff.pop();
                 wsem.rel();
+                if(buff.empty())break;
             }
             // wakeup();
             return bytes;
