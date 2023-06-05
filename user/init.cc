@@ -40,7 +40,7 @@ int main(){
         // "munmap",
         "open",
         "openat",
-        // "pipe",
+        "pipe",
         "read",
         // "sleep",
         "times",

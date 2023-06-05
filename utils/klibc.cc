@@ -232,6 +232,7 @@ void *memset(void *s, int c, size_t n) {
 
 void *memmove(void *dst, const void *src, size_t n) {
   // may overlap
+  if(n<=0)return dst;
   const char *i=(const char*)src;
   char *j=(char*)dst;
   for(i+=n-1,j+=n-1;i>=(const char*)src;i--,j--)*j=*i;

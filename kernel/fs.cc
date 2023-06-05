@@ -81,6 +81,8 @@ klib::ByteArray fs::File::readAll(){
 fs::File::~File() {
     switch(type){
         case FileType::pipe: {
+            if(ops.fields.r)obj.pipe->decReader();
+            else if(ops.fields.w)obj.pipe->decWriter();
             obj.pipe.deRef();
             break;
         }

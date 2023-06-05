@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.h"
 
-#define moduleLevel LogLevel::trace
+#define moduleLevel LogLevel::debug
 
 extern void schedule();
 static hook_t hooks[]={schedule};
@@ -27,7 +27,8 @@ void uecallHandler(){
     if(ecallId<nSyscalls){
         /// @bug is this needed??
         // kHartObjs.curtask->lastpriv=proc::Task::Priv::Kernel;
-        // csrSet(sscratch,kHartObjs.curtask->kctx.gpr);
+        kHartObjs.trapstack=(ptr_t)kInfo.segments.kstack.first+0x1000;
+        csrWrite(sscratch,kHartObjs.curtask->kctx.gpr);
         // csrSet(sstatus,BIT(csr::mstatus::sie));
         rtval=syscallPtrs[ecallId]();
         csrClear(sstatus,BIT(csr::mstatus::sie));
@@ -83,7 +84,7 @@ extern "C" void straphandler(){
     xlen_t scause; csrRead(scause,scause);
     xlen_t stval; csrRead(stval,stval);
     Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
-    Log(trace,"strap enter, saved context=%s",kHartObjs.curtask->toString(true).c_str());
+    Log(debug,"strap enter, saved context=%s",kHartObjs.curtask->toString(true).c_str());
     if(kHartObjs.curtask->lastpriv==proc::Task::Priv::User)kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
     else kHartObjs.curtask->kctx.ra()=(xlen_t)sepc;
 
@@ -116,14 +117,15 @@ extern "C" void straphandler(){
             case storeAccessFault:break;
             default:
                 Log(error,"exception[%d] sepc=%x stval=%x",scause,sepc,stval);
+                // kHartObjs.curtask->kctx.ra()=(xlen_t)sepc+4;
+                // break;
                 panic("unhandled exception!");
         }
-        csrWrite(sepc,kHartObjs.curtask->ctx.pc);
     }
     // printf("mtraphandler over\n");
     // if(kHartObjs.curtask->lastpriv!=proc::Task::Priv::User)kHartObjs.curtask->switchTo();
 
-    Log(debug,"strap exit, restore context=%s",kHartObjs.curtask->toString().c_str());
+    Log(debug,"strap exit, restore context=%s",kHartObjs.curtask->toString(true).c_str());
 }
 __attribute__((always_inline))
 void _strapenter(){
@@ -162,13 +164,15 @@ void _strapexit(){
         // ExecInst(sfence.vma);
         kHartObjs.trapstack=(ptr_t)kInfo.segments.kstack.first+0x1000;
         // xlen_t gprvaddr=kInfo.segments.kstack.second+((xlen_t)cur->kctx.gpr-(xlen_t)cur);
+        csrSet(sstatus,1l<<csr::mstatus::spp);
+        csrSet(sstatus,BIT(csr::mstatus::spie));
+        csrWrite(sepc,cur->kctx.ra());
         csrWrite(sscratch,cur->kctx.gpr);
         volatile register ptr_t t6 asm("t6")=cur->kctx.gpr;
         restoreContext();
         /// @bug suppose this swap has problem when switching process
         csrSwap(sscratch,t6);
-        csrSet(sstatus,BIT(csr::mstatus::sie));
-        ExecInst(ret);
+        ExecInst(sret);
     }
 }
 extern "C" __attribute__((naked)) void strapwrapper(){

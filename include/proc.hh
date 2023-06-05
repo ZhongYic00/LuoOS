@@ -28,7 +28,7 @@ namespace proc
         xlen_t pc;
         inline klib::string toString() const{
             klib::string rt;
-            for(int i=0;i<30;i++)
+            for(int i=1;i<31;i++)
                 rt+=klib::format("%x,",gpr[i-1]);
             return klib::format("{gpr={%s},pc=%x}",rt.c_str(),pc);
         }
@@ -151,7 +151,7 @@ namespace proc
 
         inline klib::string toString(bool detail=false) const{
             if(detail)return klib::format("Task<%d> priv=%d ctx=%s kctx=%s",id,lastpriv,ctx.toString(),kctx.toString());
-            else return klib::format("Task<%d> priv=%d sp=%x ksp=%x",id,lastpriv,ctx.gpr[1],kctx.gpr[1]);
+            else return klib::format("Task<%d> priv=%d sp=%x ksp=%x pc=%x kra=%x",id,lastpriv,ctx.gpr[1],kctx.gpr[1],ctx.pc,kctx.gpr[0]);
         }
 
         template<typename ...Ts>

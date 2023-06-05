@@ -1,3 +1,4 @@
 *.o
 os-elf.txt
 obj/*
+kernel-qemu

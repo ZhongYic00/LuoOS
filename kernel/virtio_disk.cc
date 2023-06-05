@@ -179,7 +179,7 @@ public:
         csrClear(sstatus,BIT(csr::mstatus::sie));
     }
     ~IntGuard(){
-        csrSet(sstatus,BIT(csr::mstatus::sie));
+        // csrSet(sstatus,BIT(csr::mstatus::sie));
     }
 };
 
@@ -260,10 +260,12 @@ virtio_disk_rw(struct buf *b, int write)
     .queue.notify=0; // value is queue number
 
   // Wait for virtio_disk_intr() to say request has finished.
+  disk.info[idx[0]].waiting=kHartObjs.curtask;
+  csrSet(sstatus,BIT(csr::mstatus::sie));
   while(b->disk == 1) {
-    disk.info[idx[0]].waiting=kHartObjs.curtask;
-    syscall::sleep();
+    // syscall::sleep();
   }
+  csrClear(sstatus,BIT(csr::mstatus::sie));
 
   disk.info[idx[0]].b = 0;
   free_chain(idx[0]);
