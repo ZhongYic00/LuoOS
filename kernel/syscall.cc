@@ -484,7 +484,12 @@ namespace syscall
     }
     xlen_t clone(){
         auto &ctx=kHartObjs.curtask->ctx;
+        xlen_t func=ctx.x(10),childStack=ctx.x(11);
+        int flags=ctx.x(12);
         auto pid=proc::clone(kHartObjs.curtask);
+        auto thrd=kGlobObjs.procMgr[pid]->defaultTask();
+        if(childStack)thrd->ctx.sp()=childStack;
+        // if(func)thrd->ctx.pc=func;
         Log(info,"clone curproc=%d, new proc=%d",kHartObjs.curtask->getProcess()->pid(),pid);
         return pid;
     }

@@ -21,7 +21,7 @@ int main(){
     char *testsuits[] = {
         "brk",
         "chdir",
-        // "clone",
+        "clone",
         "close",
         "dup",
         "dup2",
