@@ -18,6 +18,7 @@ compile = $(CC) $(depflags) $(CFLAGS)
 # SBI: sbi/sbi.elf;
 OS: $(OS);
 all:  OS #SBI
+	cp $(OS) kernel-qemu.elf
 
 ksrcs = kernel/start.S\
 	$(shell find kernel/ -name "*.cc")
