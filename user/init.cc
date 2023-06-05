@@ -19,38 +19,38 @@ int main(){
     // }
     // 测例代码
     char *testsuits[] = {
-        "brk",
-        "chdir",
-        // "clone", 失败
-        "close",
-        "dup",
-        "dup2",
-        // "execve", 失败
-        "exit",
-        "fork",
-        "fstat",
-        "getcwd",
-        "getdents",
-        "getpid",
-        // "getppid", 失败
-        "gettimeofday",
-        "mkdir_",
-        // "mmap",
-        "mount",
-        // "munmap",
-        "open",
-        "openat",
-        // "pipe", 失败
-        "read",
-        "sleep",
-        "times",
-        "umount",
-        "uname",
-        "unlink",
-        "wait",
-        // "waitpid", 失败
-        "write",
-        // "yield" 失败
+        // "brk",
+        // "chdir",
+        // // "clone",
+        // "close",
+        // "dup",
+        // "dup2",
+        // // "execve", 失败
+        // "exit",
+        // "fork",
+        // "fstat",
+        // "getcwd",
+        // "getdents",
+        // "getpid",
+        // // "getppid",
+        // "gettimeofday",
+        // "mkdir_",
+        // // "mmap",
+        // "mount",
+        // // "munmap",
+        // "open",
+        // "openat",
+        // // "pipe",
+        // "read",
+        // "sleep",
+        // "times",
+        // "umount",
+        // "uname",
+        // "unlink",
+        // "wait",
+        "waitpid",
+        // "write",
+        // "yield"
     };
     const int tsn = sizeof(testsuits) / sizeof(char const*);
     char *args[] = { nullptr };
