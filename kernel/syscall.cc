@@ -538,6 +538,40 @@ namespace syscall
         xlen_t addr=ctx.x(10);
         return curproc.brk(addr);
     }
+    xlen_t mmap(){
+        auto &curproc=*kHartObjs.curtask->getProcess();
+        auto &ctx=kHartObjs.curtask->ctx;
+        xlen_t addr=ctx.x(10),len=ctx.x(11);
+        int prot=ctx.x(12),flags=ctx.x(13),fd=ctx.x(14),offset=ctx.x(15);
+        using namespace vm;
+        // determine target
+        const auto align=[](xlen_t addr){return addr2pn(addr);};
+        const auto choose=[&](){
+            auto rt=curproc.heapTop=ceil(curproc.heapTop);
+            curproc.heapTop+=len;
+            curproc.heapTop=ceil(curproc.heapTop);
+            return rt;
+        };
+        PageNum vpn,pages;
+        if(addr)vpn=align(addr);
+        else vpn=choose();
+        // initialize vmo
+        auto vmo=VMO::alloc(pages);
+        /// @todo register for shared mapping
+        /// @todo copy content to vmo
+        if(fd!=-1){
+            auto file=curproc.ofile(fd);
+            auto bytes=file->read(len);
+            memmove((ptr_t)pn2addr(vmo.ppn()),bytes.buff,bytes.len);
+        }
+        // actual map
+        auto mappingType= fd==-1 ?PageMapping::MappingType::file : PageMapping::MappingType::anon;
+        auto sharingType=(PageMapping::SharingType)(flags>>8);
+        curproc.vmar.map(PageMapping{vpn,vmo,PageMapping::prot2perm((PageMapping::Prot)prot),mappingType,sharingType});
+        // return val
+        return pn2addr(vpn);
+    }
+    xlen_t munmap(){}
     // xlen_t mprotect(){}
     int execve(klib::ByteArray buf,tinystl::vector<klib::ByteArray> &args,char **envp){
         auto &ctx=kHartObjs.curtask->ctx;

@@ -62,6 +62,7 @@ namespace fs{
         ~File();
         xlen_t write(xlen_t addr,size_t len);
         klib::ByteArray read(size_t len);
+        klib::ByteArray readAll();
     };
 }
 #endif
