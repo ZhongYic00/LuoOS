@@ -176,8 +176,8 @@ void start_kernel(int hartid){
     uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
     plicInit();
     timerInit();
-    csrClear(sstatus,1l<<csr::mstatus::spp);
-    csrSet(sstatus,BIT(csr::mstatus::spie));
+    // csrClear(sstatus,1l<<csr::mstatus::spp);
+    // csrSet(sstatus,BIT(csr::mstatus::spie));
     virtio_disk_init();
     Log(info,"virtio disk init over\n");
     binit();

@@ -12,6 +12,9 @@ static hook_t hooks[]={schedule};
 
 extern void nextTimeout();
 void timerInterruptHandler(){
+    xlen_t sstatus;
+    csrRead(sstatus,sstatus);
+    if(sstatus&BIT(csr::mstatus::spp))panic("should not happen!");
     nextTimeout();
     for(auto hook:hooks)hook();
 }
@@ -31,7 +34,7 @@ void uecallHandler(){
         csrWrite(sscratch,kHartObjs.curtask->kctx.gpr);
         // csrSet(sstatus,BIT(csr::mstatus::sie));
         rtval=syscallPtrs[ecallId]();
-        csrClear(sstatus,BIT(csr::mstatus::sie));
+        // csrClear(sstatus,BIT(csr::mstatus::sie));
         Log(debug,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
     } else {
         Log(warning,"syscall num exceeds valid range");
@@ -144,6 +147,7 @@ void _strapenter(){
 __attribute__((always_inline))
 void _strapexit(){
     auto cur=kHartObjs.curtask;
+    static xlen_t prevs0=0;
     /// @todo chaos
     if(cur->lastpriv==proc::Task::Priv::User){
         kHartObjs.trapstack=cur->kctx.kstack;
@@ -163,11 +167,12 @@ void _strapexit(){
         // csrWrite(satp,kctx.satp);
         // ExecInst(sfence.vma);
         kHartObjs.trapstack=(ptr_t)kInfo.segments.kstack.first+0x1000;
+        prevs0=kHartObjs.curtask->kctx.x(8);
         // xlen_t gprvaddr=kInfo.segments.kstack.second+((xlen_t)cur->kctx.gpr-(xlen_t)cur);
         csrSet(sstatus,1l<<csr::mstatus::spp);
-        csrSet(sstatus,BIT(csr::mstatus::spie));
+        if(cur->lastpriv==proc::Task::Priv::AlwaysKernel)csrSet(sstatus,BIT(csr::mstatus::spie))
+        else csrClear(sstatus,BIT(csr::mstatus::spie))
         csrWrite(sepc,cur->kctx.ra());
-        csrWrite(sscratch,cur->kctx.gpr);
         volatile register ptr_t t6 asm("t6")=cur->kctx.gpr;
         restoreContext();
         /// @bug suppose this swap has problem when switching process

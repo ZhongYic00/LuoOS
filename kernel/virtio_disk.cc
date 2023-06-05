@@ -186,7 +186,7 @@ public:
 void
 virtio_disk_rw(struct buf *b, int write)
 {
-  IntGuard guard;
+  // IntGuard guard;
   uint64 sector = b->sectorno;
   Log(debug,"diskrw sector=%ld",sector);
 
@@ -261,11 +261,13 @@ virtio_disk_rw(struct buf *b, int write)
 
   // Wait for virtio_disk_intr() to say request has finished.
   disk.info[idx[0]].waiting=kHartObjs.curtask;
+  csrClear(sie,BIT(csr::mie::stie));
   csrSet(sstatus,BIT(csr::mstatus::sie));
   while(b->disk == 1) {
     // syscall::sleep();
   }
   csrClear(sstatus,BIT(csr::mstatus::sie));
+  csrSet(sie,BIT(csr::mie::stie));
 
   disk.info[idx[0]].b = 0;
   free_chain(idx[0]);
