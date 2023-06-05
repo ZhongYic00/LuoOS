@@ -468,9 +468,7 @@ namespace syscall
         xlen_t ticks;
         asm volatile("rdtime %0" : "=r" (ticks) ); // todo@ 优化
         // todo@ timer相关
-        // #define CLK_FREQ 8900000
-        // TimeSpec ts(ticks/CLK_FREQ, ((ticks/(CLK_FREQ/100000))%100000)*10);
-        TimeSpec ts;
+        TimeSpec ts(ticks/CLK_FREQ, ((ticks/(CLK_FREQ/100000))%100000)*10);
         curproc->vmar.copyout((xlen_t)a_ts, klib::ByteArray((uint8_t*)&ts, sizeof(ts)));
 
         return statcode::ok;
@@ -555,6 +553,7 @@ namespace syscall
         PageNum vpn,pages;
         if(addr)vpn=align(addr);
         else vpn=choose();
+        pages = bytes2pages(len);
         // initialize vmo
         auto vmo=VMO::alloc(pages);
         /// @todo register for shared mapping
@@ -703,8 +702,10 @@ namespace syscall
         syscallPtrs[syscalls::gettimeofday] = syscall::getTimeOfDay;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
         syscallPtrs[syscalls::brk] = syscall::brk;
+        syscallPtrs[syscalls::munmap] = syscall::munmap;
         syscallPtrs[syscalls::clone] = syscall::clone;
         syscallPtrs[syscalls::execve] = syscall::execve;
+        syscallPtrs[syscalls::mmap] = syscall::mmap;
         syscallPtrs[syscalls::wait] = syscall::wait;
     }
 } // namespace syscall

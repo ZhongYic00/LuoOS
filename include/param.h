@@ -15,7 +15,6 @@
 #define NBUFLIST     4
 #define FSSIZE       1000  // size of file system in blocks
 #define MAXPATH      260   // maximum file path name
-#define INTERVAL     (390000000 / 100) // timer interrupt interval
 #define BINPRM_BUF_SIZE  128  //可执行文件头大小
 
 
