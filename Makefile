@@ -19,6 +19,8 @@ compile = $(CC) $(depflags) $(CFLAGS)
 OS: $(OS);
 all:  OS #SBI
 	cp $(OS) kernel-qemu
+	rm -rf obj/*
+	rm -rf *.o *.bin *.elf
 
 ksrcs = kernel/start.S\
 	$(shell find kernel/ -name "*.cc")
@@ -72,6 +74,11 @@ run: all
 	@echo "Press Ctrl-A and then X to exit QEMU"
 	@echo "------------------------------------"
 	@${QEMU} ${QFLAGS} -kernel $(OS) ${TEXTMODE} 2> obj/log
+
+testrun: all
+	rm -rf obj/*
+	rm -rf *.o *.bin *.elf
+	qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 -bios default -drive file=fat32.img,if=none,format=raw,id=x0  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 .PHONY : debug
 debug: all
