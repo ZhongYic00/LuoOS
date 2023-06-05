@@ -19,8 +19,6 @@ compile = $(CC) $(depflags) $(CFLAGS)
 OS: $(OS);
 all:  OS #SBI
 	cp $(OS) kernel-qemu
-	rm -rf obj/*
-	rm -rf *.o *.bin *.elf
 
 ksrcs = kernel/start.S\
 	$(shell find kernel/ -name "*.cc")

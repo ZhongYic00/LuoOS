@@ -68,6 +68,7 @@ namespace syscall
         return rt;
     }
     xlen_t testFATInit() {
+        Log(info,"initializing fat");
         if(fs::fat32_init() != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObjs.curtask->getProcess();
         curproc->cwd = fs::ename("/");
@@ -76,6 +77,7 @@ namespace syscall
         if(ep == nullptr) { panic("create /dev failed\n"); }
         ep = fs::create("/dev/vda2", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
+        Log(info,"fat initialize ok");
         return statcode::ok;
     }
     xlen_t getCwd(void) {
@@ -419,7 +421,7 @@ namespace syscall
         _strapexit(); //TODO check
     }
     void yield(){
-        Log(info,"yield!");
+        Log(debug,"yield!");
         auto &cur=kHartObjs.curtask;
         sleepSave(cur->kctx.gpr);
     }
@@ -490,11 +492,11 @@ namespace syscall
         auto thrd=kGlobObjs.procMgr[pid]->defaultTask();
         if(childStack)thrd->ctx.sp()=childStack;
         // if(func)thrd->ctx.pc=func;
-        Log(info,"clone curproc=%d, new proc=%d",kHartObjs.curtask->getProcess()->pid(),pid);
+        Log(debug,"clone curproc=%d, new proc=%d",kHartObjs.curtask->getProcess()->pid(),pid);
         return pid;
     }
     int waitpid(tid_t pid,xlen_t wstatus,int options){
-        Log(info,"waitpid(pid=%d,options=%d)",pid,options);
+        Log(debug,"waitpid(pid=%d,options=%d)",pid,options);
         auto curproc=kHartObjs.curtask->getProcess();
         proc::Process* target=nullptr;
         if(pid==-1){
@@ -622,7 +624,7 @@ namespace syscall
         // klib::string path((char*)pathbuf.buff,pathbuf.len);
         char *path=(char*)pathbuf.buff;
 
-        Log(info,"execve(path=%s,)",path);
+        Log(debug,"execve(path=%s,)",path);
         auto dentry=fs::ename(path);
         klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
         auto buf=file->read(dentry->file_size);

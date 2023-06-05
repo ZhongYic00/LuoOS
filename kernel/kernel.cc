@@ -11,7 +11,7 @@
 #include "virtio.h"
 #include "fat.hh"
 
-// #define moduleLevel LogLevel::info
+#define moduleLevel LogLevel::info
 
 extern char _kstack_end;
 xlen_t kstack_end=(xlen_t)&_kstack_end;
@@ -92,6 +92,7 @@ void kernel::createKernelMapping( vm::VMAR &vmar){
     { auto &seg=kInfo.segments.bss;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w,vm::VMO::CloneType::shared);}
 }
 static void memInit(){
+    Log(info,"initializing mem...");
     csr::satp satp;
     satp.mode=8;
     satp.asid=0;
@@ -111,9 +112,10 @@ static void memInit(){
     { auto seg=(vm::segment_t){0x84000000,0x84200000}; kGlobObjs.vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
 
     kGlobObjs.vmar->print();
+    Log(info,"is about to enable kernel vm");
     csrWrite(satp,kGlobObjs.ksatp=satp.value());
     ExecInst(sfence.vma);
-
+    Log(info,"kernel vm enabled, memInit success");
 }
 static void infoInit(){
     extern char _text_start,_text_end;
@@ -179,9 +181,11 @@ void start_kernel(int hartid){
     // csrClear(sstatus,1l<<csr::mstatus::spp);
     // csrSet(sstatus,BIT(csr::mstatus::spie));
     virtio_disk_init();
-    Log(info,"virtio disk init over\n");
+    Log(info,"virtio disk init over");
     binit();
+    Log(info,"binit over");
     schedule();
+    Log(info,"first schedule");
     volatile register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
     _strapexit();
     // halt();

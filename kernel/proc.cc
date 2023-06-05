@@ -3,7 +3,7 @@
 #include "kernel.hh"
 
 using namespace proc;
-#define moduleLevel LogLevel::info
+// #define moduleLevel LogLevel::info
 Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
 }
