@@ -117,8 +117,8 @@ extern "C" void straphandler(){
             case storeAccessFault:break;
             default:
                 Log(error,"exception[%d] sepc=%x stval=%x",scause,sepc,stval);
-                kHartObjs.curtask->kctx.ra()=(xlen_t)sepc+4;
-                break;
+                // kHartObjs.curtask->kctx.ra()=(xlen_t)sepc+4;
+                // break;
                 panic("unhandled exception!");
         }
     }

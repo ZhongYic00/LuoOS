@@ -179,7 +179,7 @@ public:
         csrClear(sstatus,BIT(csr::mstatus::sie));
     }
     ~IntGuard(){
-        csrSet(sstatus,BIT(csr::mstatus::sie));
+        // csrSet(sstatus,BIT(csr::mstatus::sie));
     }
 };
 
