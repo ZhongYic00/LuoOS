@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.h"
 
-#define moduleLevel LogLevel::trace
+// #define moduleLevel LogLevel::debug
 
 extern void schedule();
 static hook_t hooks[]={schedule};
@@ -162,13 +162,15 @@ void _strapexit(){
         // ExecInst(sfence.vma);
         kHartObjs.trapstack=(ptr_t)kInfo.segments.kstack.first+0x1000;
         // xlen_t gprvaddr=kInfo.segments.kstack.second+((xlen_t)cur->kctx.gpr-(xlen_t)cur);
+        csrSet(sstatus,1l<<csr::mstatus::spp);
+        csrSet(sstatus,BIT(csr::mstatus::spie));
+        csrWrite(sepc,cur->kctx.ra());
         csrWrite(sscratch,cur->kctx.gpr);
         volatile register ptr_t t6 asm("t6")=cur->kctx.gpr;
         restoreContext();
         /// @bug suppose this swap has problem when switching process
         csrSwap(sscratch,t6);
-        csrSet(sstatus,BIT(csr::mstatus::sie));
-        ExecInst(ret);
+        ExecInst(sret);
     }
 }
 extern "C" __attribute__((naked)) void strapwrapper(){
