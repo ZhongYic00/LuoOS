@@ -19,7 +19,7 @@ int main(){
     // }
     // 测例代码
     char *testsuits[] = {
-        // "brk",
+        "brk",
         "chdir",
         // "clone", 失败
         "close",
