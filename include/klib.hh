@@ -31,6 +31,7 @@ namespace klib
   {
     T buff[128];
     size_t head,tail;
+    ringbuf():head(0),tail(0){}
     FORCEDINLINE size_t next(size_t cur){return (cur+1)%buffsize;}
     inline void put(T d){
       buff[tail]=d;
