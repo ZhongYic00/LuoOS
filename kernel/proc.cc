@@ -3,7 +3,7 @@
 #include "kernel.hh"
 
 using namespace proc;
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::info
 Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
 }
@@ -14,39 +14,41 @@ xlen_t Process::newUstack(){
     vmar.map(vm::addr2pn(ustack),kGlobObjs.pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
     return ustack;
 }
-xlen_t Process::newKstack(){
+xlen_t Process::newTrapframe(){
+    /// @todo should be hartid or threadid related ?
     auto kstackv=kInfo.segments.kstack.second;
     xlen_t kstackppn;
     using perm=vm::PageTableEntry::fieldMasks;
-    vmar.map(vm::addr2pn(kstackv),kstackppn=kGlobObjs.pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v,vm::VMO::CloneType::alloc);
-    return vm::pn2addr(kstackppn+1)-1;
+    vmar.map(vm::addr2pn(kstackv),kstackppn=kGlobObjs.pageMgr->alloc(TrapframePages),1,perm::r|perm::w|perm::u|perm::v,vm::VMO::CloneType::alloc);
+    return vm::pn2addr(kstackppn);
 }
 
 Task* Process::newKTask(prior_t prior){
-    auto thrd=new (kGlobObjs.taskMgr) KTask(prior,this->pid(),proc::UserStackDefault);
-    thrd->kctx.kstack=(ptr_t)newKstack();
+    auto thrd=Task::createTask(kGlobObjs.taskMgr,newTrapframe(),prior,this->pid());
+    thrd->lastpriv=Task::Priv::AlwaysKernel;
     thrd->kctx.sp()=(xlen_t)thrd->kctx.kstack;
     addTask(thrd);
     kGlobObjs.scheduler.add(thrd);
+    return thrd;
 }
 Task* Process::newTask(){
     // auto thrd=kGlobObjs.taskMgr.alloc(0,this->pid(),proc::UserStackDefault);
-    auto thrd=new (kGlobObjs.taskMgr) Task(0,this->pid(),proc::UserStackDefault);
+    auto thrd=Task::createTask(kGlobObjs.taskMgr,newTrapframe(),0,this->pid());
     thrd->ctx.sp()=newUstack();
     thrd->ctx.a0()=0;
-    thrd->kctx.kstack=(ptr_t)newKstack();
     addTask(thrd);
     kGlobObjs.scheduler.add(thrd);
+    return thrd;
 }
 
 Task* Process::newTask(const Task &other,bool allocStack){
-    auto thrd=new (kGlobObjs.taskMgr) Task(other,this->pid());
+    auto thrd=Task::createTask(kGlobObjs.taskMgr,newTrapframe(),other,this->pid());
     if(allocStack){
         thrd->ctx.sp()=newUstack();
     }
-    thrd->kctx.kstack=(ptr_t)newKstack();
     addTask(thrd);
     kGlobObjs.scheduler.add(thrd);
+    return thrd;
 }
 
 void validate(){

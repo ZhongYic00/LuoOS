@@ -8,7 +8,7 @@
 #include "TINYSTL/vector.h"
 #include "linux/reboot.h"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::info
 
 syscall_t syscallPtrs[sys::syscalls::nSyscalls];
 extern void _strapexit();
@@ -487,6 +487,7 @@ namespace syscall
     xlen_t clone(){
         auto &ctx=kHartObjs.curtask->ctx;
         auto pid=proc::clone(kHartObjs.curtask);
+        Log(info,"clone curproc=%d, new proc=%d",kHartObjs.curtask->getProcess()->pid(),pid);
         return pid;
     }
     int waitpid(tid_t pid,xlen_t wstatus,int options){
@@ -575,6 +576,8 @@ namespace syscall
         klib::ByteArray pathbuf = curproc->vmar.copyinstr(pathuva, FAT32_MAX_PATH);
         // klib::string path((char*)pathbuf.buff,pathbuf.len);
         char *path=(char*)pathbuf.buff;
+
+        Log(info,"execve(path=%s,)",path);
         auto dentry=fs::ename(path);
         klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
         auto buf=file->read(dentry->file_size);

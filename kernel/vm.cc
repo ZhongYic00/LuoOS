@@ -3,7 +3,7 @@
 #include "kernel.hh"
 #include "rvcsr.hh"
 
-#define moduleLevel LogLevel::info
+// #define moduleLevel LogLevel::info
 
 using namespace vm;
 PageNum PageTable::trans(PageNum vpn){

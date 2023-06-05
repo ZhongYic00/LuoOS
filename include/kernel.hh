@@ -116,6 +116,7 @@ namespace kernel{
         proc::TaskManager taskMgr;
         proc::ProcManager procMgr;
         xlen_t ksatp;
+        xlen_t prevsatp;
     };
     // struct KernelTaskObjs{
     //     proc::Context ctx;

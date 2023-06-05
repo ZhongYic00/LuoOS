@@ -15,7 +15,7 @@
 #include "proc.hh"
 #include "vm.hh"
 #include "klib.hh"
-#define moduleLevel debug
+// #define moduleLevel debug
 namespace syscall
 {
   extern int sleep();
