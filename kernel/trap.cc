@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.h"
 
-#define moduleLevel LogLevel::info
+#define moduleLevel LogLevel::trace
 
 extern void schedule();
 static hook_t hooks[]={schedule};
@@ -33,7 +33,7 @@ void uecallHandler(){
         // csrClear(sstatus,BIT(csr::mstatus::sie));
         // csrSet(sscratch,kHartObjs.curtask->ctx.gpr);
         // kHartObjs.curtask->lastpriv=proc::Task::Priv::User;
-        Log(info,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
+        Log(debug,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
     } else {
         Log(warning,"syscall num exceeds valid range");
         rtval=1;
@@ -87,7 +87,7 @@ extern "C" void straphandler(){
     Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
     Log(trace,"strap enter, saved context=%s",kHartObjs.curtask->toString(true).c_str());
     if(kHartObjs.curtask->lastpriv==proc::Task::Priv::User)kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
-    else kHartObjs.curtask->kctx.pc=(xlen_t)sepc;
+    else kHartObjs.curtask->kctx.ra()=(xlen_t)sepc;
 
     if(csr::mcause::isInterrupt(scause)){
         switch(scause<<1>>1){
@@ -107,7 +107,7 @@ extern "C" void straphandler(){
             // case hei: break;
             // case mei: break;
             default:
-                Log(error,"scause=%d",scause);
+                Log(error,"interrupt[%d]",scause);
                 panic("unhandled interrupt!");
         }
     } else {
@@ -117,7 +117,7 @@ extern "C" void straphandler(){
             // case secall:break;
             case storeAccessFault:break;
             default:
-                Log(error,"scause=%d",scause);
+                Log(error,"exception[%d] sepc=%x stval=%x",scause,sepc,stval);
                 panic("unhandled exception!");
         }
         csrWrite(sepc,kHartObjs.curtask->ctx.pc);
@@ -125,13 +125,14 @@ extern "C" void straphandler(){
     // printf("mtraphandler over\n");
     // if(kHartObjs.curtask->lastpriv!=proc::Task::Priv::User)kHartObjs.curtask->switchTo();
 
-    Log(trace,"strap exit, restore context=%s",kHartObjs.curtask->toString(true).c_str());
+    Log(debug,"strap exit, restore context=%s",kHartObjs.curtask->toString().c_str());
 }
 __attribute__((always_inline))
 void _strapenter(){
     csrSwap(sscratch,t6);
     saveContext();
     extern xlen_t kstack_end;
+    csrRead(satp,kGlobObjs.prevsatp);
     csrWrite(satp,kGlobObjs.ksatp);
     ExecInst(sfence.vma);
     volatile register ptr_t sp asm("sp");
@@ -146,13 +147,15 @@ void _strapexit(){
     /// @todo chaos
     if(cur->lastpriv==proc::Task::Priv::User){
         kHartObjs.trapstack=cur->kctx.kstack;
-        csrWrite(sscratch,cur->ctx.gpr);
+        xlen_t gprvaddr=kInfo.segments.kstack.second+(xlen_t)(cur->ctx.gpr)-(xlen_t)cur;
+        csrWrite(sscratch,gprvaddr);
         csrWrite(sepc,cur->ctx.pc);
         csrClear(sstatus,1l<<csr::mstatus::spp);
         csrSet(sstatus,BIT(csr::mstatus::spie));
         csrWrite(satp,kHartObjs.curtask->kctx.satp);
         ExecInst(sfence.vma);
-        register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
+        register xlen_t t6 asm("t6");
+        csrRead(sscratch,t6);
         restoreContext();
         csrSwap(sscratch,t6);
         ExecInst(sret);
@@ -160,6 +163,7 @@ void _strapexit(){
         // csrWrite(satp,kctx.satp);
         // ExecInst(sfence.vma);
         kHartObjs.trapstack=(ptr_t)kInfo.segments.kstack.first+0x1000;
+        // xlen_t gprvaddr=kInfo.segments.kstack.second+((xlen_t)cur->kctx.gpr-(xlen_t)cur);
         csrWrite(sscratch,cur->kctx.gpr);
         volatile register ptr_t t6 asm("t6")=cur->kctx.gpr;
         restoreContext();
