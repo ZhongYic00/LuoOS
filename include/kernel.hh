@@ -49,8 +49,10 @@ namespace sys
         getpid=172,
         getppid=173,
         brk=214,
+        munmap=215,
         clone=220,
         execve=221,
+        mmap=222,
         wait=260,
         nSyscalls,
     };

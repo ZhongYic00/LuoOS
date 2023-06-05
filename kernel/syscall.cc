@@ -555,6 +555,7 @@ namespace syscall
         PageNum vpn,pages;
         if(addr)vpn=align(addr);
         else vpn=choose();
+        pages = bytes2pages(len);
         // initialize vmo
         auto vmo=VMO::alloc(pages);
         /// @todo register for shared mapping
@@ -703,8 +704,10 @@ namespace syscall
         syscallPtrs[syscalls::gettimeofday] = syscall::getTimeOfDay;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
         syscallPtrs[syscalls::brk] = syscall::brk;
+        syscallPtrs[syscalls::munmap] = syscall::munmap;
         syscallPtrs[syscalls::clone] = syscall::clone;
         syscallPtrs[syscalls::execve] = syscall::execve;
+        syscallPtrs[syscalls::mmap] = syscall::mmap;
         syscallPtrs[syscalls::wait] = syscall::wait;
     }
 } // namespace syscall

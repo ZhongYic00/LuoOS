@@ -26,6 +26,14 @@ xlen_t fs::File::write(xlen_t addr,size_t len){
             obj.pipe->write(bytes);
             rt=bytes.len;
             break;
+        case FileType::entry:
+            elock(obj.ep);
+            if (ewrite(obj.ep, 1, addr, off, len) == len) {
+                off += len;
+                rt = len;
+            }
+            else { rt = sys::statcode::err; }
+            eunlock(obj.ep);
         default:
             break;
     }
