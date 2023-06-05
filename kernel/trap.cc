@@ -30,9 +30,7 @@ void uecallHandler(){
         // csrSet(sscratch,kHartObjs.curtask->kctx.gpr);
         // csrSet(sstatus,BIT(csr::mstatus::sie));
         rtval=syscallPtrs[ecallId]();
-        // csrClear(sstatus,BIT(csr::mstatus::sie));
-        // csrSet(sscratch,kHartObjs.curtask->ctx.gpr);
-        // kHartObjs.curtask->lastpriv=proc::Task::Priv::User;
+        csrClear(sstatus,BIT(csr::mstatus::sie));
         Log(debug,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
     } else {
         Log(warning,"syscall num exceeds valid range");
