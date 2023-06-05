@@ -531,6 +531,13 @@ namespace syscall
         xlen_t wstatus=ctx.x(11);
         return waitpid(pid,wstatus,0);
     }
+    xlen_t brk(){
+        auto &ctx=kHartObjs.curtask->ctx;
+        auto &curproc=*kHartObjs.curtask->getProcess();
+        xlen_t addr=ctx.x(10);
+        return curproc.brk(addr);
+    }
+    // xlen_t mprotect(){}
     int execve(klib::ByteArray buf,tinystl::vector<klib::ByteArray> &args,char **envp){
         auto &ctx=kHartObjs.curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
@@ -658,6 +665,7 @@ namespace syscall
         syscallPtrs[syscalls::uname] = syscall::uName;
         syscallPtrs[syscalls::gettimeofday] = syscall::getTimeOfDay;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
+        syscallPtrs[syscalls::brk] = syscall::brk;
         syscallPtrs[syscalls::clone] = syscall::clone;
         syscallPtrs[syscalls::execve] = syscall::execve;
         syscallPtrs[syscalls::wait] = syscall::wait;

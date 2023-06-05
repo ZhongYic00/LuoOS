@@ -48,6 +48,7 @@ namespace sys
         gettimeofday=169,
         getpid=172,
         getppid=173,
+        brk=214,
         clone=220,
         execve=221,
         wait=260,

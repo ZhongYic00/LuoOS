@@ -20,8 +20,8 @@ namespace vm
     //     inline xlen_t size(){return second-first;}
     // };
 
-    inline xlen_t pn2addr(xlen_t pn){ return pn<<12; }
-    inline xlen_t addr2pn(xlen_t addr){ return addr>>12; }
+    inline constexpr xlen_t pn2addr(xlen_t pn){ return pn<<12; }
+    inline constexpr xlen_t addr2pn(xlen_t addr){ return addr>>12; }
     union PageTableEntry{
         struct Fields{
         #define ONE(x) int x:1
@@ -72,8 +72,9 @@ namespace vm
     constexpr xlen_t pageEntriesPerPage=pageSize/sizeof(PageTableEntry);
     constexpr xlen_t vpnMask=0x1ff;
     constexpr xlen_t vaddrOffsetMask=pageSize-1;
-    inline xlen_t addr2offset(xlen_t addr){ return addr&(vaddrOffsetMask); }
-    inline xlen_t bytes2pages(xlen_t bytes){ return bytes/pageSize+((bytes%pageSize)>0); }
+    inline constexpr xlen_t addr2offset(xlen_t addr){ return addr&(vaddrOffsetMask); }
+    inline constexpr xlen_t bytes2pages(xlen_t bytes){ return bytes/pageSize+((bytes%pageSize)>0); }
+    inline constexpr xlen_t ceil(xlen_t addr){ return bytes2pages(addr)*pageSize; }
     inline xlen_t copyframes(PageNum src,PageNum dst,PageNum pages){
         memcpy((ptr_t)pn2addr(dst),(ptr_t)pn2addr(src),pages*pageSize);
     }
@@ -136,6 +137,9 @@ namespace vm
             if(prot&write)rt|=masks::w;
             if(prot&exec)rt|=masks::x;
             return rt;
+        }
+        inline bool contains(xlen_t addr){
+            return addr>=pn2addr(vpn) && addr<=pn2addr(vpn+vmo.pages());
         }
         bool operator==(const PageMapping &other){return vpn==other.vpn&&vmo==other.vmo&&perm==other.perm&&mapping==other.mapping&&sharing==other.sharing;}
     };
@@ -240,6 +244,12 @@ namespace vm
             // @todo 检查拷贝后是否会越界（addr+buff.len后超出用户进程大小）
             xlen_t paddr=pagetable.transaddr(addr);
             memmove((ptr_t)paddr,buff.buff,buff.len);
+        }
+        inline bool contains(xlen_t addr){
+            for(auto mapping: mappings){
+                if(mapping.contains(addr))return true;
+            }
+            return false;
         }
         class Writer{
             xlen_t vaddr;
