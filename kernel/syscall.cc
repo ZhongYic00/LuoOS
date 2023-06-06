@@ -555,7 +555,7 @@ namespace syscall
             auto rt=curproc.heapTop=ceil(curproc.heapTop);
             curproc.heapTop+=len;
             curproc.heapTop=ceil(curproc.heapTop);
-            return rt;
+            return addr2pn(rt);
         };
         PageNum vpn,pages;
         if(addr)vpn=align(addr);
