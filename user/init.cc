@@ -48,7 +48,7 @@ int main(){
         "uname",
         "unlink",
         "wait",
-        // "waitpid",
+        "waitpid",
         "write",
         "yield"
     };

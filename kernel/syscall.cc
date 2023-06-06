@@ -524,6 +524,7 @@ namespace syscall
                 // proc add hook
                 sleep();
             }
+            target=proc;
         }
         else if(pid==0)panic("waitpid: unimplemented!"); // @todo 每个回收的子进程都更新父进程的ti
         else if(pid<0)panic("waitpid: unimplemented!");
