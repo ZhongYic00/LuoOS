@@ -38,6 +38,7 @@ namespace proc
         xlen_t satp;
     };
 
+    struct Task; 
     class Tms {
         private:
             long m_tms_utime;
@@ -54,9 +55,14 @@ namespace proc
                 m_tms_cstime = a_tms.m_tms_cstime;
                 return *this;
             }
+            const Tms& operator+=(const Tms &a_tms) {
+                m_tms_cutime += a_tms.m_tms_utime;
+                m_tms_cstime += a_tms.m_tms_stime;
+                return *this;
+            }
+            inline void uTick() { ++m_tms_utime; }
+            inline void sTick() { ++m_tms_stime; }
     };
-
-    struct Task;
     constexpr xlen_t UserStackDefault=0x7ffffff0,
         TrapframePages=2,
         UserHeapTop=(UserStackDefault-(1l<<29)),
