@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.h"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::debug
 
 static hook_t hooks[]={schedule};
 
@@ -27,7 +27,7 @@ void timerInterruptHandler(){
     }
     xlen_t sstatus;
     csrRead(sstatus,sstatus);
-    if(sstatus&BIT(csr::mstatus::spp))panic("should not happen!");
+    if(cur->lastpriv!=proc::Task::Priv::AlwaysKernel&&sstatus&BIT(csr::mstatus::spp))panic("should not happen!");
     nextTimeout();
     for(auto hook:hooks)hook();
 }
