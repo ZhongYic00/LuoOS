@@ -420,6 +420,11 @@ namespace syscall
         schedule();
         _strapexit(); //TODO check
     }
+    klib::list<struct proc::SleepingTask> sleep_tasks;
+    xlen_t nanoSleep() {
+        auto cur = kHartObjs.curtask;
+        struct proc::SleepingTask tosleep();
+    }
     void yield(){
         Log(debug,"yield!");
         auto &cur=kHartObjs.curtask;
@@ -478,6 +483,7 @@ namespace syscall
     xlen_t getPid(){
         return kHartObjs.curtask->getProcess()->pid();
     }
+    xlen_t getPPid() { return kHartObjs.curtask->getProcess()->parentProc()->pid(); }
     int sleep(){
         auto &cur=kHartObjs.curtask;
         cur->sleep();
@@ -708,6 +714,7 @@ namespace syscall
         syscallPtrs[syscalls::uname] = syscall::uName;
         syscallPtrs[syscalls::gettimeofday] = syscall::getTimeOfDay;
         syscallPtrs[syscalls::getpid] = syscall::getPid;
+        syscallPtrs[syscalls::getppid] = syscall::getPPid;
         syscallPtrs[syscalls::brk] = syscall::brk;
         syscallPtrs[syscalls::munmap] = syscall::munmap;
         syscallPtrs[syscalls::clone] = syscall::clone;
