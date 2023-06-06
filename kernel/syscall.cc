@@ -435,11 +435,10 @@ namespace syscall
         // if(a_tms == nullptr) { return statcode::err; } // a_tms留空时不管tms只返回ticks？
 
         auto curproc = kHartObjs.curtask->getProcess();
-        if(a_tms != nullptr) { curproc->vmar.copyout((xlen_t)a_tms, klib::ByteArray((uint8_t*)&curproc->ti, sizeof(proc::Tms))); }
+        if(a_tms != nullptr) { curproc->vmar.copyout((xlen_t)a_tms, klib::ByteArray((uint8_t*)curproc->ti, sizeof(proc::Tms))); }
         // acquire(&tickslock);
         // todo@ timer相关
-        // int ticks = (int)(ticks/INTERVAL);
-        int ticks = 0;
+        int ticks = (int)(kHartObjs.g_ticks/INTERVAL);
         // release(&tickslock);
 
         return ticks;
@@ -469,7 +468,6 @@ namespace syscall
         auto curproc = kHartObjs.curtask->getProcess();
         xlen_t ticks;
         asm volatile("rdtime %0" : "=r" (ticks) ); // todo@ 优化
-        // todo@ timer相关
         TimeSpec ts(ticks/CLK_FREQ, ((ticks/(CLK_FREQ/100000))%100000)*10);
         curproc->vmar.copyout((xlen_t)a_ts, klib::ByteArray((uint8_t*)&ts, sizeof(ts)));
 
@@ -522,11 +520,12 @@ namespace syscall
                 sleep();
             }
         }
-        else if(pid==0)panic("waitpid: unimplemented!");
+        else if(pid==0)panic("waitpid: unimplemented!"); // @todo 每个回收的子进程都更新父进程的ti
         else if(pid<0)panic("waitpid: unimplemented!");
         if(target==nullptr)return statcode::err;
+        *(curproc->ti) += *(target->ti);
         auto rt=target->pid();
-        if(wstatus)kHartObjs.curtask->getProcess()->vmar[wstatus]=(int)(target->exitstatus<<8);
+        if(wstatus)curproc->vmar[wstatus]=(int)(target->exitstatus<<8);
         target->zombieExit();
         return rt;
     }

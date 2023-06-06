@@ -38,25 +38,8 @@ namespace proc
         xlen_t satp;
     };
 
-    class Tms {
-        private:
-            long m_tms_utime;
-            long m_tms_stime;
-            long m_tms_cutime;
-            long m_tms_cstime;
-        public:
-            Tms(): m_tms_utime(0), m_tms_stime(0), m_tms_cutime(0), m_tms_cstime(0) {}
-            Tms(const Tms &a_tms): m_tms_utime(a_tms.m_tms_utime), m_tms_stime(a_tms.m_tms_stime), m_tms_cutime(a_tms.m_tms_cutime), m_tms_cstime(a_tms.m_tms_cstime) {}
-            const Tms& operator=(const Tms &a_tms) {
-                m_tms_utime = a_tms.m_tms_utime;
-                m_tms_stime = a_tms.m_tms_stime;
-                m_tms_cutime = a_tms.m_tms_cutime;
-                m_tms_cstime = a_tms.m_tms_cstime;
-                return *this;
-            }
-    };
-
-    struct Task;
+    struct Task; 
+    class Tms;
     constexpr xlen_t UserStackDefault=0x7ffffff0,
         TrapframePages=2,
         UserHeapTop=(UserStackDefault-(1l<<29)),
@@ -75,7 +58,7 @@ namespace proc
         SharedPtr<File> files[MaxOpenFile];
         tinystl::string name;
         // @todo 以下为临时的接口，需要修改
-        Tms ti;
+        Tms *ti;
         dirent *cwd;
         mapped_file mfile;    //映射的文件的范围
         int exitstatus;
@@ -182,6 +165,33 @@ namespace proc
             }
             return rt;
         }
+    };
+    class Tms {
+        private:
+            long m_tms_utime;
+            long m_tms_stime;
+            long m_tms_cutime;
+            long m_tms_cstime;
+        public:
+            Tms(): m_tms_utime(0), m_tms_stime(0), m_tms_cutime(0), m_tms_cstime(0) {}
+            Tms(const Tms &a_tms): m_tms_utime(a_tms.m_tms_utime), m_tms_stime(a_tms.m_tms_stime), m_tms_cutime(a_tms.m_tms_cutime), m_tms_cstime(a_tms.m_tms_cstime) {}
+            const Tms& operator=(const Tms &a_tms) {
+                m_tms_utime = a_tms.m_tms_utime;
+                m_tms_stime = a_tms.m_tms_stime;
+                m_tms_cutime = a_tms.m_tms_cutime;
+                m_tms_cstime = a_tms.m_tms_cstime;
+                return *this;
+            }
+            const Tms& operator+=(const Tms &a_tms) {
+                m_tms_cutime += a_tms.m_tms_utime;
+                m_tms_cstime += a_tms.m_tms_stime;
+                return *this;
+            }
+            const Tms& operator+(Task::Priv a_priv) {
+                if(a_priv == Task::Priv::User) { ++m_tms_utime; }
+                else { ++m_tms_stime; }
+                return *this;
+            }
     };
     Process* createProcess();
     Process* createKProcess(prior_t prior);

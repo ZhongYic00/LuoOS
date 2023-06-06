@@ -7,11 +7,16 @@
 
 // #define moduleLevel LogLevel::debug
 
-extern void schedule();
 static hook_t hooks[]={schedule};
 
 extern void nextTimeout();
 void timerInterruptHandler(){
+    auto cur = kHartObjs.curtask;
+    if(cur != nullptr) {
+        auto curproc = cur->getProcess();
+        *(curproc->ti) + cur->lastpriv;
+    }
+    ++kHartObjs.g_ticks;
     xlen_t sstatus;
     csrRead(sstatus,sstatus);
     if(sstatus&BIT(csr::mstatus::spp))panic("should not happen!");

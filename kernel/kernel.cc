@@ -34,6 +34,7 @@ void nextTimeout(){
     sbi_set_timer(time+kernel::timerInterval);
 }
 static void timerInit(){
+    kHartObjs.g_ticks = 0;
     csrSet(sie,BIT(csr::mie::stie));
     nextTimeout();
 }
