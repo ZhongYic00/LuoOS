@@ -68,10 +68,9 @@ $(uimg): $(userprogs)
 
 TEXTMODE=-nographic > obj/output
 run: all
-	@${QEMU} -M ? | grep virt >/dev/null || exit
 	@echo "Press Ctrl-A and then X to exit QEMU"
 	@echo "------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel $(OS) ${TEXTMODE} 2> obj/log
+	@${QEMU} ${QFLAGS} -kernel $(OS) -s ${TEXTMODE} 2> obj/log
 
 testrun: all
 	rm -rf obj/*

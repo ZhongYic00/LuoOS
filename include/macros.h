@@ -21,6 +21,6 @@ extern int outputLevel;
     #define moduleLevel LogLevel::error
 #endif
 #define Log(level,fmt,...) \
-    if(level>=outputLevel && level>=moduleLevel){printf((__FILE__":%d:%s::\t" fmt "\n"),__LINE__,__PRETTY_FUNCTION__,##__VA_ARGS__);}
+    if(level>=outputLevel && level>=moduleLevel){kLogger.log((__FILE__":%d:%s::\t" fmt "\n"),__LINE__,__PRETTY_FUNCTION__,##__VA_ARGS__);}
 
 #define DEBUG 0

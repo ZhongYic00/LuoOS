@@ -3,7 +3,7 @@
 #include "klib.h"
 #include "alloc.hh"
 
-int outputLevel=LogLevel::info;
+int outputLevel=LogLevel::debug;
 
 void (*puts)(const char *s);
 
@@ -12,7 +12,7 @@ int putchar(char c){
 	puts(buff);
 }
 
-static int _vsnprintf(char * out, size_t n, const char* s, va_list vl)
+int _vsnprintf(char * out, size_t n, const char* s, va_list vl)
 {
 	int format = 0;
 	int longarg = 0;
@@ -148,7 +148,7 @@ int printf(const char* s, ...)
 
 void panic(char *s)
 {
-	Log(error,"panic: %s",s);
+	printf("panic: %s",s);
 	halt();
 }
 void halt(int errno){

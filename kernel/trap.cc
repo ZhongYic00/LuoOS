@@ -100,7 +100,7 @@ extern "C" void straphandler(){
     xlen_t scause; csrRead(scause,scause);
     xlen_t stval; csrRead(stval,stval);
     Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
-    Log(debug,"strap enter, saved context=%s",kHartObjs.curtask->toString(true).c_str());
+    Log(debug,"strap enter, saved context=%s",kHartObjs.curtask->toString().c_str());
     if(kHartObjs.curtask->lastpriv==proc::Task::Priv::User)kHartObjs.curtask->ctx.pc=(xlen_t)sepc;
     else kHartObjs.curtask->kctx.ra()=(xlen_t)sepc;
 
@@ -141,7 +141,7 @@ extern "C" void straphandler(){
     // printf("mtraphandler over\n");
     // if(kHartObjs.curtask->lastpriv!=proc::Task::Priv::User)kHartObjs.curtask->switchTo();
 
-    Log(debug,"strap exit, restore context=%s",kHartObjs.curtask->toString(true).c_str());
+    Log(debug,"strap exit, restore context=%s",kHartObjs.curtask->toString().c_str());
 }
 __attribute__((always_inline))
 void _strapenter(){

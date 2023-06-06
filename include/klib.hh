@@ -37,6 +37,11 @@ namespace klib
       buff[tail]=d;
       tail=next(tail);
     }
+    inline T& req(){
+      auto &rt=buff[tail];
+      tail=next(tail);
+      return rt;
+    }
     inline void pop(){
       head=next(head);
     }
@@ -395,7 +400,7 @@ struct list:public Seq<T>{
       inline const bool expired() const { return (m_meta!=nullptr) ? (m_meta->m_ref<=0) : true; }
       // inline const bool valid() const { return m_ptr != nullptr; }
       void print() const {
-        Log(debug,"SharedPtr: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
+        // Log(debug,"SharedPtr: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
       }
   };
   /*
@@ -434,6 +439,18 @@ public:
     char c=buf.get();buf.pop();return c;
   }
 };
+
+class Logger{
+  struct LogItem{
+    int id;
+    char buf[300];
+  };
+  klib::ringbuf<LogItem> ring;
+  int lid=0;
+public:
+    void log(const char *fmt,...);
+};
+extern Logger kLogger;
 
 // namespace klib
 // {

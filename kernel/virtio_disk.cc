@@ -15,7 +15,7 @@
 #include "proc.hh"
 #include "vm.hh"
 #include "klib.hh"
-// #define moduleLevel debug
+#define moduleLevel debug
 namespace syscall
 {
   extern int sleep();
@@ -161,7 +161,7 @@ free_chain(int i)
 static int
 alloc3_desc(int *idx)
 {
-  Log(debug,"alloc3_desc");
+  Log(trace,"alloc3_desc");
   for(int i = 0; i < 3; i++){
     idx[i] = alloc_desc();
     if(idx[i] < 0){
