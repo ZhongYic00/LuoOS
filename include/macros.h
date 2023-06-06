@@ -16,7 +16,7 @@ enum LogLevel{
 #define TRACE(x) IFDEF(moduleLevel<=LogLevel::trace,x)
 #define IFTEST(x) IFDEF(GUEST,x)
 
-#define outputLevel LogLevel::info
+extern int outputLevel;
 #ifndef moduleLevel
     #define moduleLevel LogLevel::error
 #endif
