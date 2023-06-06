@@ -131,6 +131,7 @@ namespace kernel{
         KernelTaskObjs *curtask;
         ptr_t trapstack;
         uint g_ticks;
+        proc::SleepingTask sleep_tasks[NMAXSLEEP];
     };
     inline int readHartId(){register int hartid asm("tp"); return hartid;}
     void createKernelMapping(vm::VMAR &vmar);

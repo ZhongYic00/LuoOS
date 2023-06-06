@@ -176,9 +176,9 @@ namespace proc
     };
     struct SleepingTask {
         struct Task *m_task;
-        uint wakeup_tick;
-        SleepingTask():m_task(nullptr), wakeup_tick(0) {}
-        SleepingTask(struct Task *a_task, uint a_tick):m_task(a_task), wakeup_tick(a_tick) {}
+        uint m_wakeup_tick;
+        SleepingTask():m_task(nullptr), m_wakeup_tick(0) {}
+        SleepingTask(struct Task *a_task, uint a_tick):m_task(a_task), m_wakeup_tick(a_tick) {}
     };
     struct KTask:public Task{};
     typedef ObjManager<Process> ProcManagerBase;

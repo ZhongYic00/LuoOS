@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.h"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::debug
 
 static hook_t hooks[]={schedule};
 
@@ -18,9 +18,16 @@ void timerInterruptHandler(){
         else {curproc->ti.sTick(); }
     }
     ++kHartObjs.g_ticks;
+    for(int i = 0; i < NMAXSLEEP; ++i) {
+        auto towake = kHartObjs.sleep_tasks[i];
+        if(towake.m_task!=nullptr && towake.m_wakeup_tick<kHartObjs.g_ticks) {
+            kGlobObjs.scheduler.wakeup(towake.m_task);
+            kHartObjs.sleep_tasks[i].m_task = nullptr;
+        }
+    }
     xlen_t sstatus;
     csrRead(sstatus,sstatus);
-    if(sstatus&BIT(csr::mstatus::spp))panic("should not happen!");
+    if(cur->lastpriv!=proc::Task::Priv::AlwaysKernel&&sstatus&BIT(csr::mstatus::spp))panic("should not happen!");
     nextTimeout();
     for(auto hook:hooks)hook();
 }

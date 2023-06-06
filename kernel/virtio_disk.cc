@@ -260,7 +260,7 @@ virtio_disk_rw(struct buf *b, int write)
     .queue.notify=0; // value is queue number
 
   // Wait for virtio_disk_intr() to say request has finished.
-  disk.info[idx[0]].waiting=kHartObjs.curtask;
+  // disk.info[idx[0]].waiting=kHartObjs.curtask;
   csrClear(sie,BIT(csr::mie::stie));
   csrSet(sstatus,BIT(csr::mstatus::sie));
   while(b->disk == 1) {
@@ -289,7 +289,7 @@ virtio_disk_intr()
     //   panic("virtio_disk_intr status");
     
     info.b->disk = 0;   // disk is done with buf
-    kGlobObjs.scheduler.wakeup(info.waiting);
+    // kGlobObjs.scheduler.wakeup(info.waiting);
 
     disk.used_idx = (disk.used_idx + 1) % NUM;
   }

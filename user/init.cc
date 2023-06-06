@@ -42,7 +42,7 @@ int main(){
         "openat",
         "pipe",
         "read",
-        // "sleep",
+        "sleep",
         "times",
         "umount",
         "uname",

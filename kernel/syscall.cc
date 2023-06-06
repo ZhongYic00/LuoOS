@@ -420,10 +420,22 @@ namespace syscall
         schedule();
         _strapexit(); //TODO check
     }
-    klib::list<struct proc::SleepingTask> sleep_tasks;
     xlen_t nanoSleep() {
         auto cur = kHartObjs.curtask;
-        struct proc::SleepingTask tosleep();
+        auto ctx = cur->ctx;
+        TimeSpec *a_tv = (TimeSpec*)ctx.x(10);
+
+        auto curproc = cur->getProcess();
+        klib::ByteArray tvarray = curproc->vmar.copyin((xlen_t)a_tv, sizeof(TimeSpec));
+        TimeSpec *tv = (TimeSpec*)tvarray.buff;
+        struct proc::SleepingTask tosleep(cur, kHartObjs.g_ticks+tv->tvSec()*CLK_FREQ/INTERVAL+tv->tvNSec()*(CLK_FREQ/100000)/10/INTERVAL);
+        for(int i = 0; i < NMAXSLEEP; ++i) {
+            if(kHartObjs.sleep_tasks[i].m_task == nullptr) {
+                kHartObjs.sleep_tasks[i] = tosleep;
+                return sleep();
+            }
+        }
+        return statcode::err;
     }
     void yield(){
         Log(debug,"yield!");
@@ -724,6 +736,7 @@ namespace syscall
         syscallPtrs[syscalls::write] = syscall::write;
         syscallPtrs[syscalls::exit] = syscall::exit;
         syscallPtrs[syscalls::fstat] = syscall::fStat;
+        syscallPtrs[syscalls::nanosleep] = syscall::nanoSleep;
         syscallPtrs[syscalls::yield] = syscall::sysyield;
         syscallPtrs[syscalls::times] = syscall::times;
         syscallPtrs[syscalls::uname] = syscall::uName;
