@@ -109,7 +109,7 @@ namespace vm
 
     struct PageMapping{
         enum Prot{
-            none=0x0,read=0x4,write=0x2,exec=0x1
+            none=0x0,read=0x1,write=0x2,exec=0x4,mask=0xf
         };
         enum class MappingType:uint8_t{
             normal=0x0,file=0x1,anon=0x2
@@ -132,11 +132,9 @@ namespace vm
         inline klib::string toString() const{return klib::format("%lx=>%s",vpn,vmo.toString());}
         inline PageMapping clone() const{return PageMapping{vpn,vmo.clone(),perm};}
         inline static perm_t prot2perm(Prot prot){
-            perm_t rt=0;
             using masks=PageTableEntry::fieldMasks;
-            if(prot&read)rt|=masks::r;
-            if(prot&write)rt|=masks::w;
-            if(prot&exec)rt|=masks::x;
+            perm_t rt=masks::v|masks::u;
+            rt|=(prot&mask)<<1;
             return rt;
         }
         inline bool contains(xlen_t addr){
@@ -204,6 +202,7 @@ namespace vm
         //     // pagetable.createMapping(vmo);
         // }
         inline void map(const PageMapping& mapping){
+            /// @todo always forget to set v-bit or u-bit
             Log(debug,"map %s",mapping.toString().c_str());
             mappings.push_back(mapping);
             pagetable.createMapping(mapping);
@@ -251,6 +250,12 @@ namespace vm
                 if(mapping.contains(addr))return true;
             }
             return false;
+        }
+        template<typename Lambda>
+        inline PageMapping& find(Lambda predicate){
+            for(auto mapping: mappings){
+                if(predicate(mapping))return mapping;
+            }
         }
         class Writer{
             xlen_t vaddr;
