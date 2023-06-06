@@ -39,7 +39,8 @@ xlen_t fs::File::write(xlen_t addr,size_t len){
     }
     return rt;
 }
-klib::ByteArray fs::File::read(size_t len){
+klib::ByteArray fs::File::read(size_t len, long a_off, bool a_update){
+    if(a_off < 0) { a_off = off; }
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.r) { return rt; }
     switch(type){
@@ -54,9 +55,11 @@ klib::ByteArray fs::File::read(size_t len){
             break;
         case FileType::entry: {
             int rdbytes = 0;
-            klib::ByteArray buf(len); // @todo 第二次execve的时候buf分到了空指针
+            klib::ByteArray buf(len);
             elock(obj.ep);
-            if((rdbytes = eread(obj.ep, 0, (uint64)buf.buff, off, len)) > 0) { off += rdbytes; }
+            if((rdbytes = eread(obj.ep, 0, (uint64)buf.buff, a_off, len)) > 0) {
+                if(a_update) { off = a_off + rdbytes; }
+            }
             eunlock(obj.ep);
             return buf;
             break;

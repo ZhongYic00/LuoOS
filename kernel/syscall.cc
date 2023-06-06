@@ -571,7 +571,7 @@ namespace syscall
         /// @todo copy content to vmo
         if(fd!=-1){
             auto file=curproc.ofile(fd);
-            auto bytes=file->read(len);
+            auto bytes=file->read(len, 0, false);
             memmove((ptr_t)pn2addr(vmo.ppn()),bytes.buff,bytes.len);
         }
         // actual map

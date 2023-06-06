@@ -63,7 +63,7 @@ namespace fs{
         File(struct dirent *a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags) {}
         ~File();
         xlen_t write(xlen_t addr,size_t len);
-        klib::ByteArray read(size_t len);
+        klib::ByteArray read(size_t len, long a_off=-1, bool a_update=true);
         klib::ByteArray readAll();
     };
 }
