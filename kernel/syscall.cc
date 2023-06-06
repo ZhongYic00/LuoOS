@@ -435,9 +435,8 @@ namespace syscall
         // if(a_tms == nullptr) { return statcode::err; } // a_tms留空时不管tms只返回ticks？
 
         auto curproc = kHartObjs.curtask->getProcess();
-        if(a_tms != nullptr) { curproc->vmar.copyout((xlen_t)a_tms, klib::ByteArray((uint8_t*)curproc->ti, sizeof(proc::Tms))); }
+        if(a_tms != nullptr) { curproc->vmar.copyout((xlen_t)a_tms, klib::ByteArray((uint8_t*)&curproc->ti, sizeof(proc::Tms))); }
         // acquire(&tickslock);
-        // todo@ timer相关
         int ticks = (int)(kHartObjs.g_ticks/INTERVAL);
         // release(&tickslock);
 
@@ -523,7 +522,7 @@ namespace syscall
         else if(pid==0)panic("waitpid: unimplemented!"); // @todo 每个回收的子进程都更新父进程的ti
         else if(pid<0)panic("waitpid: unimplemented!");
         if(target==nullptr)return statcode::err;
-        *(curproc->ti) += *(target->ti);
+        curproc->ti += target->ti;
         auto rt=target->pid();
         if(wstatus)curproc->vmar[wstatus]=(int)(target->exitstatus<<8);
         target->zombieExit();

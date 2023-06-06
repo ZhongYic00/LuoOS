@@ -14,7 +14,8 @@ void timerInterruptHandler(){
     auto cur = kHartObjs.curtask;
     if(cur != nullptr) {
         auto curproc = cur->getProcess();
-        *(curproc->ti) + cur->lastpriv;
+        if(cur->lastpriv == proc::Task::Priv::User) { curproc->ti.uTick(); }
+        else {curproc->ti.sTick(); }
     }
     ++kHartObjs.g_ticks;
     xlen_t sstatus;
