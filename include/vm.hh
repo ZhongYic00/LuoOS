@@ -209,7 +209,12 @@ namespace vm
             Log(debug,"after map, VMAR:%s",mappings.toString().c_str());
         }
         inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm,CloneType ct=CloneType::clone){map(PageMapping{vpn,VMO{ppn,pages,ct},perm});}
-        inline void unmap();
+        inline void unmap(const PageMapping &mapping){
+            Log(debug,"unmap %s",mapping.toString().c_str());
+            mappings.remove(mapping);
+            pagetable.removeMapping(mapping);
+            Log(debug,"after unmap, VMAR:%s",mappings.toString().c_str());
+        }
         inline void reset(){
             Log(debug,"before reset, VMAR:%s",mappings.toString().c_str());
             tinystl::vector<PageMapping> toremove;
@@ -252,10 +257,12 @@ namespace vm
             return false;
         }
         template<typename Lambda>
-        inline PageMapping& find(Lambda predicate){
+        inline PageMapping find(Lambda predicate){
             for(auto mapping: mappings){
-                if(predicate(mapping))return mapping;
+                if(predicate(mapping))
+                    return mapping;
             }
+            /// @todo error handling
         }
         class Writer{
             xlen_t vaddr;
