@@ -137,7 +137,7 @@ static void infoInit(){
 }
 void idle(){
     while(true){
-        Log(info,"kidle...");
+        Log(error,"kidle...");
         /// @bug after interrupt, sepc not +4, always return to instr wfi ?
         ExecInst(wfi);
     }
