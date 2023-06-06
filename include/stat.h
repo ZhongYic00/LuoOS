@@ -49,7 +49,7 @@ namespace fs {
 		gid_t st_gid;			/* Group ID of owner */
 		dev_t st_rdev;			/* Device ID (if special file) */
 		unsigned long __pad;	
-		off_t st_size;			/* Total size, in bytes */
+		size_t st_size;			/* Total size, in bytes */
 		blksize_t st_blksize;	/* Block size for filesystem I/O */
 		int __pad2; 			
 		blkcnt_t st_blocks;		/* Number of 512B blocks allocated */
