@@ -45,6 +45,8 @@ class TimeSpec {
     public:
         TimeSpec():m_tv_sec(0), m_tv_nsec(0) {}
         TimeSpec(time_t a_tv_sec, long a_tv_nsec):m_tv_sec(a_tv_sec), m_tv_nsec(a_tv_nsec) {}
+        inline time_t tvSec() { return m_tv_sec; }
+        inline time_t tvNSec() { return m_tv_nsec; }
 };
 #define NULL 0
 #define readb(addr) (*(volatile uint8 *)(addr))     
@@ -75,5 +77,6 @@ class TimeSpec {
 
 #define INTERVAL     (390000000 / 100) // timer interrupt interval
 #define CLK_FREQ 		8900000
+#define NMAXSLEEP   32
 
 #endif

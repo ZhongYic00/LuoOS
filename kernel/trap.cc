@@ -18,6 +18,13 @@ void timerInterruptHandler(){
         else {curproc->ti.sTick(); }
     }
     ++kHartObjs.g_ticks;
+    for(int i = 0; i < NMAXSLEEP; ++i) {
+        auto towake = kHartObjs.sleep_tasks[i];
+        if(towake.m_task!=nullptr && towake.wakeup_tick<kHartObjs.g_ticks) {
+            kGlobObjs.scheduler.wakeup(towake.m_task);
+            kHartObjs.sleep_tasks[i].m_task = nullptr;
+        }
+    }
     xlen_t sstatus;
     csrRead(sstatus,sstatus);
     if(sstatus&BIT(csr::mstatus::spp))panic("should not happen!");

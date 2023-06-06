@@ -42,13 +42,13 @@ int main(){
         // "openat",
         // "pipe",
         // "read",
-        // // "sleep",
+        "sleep",
         // "times",
         // "umount",
         // "uname",
         // "unlink",
         // "wait",
-        "waitpid",
+        // // "waitpid",
         // "write",
         // "yield"
     };
