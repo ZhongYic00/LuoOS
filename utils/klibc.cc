@@ -3,7 +3,7 @@
 #include "klib.h"
 #include "alloc.hh"
 
-int outputLevel=LogLevel::error;
+int outputLevel=LogLevel::info;
 
 void (*puts)(const char *s);
 
