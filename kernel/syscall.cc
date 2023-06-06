@@ -559,7 +559,7 @@ namespace syscall
             auto rt=curproc.heapTop=ceil(curproc.heapTop);
             curproc.heapTop+=len;
             curproc.heapTop=ceil(curproc.heapTop);
-            return rt;
+            return addr2pn(rt);
         };
         PageNum vpn,pages;
         if(addr)vpn=align(addr);
@@ -581,7 +581,23 @@ namespace syscall
         // return val
         return pn2addr(vpn);
     }
-    xlen_t munmap(){}
+    xlen_t munmap(){
+        auto &ctx=kHartObjs.curtask->ctx;
+        auto &curproc=*kHartObjs.curtask->getProcess();
+        xlen_t addr=ctx.x(10),len=ctx.x(11);
+        /// @todo len, partial unmap?
+        using namespace vm;
+        if(addr&vaddrOffsetMask){
+            Log(warning,"munmap addr not aligned!");
+            return statcode::err;
+        }
+        addr=addr2pn(addr);
+        auto mapping=curproc.vmar.find([&](const PageMapping &mapping){
+            /// @todo addr in mapping?
+            return mapping.vpn==addr;
+        });
+        curproc.vmar.unmap(mapping);
+    }
     // xlen_t mprotect(){}
     int execve(klib::ByteArray buf,tinystl::vector<klib::ByteArray> &args,char **envp){
         auto &ctx=kHartObjs.curtask->ctx;

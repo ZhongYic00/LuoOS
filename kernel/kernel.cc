@@ -64,8 +64,8 @@ static void plicInit(){
     using namespace platform::plic;
 
     uartInit();
-    mmio<word_t>(priorityOf(platform::uart0::irq))=1;
-    mmio<word_t>(enableOf(hart))=1<<platform::uart0::irq;
+    // mmio<word_t>(priorityOf(platform::uart0::irq))=1;
+    // mmio<word_t>(enableOf(hart))=1<<platform::uart0::irq;
 
     mmio<word_t>(priorityOf(platform::virtio::blk::irq))=1;
     mmio<word_t>(enableOf(hart))|=1<<platform::virtio::blk::irq;

@@ -118,7 +118,7 @@ namespace proc
                 Log(info,"curtop=%x,destop=%x, needs to alloc %d pages",curtop,destop,pages);
                 auto vmo=VMO::alloc(pages);
                 using perm=PageTableEntry::fieldMasks;
-                vmar.map(PageMapping{curtop,vmo,perm::r|perm::w|perm::x,PageMapping::MappingType::anon});
+                vmar.map(PageMapping{curtop,vmo,perm::r|perm::w|perm::x|perm::u|perm::v,PageMapping::MappingType::anon});
                 return heapTop=addr;
             }
         }
