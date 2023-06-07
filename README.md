@@ -182,6 +182,50 @@ for user use
 
 ![dependency](docs/imgs/dependency.png)
 
+项目文件结构如下：
+
+```
+├── include
+│   ├── alloc.hh // 堆内存及页帧分配
+│   ├── buf.h	// FAT文件块
+│   ├── common.h //公共头文件
+│   ├── fat.hh	//FAT文件系统
+│   ├── fs.hh 	//文件系统
+│   ├── ipc.hh	//进程间通信
+│   ├── kernel.hh	//内核公共结构
+│   ├── klib.h	//内核C库
+│   ├── klib.hh	//内核库
+│   ├── ld.hh	//ELF装载
+│   ├── linux/	//Linux内核头文件
+│   ├── lock.hh	//同步及锁
+│   ├── macros.h	// 公共宏定义，如Log、TRACE
+│   ├── platform.h	// 硬件平台接口定义
+│   ├── proc.hh		// 进程与线程
+│   ├── resmgr.hh	// 公共资源管理器，如进程线程一类以ID为键值的
+│   ├── rvcsr.hh	// CSR寄存器定义
+│   ├── safestl.hh	// 引如标准STL
+│   ├── sbi.hh		// SBI接口
+│   ├── sched.hh	// 调度器
+│   ├── thirdparty/	// 第三方库头文件
+│   ├── types.h		// 公共类型定义
+│   ├── virtio.h	// virtio
+│   └── vm.hh		// 虚拟内存
+├── kernel/			// 内核源文件
+├── Makefile
+├── obj/			// 编译中间结果目录
+├── tests/			// 部分Hosted环境下执行的单元测试
+├── thirdparty/		// 第三方库源文件
+├── user
+│   ├── init.cc		// 初始用户进程
+│   ├── prog0.cc	// 测试用户程序
+│   └── user.ld		// 用户程序链接脚本
+└── utils
+    ├── klib.cc		// 内核libc源文件
+    └── klibc.cc	// 内核库源文件
+```
+
+
+
 #### 内存分配
 
 内存分配又分为页帧分配器与内核堆分配器，二者现阶段均为内核全局唯一的对象。

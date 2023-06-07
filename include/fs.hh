@@ -3,7 +3,7 @@
 
 #include "ipc.hh"
 #include "resmgr.hh"
-#include "fcntl.h"
+#include "linux/fcntl.h"
 
 
 namespace fs{
