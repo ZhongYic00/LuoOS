@@ -38,7 +38,7 @@ namespace syscall
         sleep();
     }
     xlen_t testmount(){
-        int rt=fs::fat32_init();
+        int rt=fs::fat32Init();
         kHartObjs.curtask->getProcess()->cwd = fs::ename("/");
         printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
         SharedPtr<fs::File> shit;
@@ -69,11 +69,11 @@ namespace syscall
     }
     xlen_t testFATInit() {
         Log(info,"initializing fat");
-        if(fs::fat32_init() != 0) { panic("fat init failed\n"); }
+        if(fs::fat32Init() != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObjs.curtask->getProcess();
         curproc->cwd = fs::ename("/");
         curproc->files[3] = new fs::File(curproc->cwd,0);
-        struct fs::dirent *ep = fs::create("/dev", T_DIR, 0);
+        struct fs::DirEnt *ep = fs::create("/dev", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
         ep = fs::create("/dev/vda2", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
@@ -91,7 +91,7 @@ namespace syscall
         }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        struct fs::dirent *de = curproc->cwd;
+        struct fs::DirEnt *de = curproc->cwd;
         char path[FAT32_MAX_PATH];
         char *s;  // s为path的元素指针
         // @todo 路径处理过程考虑包装成类
@@ -155,7 +155,7 @@ namespace syscall
         char *path = (char*)patharr.buff;
         SharedPtr<fs::File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; }
-        struct fs::dirent *ep;
+        struct fs::DirEnt *ep;
 
         if((ep = fs::create2(path, T_DIR, 0, f)) == nullptr) {
             printf("can't create %s\n", path);
@@ -217,7 +217,7 @@ namespace syscall
             printf("path error\n");
             return statcode::err;
         }
-        struct fs::dirent *ep = fs::ename(devpath);
+        struct fs::DirEnt *ep = fs::ename(devpath);
         if(ep == nullptr) {
             printf("not found file\n");
             return statcode::err;
@@ -240,18 +240,18 @@ namespace syscall
         klib::ByteArray fstypearr = curproc->vmar.copyinstr((xlen_t)a_fstype, FAT32_MAX_PATH);
         char *devpath = (char*)devpatharr.buff;
         char *mountpath = (char*)mountpatharr.buff;
-        char *fstype = (char*)fstypearr.buff;
+        char *FileSystem = (char*)fstypearr.buff;
         if(strncmp("/",mountpath,2) == 0) { //mountpoint not allowed the root
             printf("not allowed\n");
             return statcode::err;
         }
-        if ((strncmp("vfat",fstype,5)!=0) && (strncmp("fat32",fstype,6)!=0)) {
-            printf("the fstype is not fat32\n");
+        if ((strncmp("vfat",FileSystem,5)!=0) && (strncmp("fat32",FileSystem,6)!=0)) {
+            printf("the FileSystem is not fat32\n");
             return statcode::err;
         }
 
-        struct fs::dirent *dev_ep = fs::ename(devpath);
-        struct fs::dirent *ep = fs::ename(mountpath);
+        struct fs::DirEnt *dev_ep = fs::ename(devpath);
+        struct fs::DirEnt *ep = fs::ename(mountpath);
         if(dev_ep == nullptr) {
             printf("dev not found file\n");
             return statcode::err;
@@ -275,7 +275,7 @@ namespace syscall
         auto curproc = kHartObjs.curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
-        struct fs::dirent *ep = fs::ename(path);
+        struct fs::DirEnt *ep = fs::ename(path);
         if(ep == nullptr) { return statcode::err; }
         fs::elock(ep);
         if(!(ep->attribute & ATTR_DIRECTORY)){
@@ -305,7 +305,7 @@ namespace syscall
         char *path = (char*)patharr.buff;
         SharedPtr<fs::File> f1, f2;
         if(path[0] != '/') { f2 = curproc->files[a_dirfd]; }
-        struct fs::dirent *ep;
+        struct fs::DirEnt *ep;
         int fd;
 
         if(a_flags & O_CREATE) {
@@ -658,9 +658,9 @@ namespace syscall
         char *path=(char*)pathbuf.buff;
 
         Log(debug,"execve(path=%s,)",path);
-        auto dentry=fs::ename(path);
-        klib::SharedPtr<fs::File> file=new fs::File(dentry,fs::File::FileOp::read);
-        auto buf=file->read(dentry->file_size);
+        auto Ent=fs::ename(path);
+        klib::SharedPtr<fs::File> file=new fs::File(Ent,fs::File::FileOp::read);
+        auto buf=file->read(Ent->file_size);
         // auto buf=klib::ByteArray{0};
         // buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
 

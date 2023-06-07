@@ -38,10 +38,10 @@ static struct {
 } fat;
 static struct entry_cache {
     // struct spinlock lock;
-    struct dirent entries[ENTRY_CACHE_NUM];
+    struct DirEnt entries[ENTRY_CACHE_NUM];
 } ecache; // 目录缓冲区
-static struct dirent root; // 根目录
-struct fstype dev_fat[8]; //挂载设备集合
+static struct DirEnt root; // 根目录
+struct FileSystem dev_fat[8]; //挂载设备集合
 int mount_num=0; //表示寻找在挂载集合的下标
 // @param   cluster   cluster number starts from 2, which means no 0 and 1
 // 根据簇号得到起始扇区号
@@ -172,7 +172,7 @@ static uint rw_clus(uint32 cluster, int write, int user, uint64 data, uint off, 
     2.当alloc为0，则将cur_clus置为first_clus
     返回off在该簇的偏移（off % fat.byts_per_clus）
 */
-static int reloc_clus(struct dirent *entry, uint off, int alloc) {
+static int reloc_clus(struct DirEnt *entry, uint off, int alloc) {
     int clus_num = off / fat.byts_per_clus;
     while (clus_num > entry->clus_cnt) {
         int clus = read_fat(entry->cur_clus);
@@ -204,15 +204,15 @@ static int reloc_clus(struct dirent *entry, uint off, int alloc) {
     return off % fat.byts_per_clus;
 }
 /*
-    Returns a dirent struct. If name is given, check ecache. It is difficult to cache entries
+    Returns a DirEnt struct. If name is given, check ecache. It is difficult to cache entries
     by their whole path. But when parsing a path, we open all the directories through it, 
     which forms a linked list from the final file to the root. Thus, we use the "parent" pointer 
     to recognize whether an entry with the "name" as given is really the file we want in the right path.
     Should never get root by eget, it's easy to understand.
 */
 // 在目录缓冲区中根据parent和name寻找目录，如果没有找到则将其放到缓冲区，并将vaild设为0（如果缓冲区有空余的话）（没有置换算法）
-static struct dirent *eget(struct dirent *parent, char *name) {
-    struct dirent *ep;
+static struct DirEnt *eget(struct DirEnt *parent, char *name) {
+    struct DirEnt *ep;
     // acquire(&ecache.lock);
     if (name) {
         for (ep = root.next; ep != &root; ep = ep->next) {          // LRU algo
@@ -291,7 +291,7 @@ uint8 cal_checksum(uchar* shortname) {
     @param   islong      if non-zero, read as l-n-e, otherwise s-n-e.
 */
 // 对于给定的目录项读取文件名，放在buffer中
-static void read_entry_name(char *buffer, union dentry *d) {
+static void read_entry_name(char *buffer, union Ent *d) {
     if (d->lne.attr == ATTR_LONG_NAME) {                       // long entry branch
         wchar temp[NELEM(d->lne.name1)];
         memmove(temp, d->lne.name1, sizeof(temp));
@@ -319,7 +319,7 @@ static void read_entry_name(char *buffer, union dentry *d) {
     @param   raw_entry   pointer to the entry in a sector buffer
 */
 // 将目录项d的信息读取到entry
-static void read_entry_info(struct dirent *entry, union dentry *d) {
+static void read_entry_info(struct DirEnt *entry, union Ent *d) {
     entry->attribute = d->sne.attr;
     entry->first_clus = ((uint32)d->sne.fst_clus_hi << 16) | d->sne.fst_clus_lo;
     entry->file_size = d->sne.file_size;
@@ -352,8 +352,8 @@ static char *skipelem(char *path, char *name) {
     1. 如果parent=1，返回d
     2. 如果parent=0，返回d/
 */
-static struct dirent *lookup_path(char *path, int parent, char *name) {
-    struct dirent *entry, *next;
+static struct DirEnt *lookup_path(char *path, int parent, char *name) {
+    struct DirEnt *entry, *next;
     if (*path == '/') { entry = edup(&root); }
     else if (*path != '\0') { entry = edup(kHartObjs.curtask->getProcess()->cwd); }
     else { return nullptr; }
@@ -383,8 +383,8 @@ static struct dirent *lookup_path(char *path, int parent, char *name) {
     }
     return entry;
 }
-static struct dirent *lookup_path2(char *path, int parent, SharedPtr<File> f ,char *name) {
-    struct dirent *entry, *next;
+static struct DirEnt *lookup_path2(char *path, int parent, SharedPtr<File> f ,char *name) {
+    struct DirEnt *entry, *next;
     if (*path == '\0') {
         printf("nothing in path\n");
         return nullptr;
@@ -427,7 +427,7 @@ static struct dirent *lookup_path2(char *path, int parent, SharedPtr<File> f ,ch
 }
 
 /////////////////fs.hh中定义的函数///////////////////////////
-int fs::fat32_init() {
+int fs::fat32Init() {
     struct buf *b = bread(0, 0);
     if (strncmp((char const*)(b->data + 82), "FAT32", 5)) { panic("not FAT32 volume"); }
     memmove(&fat.bpb.byts_per_sec, b->data + 11, 2); // avoid misaligned load on k210
@@ -455,7 +455,7 @@ int fs::fat32_init() {
     root.next = &root;
     root.filename[0] = '/';
     root.filename[1] = '\0';
-    for(struct dirent *de = ecache.entries; de < ecache.entries + ENTRY_CACHE_NUM; de++) {
+    for(struct DirEnt *de = ecache.entries; de < ecache.entries + ENTRY_CACHE_NUM; de++) {
         de->dev = 0;
         de->valid = 0;
         de->ref = 0;
@@ -489,7 +489,7 @@ uint32 fs::get_byts_per_clus() { return fat.byts_per_clus; }
 /* like the original readi, but "reade" is odd, let alone "writee" */
 // Caller must hold entry->lock.
 // 读取偏移为off，长为n的数据到dst处，并将cur_clus移动到结束处所在的簇（off是相对于数据区起始位置的偏移）
-int fs::eread(struct dirent *entry, int user_dst, uint64 dst, uint off, uint n) {
+int fs::eread(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n) {
     if (off > entry->file_size || off + n < off || (entry->attribute & ATTR_DIRECTORY)) { return 0; }
     if (entry->attribute & ATTR_LINK){
         struct link li;
@@ -509,7 +509,7 @@ int fs::eread(struct dirent *entry, int user_dst, uint64 dst, uint off, uint n) 
 }
 // Caller must hold entry->lock.
 // 将首地址为src，长为n的数据写入偏移为off处，并将cur_clus移动到结束处所在的簇（off是相对于数据区起始位置的偏移）
-int fs::ewrite(struct dirent *entry, int user_src, uint64 src, uint off, uint n) {
+int fs::ewrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint n) {
     if (off > entry->file_size || off + n < off || (uint64)off + n > 0xffffffff || (entry->attribute & ATTR_READ_ONLY)) { return -1; }
     if (entry->attribute & ATTR_LINK){
         struct link li;
@@ -562,10 +562,10 @@ char *fs::formatname(char *name) {
     @param   off         offset int the dp, should be calculated via dirlookup before calling this
 */
 // 在dp中生成一个目录并写入磁盘，如果off==0，生成'.'目录，如果0<off<=32，生成'..'目录，如果off>32，生成长名目录，长名保存自ep中，将ep->first_clus设为目录的起始簇
-void fs::emake(struct dirent *dp, struct dirent *ep, uint off) {
+void fs::emake(struct DirEnt *dp, struct DirEnt *ep, uint off) {
     if (!(dp->attribute & ATTR_DIRECTORY)) { panic("emake: not dir"); }
-    if (off % sizeof(union dentry)) { panic("emake: not aligned"); }
-    union dentry de;
+    if (off % sizeof(union Ent)) { panic("emake: not aligned"); }
+    union Ent de;
     memset(&de, 0, sizeof(de));
     if (off <= 32) {  // 短名
         if (off == 0) { strncpy(de.sne.name, ".          ", sizeof(de.sne.name)); }
@@ -621,10 +621,10 @@ void fs::emake(struct dirent *dp, struct dirent *ep, uint off) {
     Allocate an entry on disk. Caller must hold dp->lock.
 */
 // 在dp目录下创建一个文件/目录，返回创建的文件/目录
-struct dirent *fs::ealloc(struct dirent *dp, char *name, int attr) {
+struct DirEnt *fs::ealloc(struct DirEnt *dp, char *name, int attr) {
     if (!(dp->attribute & ATTR_DIRECTORY)) { panic("ealloc not dir"); }
     if (dp->valid != 1 || !(name = formatname(name))) { return nullptr; } // detect illegal character
-    struct dirent *ep;
+    struct DirEnt *ep;
     uint off = 0;
     if ((ep = dirlookup(dp, name, &off)) != 0) { return ep; } // entry exists
     ep = eget(dp, name);
@@ -653,7 +653,7 @@ struct dirent *fs::ealloc(struct dirent *dp, char *name, int attr) {
     return ep;
 }
 // entry引用数加一
-struct dirent *fs::edup(struct dirent *entry) {
+struct DirEnt *fs::edup(struct DirEnt *entry) {
     if (entry != 0) {
         // acquire(&ecache.lock);
         entry->ref++;
@@ -666,14 +666,14 @@ struct dirent *fs::edup(struct dirent *entry) {
     caller must hold entry->parent->lock
 */
 // 在entry的父目录中更新entry的目录项
-void fs::eupdate(struct dirent *entry) {
+void fs::eupdate(struct DirEnt *entry) {
     if (!entry->dirty || entry->valid != 1) { return; }
     uint entcnt = 0;
     uint32 off = reloc_clus(entry->parent, entry->off, 0);
     rw_clus(entry->parent->cur_clus, 0, 0, (uint64) &entcnt, off, 1);
     entcnt &= ~LAST_LONG_ENTRY;
     off = reloc_clus(entry->parent, entry->off + (entcnt << 5), 0);
-    union dentry de;
+    union Ent de;
     rw_clus(entry->parent->cur_clus, 0, 0, (uint64)&de, off, sizeof(de));
     de.sne.fst_clus_hi = (uint16)(entry->first_clus >> 16);
     de.sne.fst_clus_lo = (uint16)(entry->first_clus & 0xffff);
@@ -687,7 +687,7 @@ void fs::eupdate(struct dirent *entry) {
     remove the entry in its parent directory
 */
 // 将entry从它的父目录中移除，被移除后entry的valid被置为-1
-void fs::eremove(struct dirent *entry) {
+void fs::eremove(struct DirEnt *entry) {
     if (entry->valid != 1) { return; }
     uint entcnt = 0;
     uint32 off = entry->off;
@@ -707,7 +707,7 @@ void fs::eremove(struct dirent *entry) {
     caller must hold entry->lock
 */
 // 在数据区清空文件/目录
-void fs::etrunc(struct dirent *entry) {
+void fs::etrunc(struct DirEnt *entry) {
     if(!(entry->attribute & ATTR_LINK)){
         for (uint32 clus = entry->first_clus; clus >= 2 && clus < FAT32_EOC; ) {
             uint32 next = read_fat(clus);
@@ -720,18 +720,18 @@ void fs::etrunc(struct dirent *entry) {
     entry->dirty = 1;
 }
 // 请求睡眠锁，要求引用数大于0
-void fs::elock(struct dirent *entry) {
+void fs::elock(struct DirEnt *entry) {
     // if (entry == 0 || entry->ref < 1) { panic("elock"); }
     // acquiresleep(&entry->lock);
 }
 // 释放睡眠锁
-void fs::eunlock(struct dirent *entry) {
+void fs::eunlock(struct DirEnt *entry) {
     // if (entry == 0 || !holdingsleep(&entry->lock) || entry->ref < 1) { panic("eunlock"); }
     // if (entry == 0 || entry->ref < 1) { panic("eunlock"); }
     // releasesleep(&entry->lock);
 }
 // 将entry引用数减少1，如果entry的引用数减少为0，则将entry放置缓冲区最前面，并执行eput(entry->parent)
-void fs::eput(struct dirent *entry) {
+void fs::eput(struct DirEnt *entry) {
     // acquire(&ecache.lock);
     if (entry != &root && entry->valid != 0 && entry->ref == 1) {
         // ref == 1 means no other process can have entry locked,
@@ -754,7 +754,7 @@ void fs::eput(struct dirent *entry) {
         // releasesleep(&entry->lock);
         // Once entry->ref decreases down to 0, we can't guarantee the entry->parent field remains unchanged.
         // Because eget() may take the entry away and write it.
-        struct dirent *eparent = entry->parent;
+        struct DirEnt *eparent = entry->parent;
         // acquire(&ecache.lock);
         entry->ref--;
         // release(&ecache.lock);
@@ -765,7 +765,7 @@ void fs::eput(struct dirent *entry) {
     // release(&ecache.lock);
 }
 // 将dirent的信息copy到stat中，包括文件名、文件类型、所在设备号、文件大小
-void fs::estat(struct dirent *de, struct stat *st) {
+void fs::estat(struct DirEnt *de, struct stat *st) {
     strncpy(st->name, de->filename, STAT_MAX_NAME);
     st->type = (de->attribute & ATTR_DIRECTORY) ? T_DIR : T_FILE;
     st->dev = de->dev;
@@ -787,7 +787,7 @@ void fs::estat(struct dirent *de, struct stat *st) {
     找到返回1，文件被删除返回0，后面没有文件了返回-1
     count记录了向后遍历了几个目录项
 */
-int fs::enext(struct dirent *dp, struct dirent *ep, uint off, int *count) {
+int fs::enext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count) {
     Log(trace,"enext(dp=%p,ep=%p)",dp);
     if (!(dp->attribute & ATTR_DIRECTORY)) {
         panic("enext not dir");
@@ -801,7 +801,7 @@ int fs::enext(struct dirent *dp, struct dirent *ep, uint off, int *count) {
         dp->first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         dp->attribute = li.de.sne.attr;
     }
-    union dentry de;
+    union Ent de;
     int cnt = 0;
     memset(ep->filename, 0, FAT32_MAX_FILENAME + 1);
     // 遍历dp的簇
@@ -852,7 +852,7 @@ int fs::enext(struct dirent *dp, struct dirent *ep, uint off, int *count) {
     @param   poff        offset of proper empty entry slots from the beginning of the dir
 */
 // 在dp目录中搜索文件名为filename的文件，poff记录了偏移，返回找到的文件
-struct dirent *fs::dirlookup(struct dirent *dp, char *filename, uint *poff) {
+struct DirEnt *fs::dirlookup(struct DirEnt *dp, char *filename, uint *poff) {
      if(dp->mount_flag==1) {
         fat.bpb.byts_per_sec=dev_fat[dp->dev].bpb.byts_per_sec;
         fat.bpb.fat_cnt=dev_fat[dp->dev].bpb.fat_cnt;
@@ -889,7 +889,7 @@ struct dirent *fs::dirlookup(struct dirent *dp, char *filename, uint *poff) {
         printf("valid is not 1\n");
         return nullptr;
     }
-    struct dirent *ep = eget(dp, filename); // 从缓冲区中找
+    struct DirEnt *ep = eget(dp, filename); // 从缓冲区中找
     if (ep->valid == 1) { return ep; }                               // ecache hits
     // 缓冲区找不到则往下执行
     int len = strlen(filename);
@@ -923,33 +923,33 @@ struct dirent *fs::dirlookup(struct dirent *dp, char *filename, uint *poff) {
     return nullptr;
 }
 // 根据路径寻找目录（进入该目录）
-struct dirent *fs::ename(char *path) {
+struct DirEnt *fs::ename(char *path) {
     char name[FAT32_MAX_FILENAME + 1];
     return lookup_path(path, 0, name);
 }
 // 根据路径寻找目录（不进入该目录）
-struct dirent *fs::enameparent(char *path, char *name) { return lookup_path(path, 1, name); }
+struct DirEnt *fs::enameparent(char *path, char *name) { return lookup_path(path, 1, name); }
 // 根据路径寻找目录（进入该文件/目录）
-struct dirent *fs::ename2(char *path, SharedPtr<File> f) {
+struct DirEnt *fs::ename2(char *path, SharedPtr<File> f) {
     char name[FAT32_MAX_FILENAME + 1];
     return lookup_path2(path, 0, f, name);
 }
 // 根据路径寻找目录（不进入该文件/目录）
-struct dirent *fs::enameparent2(char *path, char *name, SharedPtr<File> f) { return lookup_path2(path, 1, f, name); }
+struct DirEnt *fs::enameparent2(char *path, char *name, SharedPtr<File> f) { return lookup_path2(path, 1, f, name); }
 
 int fs::link(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2){
-  struct dirent *dp1, *dp2;
+  struct DirEnt *dp1, *dp2;
   if((dp1 = ename2(oldpath, f1)) == nullptr) {
     printf("can't find dir\n");
     return -1;
   }
-  struct dirent *parent1;
+  struct DirEnt *parent1;
   parent1 = dp1->parent;
   int off2;
   off2 = reloc_clus(parent1, dp1->off, 0);
-  union dentry de;
+  union Ent de;
   if (rw_clus(parent1->cur_clus, 0, 0, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
-    printf("can't read dentry\n");
+    printf("can't read Ent\n");
     return -1;
   }
   struct link li;
@@ -988,7 +988,7 @@ int fs::link(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f
     printf("can't find dir\n");
     return NULL;
   }
-  struct dirent *ep;
+  struct DirEnt *ep;
   elock(dp2);
   uint off = 0;
   if((ep = dirlookup(dp2, name, &off)) != 0) {
@@ -1005,15 +1005,15 @@ int fs::link(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f
   return 0;
 }
 int fs::unlink(char *path, SharedPtr<File> f) {
-  struct dirent *dp;
+  struct DirEnt *dp;
   if((dp = ename2(path, f)) == nullptr) { return -1; }
-  struct dirent *parent;
+  struct DirEnt *parent;
   parent = dp->parent;
   int off;
   off = reloc_clus(parent, dp->off, 0);
-  union dentry de;
+  union Ent de;
   if (rw_clus(parent->cur_clus, 0, 0, (uint64)&de, off, 32) != 32 || de.lne.order == END_OF_ENTRY) {
-    printf("can't read dentry\n");
+    printf("can't read Ent\n");
     return -1;
   }
   if(de.sne.attr & ATTR_LINK) {
@@ -1037,8 +1037,8 @@ int fs::unlink(char *path, SharedPtr<File> f) {
 }
 // 目录是否为空
 // Is the directory dp empty except for "." and ".." ?
-int fs::isdirempty(struct dirent *dp) {
-  struct dirent ep;
+int fs::isdirempty(struct DirEnt *dp) {
+  struct DirEnt ep;
   int count;
   int ret;
   ep.valid = 0;
@@ -1049,7 +1049,7 @@ int fs::remove(char *path) {
   char *s = path + strlen(path) - 1;
   while (s >= path && *s == '/') { s--; }
   if (s >= path && *s == '.' && (s == path || *--s == '/')) { return -1; }
-  struct dirent *ep;
+  struct DirEnt *ep;
   if((ep = ename(path)) == nullptr){ return -1; }
   elock(ep);
   if((ep->attribute & ATTR_DIRECTORY) && !isdirempty(ep)) {
@@ -1065,7 +1065,7 @@ int fs::remove(char *path) {
   return 0;
 }
 int fs::remove2(char *path, SharedPtr<File> f) {
-  struct dirent *ep;
+  struct DirEnt *ep;
   if((ep = ename2(path, f)) == nullptr){ return -1; }
   elock(ep);
   if((ep->attribute & ATTR_DIRECTORY) && !isdirempty(ep)){
@@ -1086,7 +1086,7 @@ int fs::syn_disk(uint64 start,long len) {
     uint64 pa,va;
     long off;
     struct proc::Process*p=kHartObjs.curtask->getProcess();
-    struct dirent *ep=p->mfile.mfile->obj.ep;
+    struct DirEnt *ep=p->mfile.mfile->obj.ep;
     // @todo 内存相关
     // pagetable_t pagetable = p->pagetable;
     // if(start>p->mfile.baseaddr) { off=p->mfile.off+start-p->mfile.baseaddr; }
@@ -1109,7 +1109,7 @@ int fs::syn_disk(uint64 start,long len) {
     // eunlock(ep);
     return 1;
 }
-int fs::do_mount(struct dirent *mountpoint,struct dirent *dev) {
+int fs::do_mount(struct DirEnt *mountpoint,struct DirEnt *dev) {
     while(dev_fat[mount_num].vaild!=0) {
         mount_num++;
         mount_num=mount_num%8;
@@ -1146,14 +1146,14 @@ int fs::do_mount(struct dirent *mountpoint,struct dirent *dev) {
     mountpoint->dev=mount_num;
     return 0;
 }
-int fs::do_umount(struct dirent *mountpoint) {
+int fs::do_umount(struct DirEnt *mountpoint) {
     mountpoint->mount_flag=0;
     memset(&dev_fat[mountpoint->dev],0,sizeof(dev_fat[0]));
     mountpoint->dev=0;
     return 0;
 }
-struct dirent *fs::create(char *path, short type, int mode) {
-    struct dirent *ep, *dp;
+struct DirEnt *fs::create(char *path, short type, int mode) {
+    struct DirEnt *ep, *dp;
     char name[FAT32_MAX_FILENAME + 1];
     if((dp = enameparent(path, name)) == nullptr) { return nullptr; }
     if (type == T_DIR) { mode = ATTR_DIRECTORY; }
@@ -1177,8 +1177,8 @@ struct dirent *fs::create(char *path, short type, int mode) {
     elock(ep);
     return ep;
 }
-struct dirent *fs::create2(char *path, short type, int mode, SharedPtr<File> f) {
-    struct dirent *ep, *dp;
+struct DirEnt *fs::create2(char *path, short type, int mode, SharedPtr<File> f) {
+    struct DirEnt *ep, *dp;
     char name[FAT32_MAX_FILENAME + 1];
 
     if((dp = enameparent2(path, name, f)) == nullptr){
@@ -1206,14 +1206,14 @@ struct dirent *fs::create2(char *path, short type, int mode, SharedPtr<File> f) 
     elock(ep);
     return ep;
 }
-void fs::getDStat(struct dirent *de, struct dstat *st) {
+void fs::getDStat(struct DirEnt *de, struct dstat *st) {
     strncpy(st->d_name, de->filename, STAT_MAX_NAME);
     st->d_type = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
     st->d_ino = de->first_clus;
     st->d_off = 0;
     st->d_reclen = de->file_size;
 }
-void fs::getKStat(struct dirent *de, struct kstat *kst) {
+void fs::getKStat(struct DirEnt *de, struct kstat *kst) {
     kst->st_dev = de->dev;
     kst->st_ino = de->first_clus;
     kst->st_mode = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;

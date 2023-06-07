@@ -72,7 +72,7 @@ namespace proc
     typedef tid_t pid_t;
     struct Process:public IdManagable,public Scheduable{
         using File=fs::File;
-        using dirent=fs::dirent;
+        using DirEnt=fs::DirEnt;
         using mapped_file=fs::mapped_file;
         tid_t parent;
         VMAR vmar;
@@ -82,7 +82,7 @@ namespace proc
         tinystl::string name;
         // @todo 以下为临时的接口，需要修改
         Tms ti;
-        dirent *cwd;
+        DirEnt *cwd;
         mapped_file mfile;    //映射的文件的范围
         int exitstatus;
 

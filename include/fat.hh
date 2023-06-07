@@ -34,7 +34,7 @@ namespace fs {
         long off;
     };
     // 短文件名(32bytes)
-    typedef struct short_name_entry {
+    typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）
         uint8 attr; // 属性
         uint8 _nt_res; // 保留
@@ -47,9 +47,9 @@ namespace fs {
         uint16 _lst_wrt_date; // 文件最近修改的日期
         uint16 fst_clus_lo;  // 文件起始簇号的低16位
         uint32 file_size;  // 文件的大小
-    } __attribute__((packed, aligned(4))) short_name_entry_t;
+    } __attribute__((packed, aligned(4))) SNE;
     // 长文件名(32bytes)
-    typedef struct long_name_entry {
+    typedef struct LongNameEntry {
         uint8 order; // 目录项序列号
         wchar name1[5]; // 第1~5个字符的unicode码
         uint8 attr; // 长目录项的属性标志，一定是0x0F。
@@ -58,14 +58,14 @@ namespace fs {
         wchar name2[6]; // 第6~11个字符的unicode码
         uint16 _fst_clus_lo; // 文件起始簇号 保留 目前常置0
         wchar name3[2]; // 第12~13个字符的unicode码
-    } __attribute__((packed, aligned(4))) long_name_entry_t;
+    } __attribute__((packed, aligned(4))) LNE;
     // disk entry
-    union dentry {
-        short_name_entry_t sne; // short name entry
-        long_name_entry_t lne; // long name entry
+    union Ent {
+        SNE sne; // short name entry
+        LNE lne; // long name entry
     };
     // 目录项
-    struct dirent {
+    struct DirEnt {
         char  filename[FAT32_MAX_FILENAME + 1];  // 文件名
         uint8   attribute;  // 属性
         uint32  first_clus;  // 起始簇号
@@ -77,19 +77,19 @@ namespace fs {
         short valid;  // 合法性
         int ref; // 关联数
         uint32 off; // 父目录的entry的偏移 // offset in the parent dir entry, for writing convenience
-        struct dirent *parent; // because FAT32 doesn't have such thing like inum, use this for cache trick
-        struct dirent *next; // 
-        struct dirent *prev; // 
+        struct DirEnt *parent; // because FAT32 doesn't have such thing like inum, use this for cache trick
+        struct DirEnt *next; // 
+        struct DirEnt *prev; // 
         uint8 mount_flag;
         // struct sleeplock lock;
     };
     // link
     struct link{
-        union dentry de;
+        union Ent de;
         uint32 link_count;
     };
     // file system?
-    struct fstype {
+    struct FileSystem {
         uint32 first_data_sec; // data所在的第一个扇区
         uint32 data_sec_cnt; // 数据扇区数
         uint32 data_clus_cnt; // 数据簇数
@@ -105,44 +105,44 @@ namespace fs {
             uint32 root_clus; // 根目录簇号 
         } bpb;
         int vaild;
-        struct dirent root; //这个文件系统的根目录文件
+        struct DirEnt root; //这个文件系统的根目录文件
         uint8 mount_mode; //是否被挂载的标志
     };
 
 
-    int fat32_init(void);
-    struct dirent *dirlookup(struct dirent *entry, char *filename, uint *poff);
+    int fat32Init(void);
+    struct DirEnt *dirlookup(struct DirEnt *entry, char *filename, uint *poff);
     char* formatname(char *name);
-    void emake(struct dirent *dp, struct dirent *ep, uint off);
-    struct dirent *ealloc(struct dirent *dp, char *name, int attr);
-    struct dirent *edup(struct dirent *entry);
-    void eupdate(struct dirent *entry);
-    void etrunc(struct dirent *entry);
-    void eremove(struct dirent *entry);
-    void eput(struct dirent *entry);
-    void estat(struct dirent *ep, struct stat *st);
-    void elock(struct dirent *entry);
-    void eunlock(struct dirent *entry);
-    int enext(struct dirent *dp, struct dirent *ep, uint off, int *count);
-    struct dirent *ename(char *path);
-    struct dirent *enameparent(char *path, char *name);
-    int eread(struct dirent *entry, int user_dst, uint64 dst, uint off, uint n);
-    int ewrite(struct dirent *entry, int user_src, uint64 src, uint off, uint n);
-    struct dirent *enameparent2(char *path, char *name, SharedPtr<File> f);
-    struct dirent *ename2(char *path, SharedPtr<File> f);
+    void emake(struct DirEnt *dp, struct DirEnt *ep, uint off);
+    struct DirEnt *ealloc(struct DirEnt *dp, char *name, int attr);
+    struct DirEnt *edup(struct DirEnt *entry);
+    void eupdate(struct DirEnt *entry);
+    void etrunc(struct DirEnt *entry);
+    void eremove(struct DirEnt *entry);
+    void eput(struct DirEnt *entry);
+    void estat(struct DirEnt *ep, struct stat *st);
+    void elock(struct DirEnt *entry);
+    void eunlock(struct DirEnt *entry);
+    int enext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count);
+    struct DirEnt *ename(char *path);
+    struct DirEnt *enameparent(char *path, char *name);
+    int eread(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n);
+    int ewrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint n);
+    struct DirEnt *enameparent2(char *path, char *name, SharedPtr<File> f);
+    struct DirEnt *ename2(char *path, SharedPtr<File> f);
     uint32 get_byts_per_clus();
     int link(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2);
     int unlink(char *path, SharedPtr<File> f);
     int remove(char *path);
-    int isdirempty(struct dirent *dp);
+    int isdirempty(struct DirEnt *dp);
     int remove2(char *path, SharedPtr<File> f);
     int syn_disk(uint64 start,long len);
-    int do_mount(struct dirent *mountpoint,struct dirent *dev);
-    int do_umount(struct dirent *mountpoint);
-    struct dirent *create(char *path, short type, int mode);
-    struct dirent *create2(char *path, short type, int mode, SharedPtr<File> f);
-    void getDStat(struct dirent *de, struct dstat *st);
-    void getKStat(struct dirent *de, struct kstat *kst);
+    int do_mount(struct DirEnt *mountpoint,struct DirEnt *dev);
+    int do_umount(struct DirEnt *mountpoint);
+    struct DirEnt *create(char *path, short type, int mode);
+    struct DirEnt *create2(char *path, short type, int mode, SharedPtr<File> f);
+    void getDStat(struct DirEnt *de, struct dstat *st);
+    void getKStat(struct DirEnt *de, struct kstat *kst);
 
 }
 
