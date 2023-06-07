@@ -17,7 +17,7 @@ int main(){
     printf("pipe2 result: rfd=%d wfd=%d\n",pipe[0],pipe[1]);
     if(sys::syscall(sys::syscalls::clone)!=0){
         printf("parent return to here");
-        sys::syscall(sys::syscalls::testmount);
+        sys::syscall(sys::syscalls::testMount);
         ischild=false;
         // int ret=sys::syscall1(sys::syscalls::wait,-1);
         // printf("wait ret=%d\n",ret);
@@ -52,7 +52,7 @@ int main(){
     //     while(i--){
     //         sys::syscall(0);
     //     }
-    //     if(sys::syscall(sys::syscalls::testexit)==-1){
+    //     if(sys::syscall(sys::syscalls::testExit)==-1){
     //         ExecInst(wfi);
     //     } else {
     //         sys::syscall(sys::syscalls::yield);

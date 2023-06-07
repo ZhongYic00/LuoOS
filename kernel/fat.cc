@@ -762,7 +762,7 @@ void fs::entRelse(struct DirEnt *entry) {
     // release(&ecache.lock);
 }
 // 将dirent的信息copy到stat中，包括文件名、文件类型、所在设备号、文件大小
-void fs::entStat(struct DirEnt *de, struct stat *st) {
+void fs::entStat(struct DirEnt *de, struct Stat *st) {
     strncpy(st->name, de->filename, STAT_MAX_NAME);
     st->type = (de->attribute & ATTR_DIRECTORY) ? T_DIR : T_FILE;
     st->dev = de->dev;
@@ -1077,35 +1077,6 @@ int fs::pathRemoveAt(char *path, SharedPtr<File> f) {
   entRelse(ep);
   return 0;
 }
-int fs::mapFileSyn(uint64 start,long len) {
-    uint i, n;
-    // pte_t *pte;
-    uint64 pa,va;
-    long off;
-    struct proc::Process*p=kHartObjs.curtask->getProcess();
-    struct DirEnt *ep=p->mfile.mfile->obj.ep;
-    // @todo 内存相关
-    // pagetable_t pagetable = p->pagetable;
-    // if(start>p->mfile.baseaddr) { off=p->mfile.off+start-p->mfile.baseaddr; }
-    // else { off=p->mfile.off; }
-    // va=start;
-    // entLock(ep);
-    // for(i = 0; i < (int)len; i += PGSIZE) {
-    //     pte = walk(pagetable, va+i, 0);
-    //     if(pte == 0) { return 0; }
-    //     if((*pte & PTE_V) == 0) { return 0; }
-    //     if((*pte & PTE_U) == 0) { return 0; }
-    //     if((*pte & PTE_D) == 0) { continue; }
-    //     pa = PTE2PA(*pte);
-    //     if(pa == NULL) { panic("start_map: address should exist"); }
-    //     if(len - i < PGSIZE) { n = len - i; }
-    //     else { n = PGSIZE; }
-    //     printf("write\n");
-    //     if(entWrite(ep, 0, (uint64)pa, off+i, n) != n) { return -1; }
-    // }
-    // entUnlock(ep);
-    return 1;
-}
 int fs::devMount(struct DirEnt *mountpoint,struct DirEnt *dev) {
     while(dev_fat[mount_num].vaild!=0) {
         mount_num++;
@@ -1203,14 +1174,14 @@ struct DirEnt *fs::pathCreateAt(char *path, short type, int mode, SharedPtr<File
     entLock(ep);
     return ep;
 }
-void fs::getDStat(struct DirEnt *de, struct dstat *st) {
+void fs::getDStat(struct DirEnt *de, struct DStat *st) {
     strncpy(st->d_name, de->filename, STAT_MAX_NAME);
     st->d_type = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
     st->d_ino = de->first_clus;
     st->d_off = 0;
     st->d_reclen = de->file_size;
 }
-void fs::getKStat(struct DirEnt *de, struct kstat *kst) {
+void fs::getKStat(struct DirEnt *de, struct KStat *kst) {
     kst->st_dev = de->dev;
     kst->st_ino = de->first_clus;
     kst->st_mode = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;

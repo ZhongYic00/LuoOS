@@ -18,62 +18,58 @@ namespace syscall {
     using kernel::TimeSpec;
     using kernel::UtSName;
     using fs::File;
+    using fs::KStat;
+    using fs::DStat;
+    using fs::DirEnt;
     // 前向引用
     void yield();
-    xlen_t none(){return 0;}
-    xlen_t testexit(){
-        static bool b=false;
-        b=!b;
-        if(b)return 1;
-        return -1;
+    xlen_t none() { return 0; }
+    xlen_t testExit() {
+        static bool b = false;
+        b =! b;
+        if(b) { return statcode::ok; }
+        return statcode::err;
     }
-    xlen_t testbio(){
-        for(int i=0;i<35;i++){
-            auto buf=bread(0,i);
+    xlen_t testBio() {
+        for(int i = 0; i < 35; i++){
+            auto buf = bread(0, i);
             bwrite(buf);
             brelse(buf);
         }
+        return statcode::ok;
     }
-    xlen_t testidle(){
-        sleep();
+    xlen_t testIdle() {
+        return sleep();
     }
-    xlen_t testmount(){
-        int rt=fs::fat32Init();
+    xlen_t testMount() {
+        int rt = fs::fat32Init();
         kHartObjs.curtask->getProcess()->cwd = fs::entEnter("/");
         printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
-        SharedPtr<File> shit;
-        auto testfile=fs::pathCreateAt("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
-        assert(rt==0);
-        Log(info,"pathCreateAt success\n---------------------------------------------------------");
-        klib::string content="test write";
-        rt=fs::entWrite(testfile,0,(xlen_t)content.c_str(),0,content.size());
-        assert(rt==content.size());
+        SharedPtr<File> f;
+        auto testfile = fs::pathCreateAt("/testfile", T_FILE, O_CREATE|O_RDWR, f);
+        assert(rt == 0);
+        Log(info, "pathCreateAt success\n---------------------------------------------------------");
+        klib::string content = "test write";
+        rt=fs::entWrite(testfile, 0, (xlen_t)content.c_str(), 0, content.size());
+        assert(rt == content.size());
         fs::entRelse(testfile);
-        Log(info,"entWrite success\n---------------------------------------------------------");
-        testfile=fs::entEnterFrom("/testfile",shit);
-        char buf[2*(content.size())];
-        rt=fs::entRead(testfile,0,(xlen_t)buf,0,content.size());
-        assert(rt==content.size());
+        Log(info, "entWrite success\n---------------------------------------------------------");
+        testfile = fs::entEnterFrom("/testfile", f);
+        char buf[2 * content.size()];
+        rt = fs::entRead(testfile, 0, (xlen_t)buf, 0, content.size());
+        assert(rt == content.size());
         fs::entRelse(testfile);
-        Log(info,"entRead success\n---------------------------------------------------------");
-        printf("%s\n", buf); // @todo printf字符串结尾会输出奇怪字符
-        // 新的fat32.img装了比赛测例的riscv64文件夹，没有test.txt
-        // content="Hello, world!";
-        // testfile=fs::entEnterFrom("/test.txt", shit);
-        // rt=fs::entRead(testfile,0,(xlen_t)buf,0,content.size());
-        // assert(rt==content.size());
-        // fs::entRelse(testfile);
-        // Log(info,"entRead success\n---------------------------------------------------------");
-        // printf("%s\n", buf);
+        Log(info, "entRead success\n---------------------------------------------------------");
+        printf("%s\n", buf);
         return rt;
     }
     xlen_t testFATInit() {
-        Log(info,"initializing fat");
+        Log(info, "initializing fat\n");
         if(fs::fat32Init() != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObjs.curtask->getProcess();
         curproc->cwd = fs::entEnter("/");
         curproc->files[3] = new File(curproc->cwd,0);
-        struct fs::DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
+        struct DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
         ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
@@ -91,7 +87,7 @@ namespace syscall {
         }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        struct fs::DirEnt *de = curproc->cwd;
+        struct DirEnt *de = curproc->cwd;
         char path[FAT32_MAX_PATH];
         char *s;  // s为path的元素指针
         // @todo 路径处理过程考虑包装成类
@@ -155,7 +151,7 @@ namespace syscall {
         char *path = (char*)patharr.buff;
         SharedPtr<File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; }
-        struct fs::DirEnt *ep;
+        struct DirEnt *ep;
 
         if((ep = fs::pathCreateAt(path, T_DIR, 0, f)) == nullptr) {
             printf("can't create %s\n", path);
@@ -217,7 +213,7 @@ namespace syscall {
             printf("path error\n");
             return statcode::err;
         }
-        struct fs::DirEnt *ep = fs::entEnter(devpath);
+        struct DirEnt *ep = fs::entEnter(devpath);
         if(ep == nullptr) {
             printf("not found file\n");
             return statcode::err;
@@ -250,8 +246,8 @@ namespace syscall {
             return statcode::err;
         }
 
-        struct fs::DirEnt *dev_ep = fs::entEnter(devpath);
-        struct fs::DirEnt *ep = fs::entEnter(mountpath);
+        struct DirEnt *dev_ep = fs::entEnter(devpath);
+        struct DirEnt *ep = fs::entEnter(mountpath);
         if(dev_ep == nullptr) {
             printf("dev not found file\n");
             return statcode::err;
@@ -275,7 +271,7 @@ namespace syscall {
         auto curproc = kHartObjs.curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
-        struct fs::DirEnt *ep = fs::entEnter(path);
+        struct DirEnt *ep = fs::entEnter(path);
         if(ep == nullptr) { return statcode::err; }
         fs::entLock(ep);
         if(!(ep->attribute & ATTR_DIRECTORY)){
@@ -305,7 +301,7 @@ namespace syscall {
         char *path = (char*)patharr.buff;
         SharedPtr<File> f1, f2;
         if(path[0] != '/') { f2 = curproc->files[a_dirfd]; }
-        struct fs::DirEnt *ep;
+        struct DirEnt *ep;
         int fd;
 
         if(a_flags & O_CREATE) {
@@ -366,14 +362,14 @@ namespace syscall {
     xlen_t getDents64(void) {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
-        struct fs::dstat *a_buf = (struct fs::dstat*)ctx.x(11);
+        struct DStat *a_buf = (struct DStat*)ctx.x(11);
         size_t a_len = ctx.x(12);
-        if(fdOutRange(a_fd) || a_buf==nullptr || a_len<sizeof(fs::dstat)) { return statcode::err; }
+        if(fdOutRange(a_fd) || a_buf==nullptr || a_len<sizeof(DStat)) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
         SharedPtr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
-        struct fs::dstat ds;
+        struct DStat ds;
         getDStat(f->obj.ep, &ds);
         curproc->vmar.copyout((xlen_t)a_buf, klib::ByteArray((uint8_t*)&ds,sizeof(ds)));
 
@@ -402,13 +398,13 @@ namespace syscall {
     xlen_t fStat() {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
-        struct fs::kstat *a_kst = (struct fs::kstat*)ctx.x(11);
+        struct KStat *a_kst = (struct KStat*)ctx.x(11);
         if(fdOutRange(a_fd) || a_kst==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
         SharedPtr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
-        struct fs::kstat kst;
+        struct KStat kst;
         fs::getKStat(f->obj.ep, &kst);
         curproc->vmar.copyout((xlen_t)a_kst, klib::ByteArray((uint8_t*)&kst,sizeof(kst)));
 
@@ -689,12 +685,12 @@ namespace syscall {
     void init(){
         using sys::syscalls;
         syscallPtrs[syscalls::none]=none;
-        syscallPtrs[syscalls::testexit]=testexit;
+        syscallPtrs[syscalls::testexit]=testExit;
         syscallPtrs[syscalls::testyield]=sysyield;
         syscallPtrs[syscalls::testwrite]=write;
-        syscallPtrs[syscalls::testbio]=testbio;
-        syscallPtrs[syscalls::testidle]=testidle;
-        syscallPtrs[syscalls::testmount]=testmount;
+        syscallPtrs[syscalls::testbio]=testBio;
+        syscallPtrs[syscalls::testidle]=testIdle;
+        syscallPtrs[syscalls::testmount]=testMount;
         syscallPtrs[syscalls::testfatinit]=testFATInit;
         syscallPtrs[syscalls::reboot]=reboot;
         // syscallPtrs[SYS_fcntl] = sys_fcntl;

@@ -4,13 +4,6 @@
 #include "fs.hh"
 
 namespace fs {
-    struct mapped_file {
-        uint64 baseaddr;
-        unsigned long len;
-        SharedPtr<File> mfile;
-        int valid;
-        long off;
-    };
     typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）
         uint8 attr; // 属性
@@ -80,20 +73,20 @@ namespace fs {
         struct DirEnt root; //这个文件系统的根目录文件
         uint8 mount_mode; //是否被挂载的标志
     };
-	struct dstat {
+	struct DStat {
 	  uint64 d_ino;	// 索引结点号
 	  int64 d_off;	// 到下一个dirent的偏移
 	  uint16 d_reclen;	// 当前dirent的长度
 	  uint8 d_type;	// 文件类型
 	  char d_name[STAT_MAX_NAME + 1];	//文件名
 	};
-	struct stat {
+	struct Stat {
 	  char name[STAT_MAX_NAME + 1]; // 文件名
 	  int dev;     // File system's disk device // 文件系统的磁盘设备
 	  short type;  // Type of file // 文件类型
 	  uint64 size; // Size of file in bytes // 文件大小(字节)
 	};
-	struct kstat {
+	struct KStat {
 		dev_t st_dev;  			/* ID of device containing file */
 		ino_t st_ino;  			/* Inode number */
 		mode_t st_mode;  		/* File type and mode */
@@ -127,7 +120,7 @@ namespace fs {
     void entTrunc(struct DirEnt *entry);
     void entRemove(struct DirEnt *entry);
     void entRelse(struct DirEnt *entry);
-    void entStat(struct DirEnt *ep, struct stat *st);
+    void entStat(struct DirEnt *ep, struct Stat *st);
     void entLock(struct DirEnt *entry);
     void entUnlock(struct DirEnt *entry);
     int entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count);
@@ -143,13 +136,12 @@ namespace fs {
     int pathRemove(char *path);
     int dirIsEmpty(struct DirEnt *dp);
     int pathRemoveAt(char *path, SharedPtr<File> f);
-    int mapFileSyn(uint64 start,long len);
     int devMount(struct DirEnt *mountpoint,struct DirEnt *dev);
     int devUnmount(struct DirEnt *mountpoint);
     struct DirEnt *pathCreate(char *path, short type, int mode);
     struct DirEnt *pathCreateAt(char *path, short type, int mode, SharedPtr<File> f);
-    void getDStat(struct DirEnt *de, struct dstat *st);
-    void getKStat(struct DirEnt *de, struct kstat *kst);
+    void getDStat(struct DirEnt *de, struct DStat *st);
+    void getKStat(struct DirEnt *de, struct KStat *kst);
 
 }
 
