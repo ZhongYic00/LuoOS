@@ -84,7 +84,7 @@ namespace fs {
         // struct sleeplock lock;
     };
     // link
-    struct link{
+    struct Link{
         union Ent de;
         uint32 link_count;
     };
@@ -111,28 +111,28 @@ namespace fs {
 
 
     int fat32Init(void);
-    struct DirEnt *dirlookup(struct DirEnt *entry, char *filename, uint *poff);
-    char* formatname(char *name);
-    void emake(struct DirEnt *dp, struct DirEnt *ep, uint off);
-    struct DirEnt *ealloc(struct DirEnt *dp, char *name, int attr);
-    struct DirEnt *edup(struct DirEnt *entry);
-    void eupdate(struct DirEnt *entry);
-    void etrunc(struct DirEnt *entry);
-    void eremove(struct DirEnt *entry);
-    void eput(struct DirEnt *entry);
-    void estat(struct DirEnt *ep, struct stat *st);
-    void elock(struct DirEnt *entry);
-    void eunlock(struct DirEnt *entry);
-    int enext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count);
-    struct DirEnt *ename(char *path);
-    struct DirEnt *enameparent(char *path, char *name);
-    int eread(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n);
-    int ewrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint n);
-    struct DirEnt *enameparent2(char *path, char *name, SharedPtr<File> f);
-    struct DirEnt *ename2(char *path, SharedPtr<File> f);
-    uint32 get_byts_per_clus();
-    int link(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2);
-    int unlink(char *path, SharedPtr<File> f);
+    struct DirEnt *dirLookUp(struct DirEnt *entry, char *filename, uint *poff);
+    char* flName(char *name);
+    void entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off);
+    struct DirEnt *entAllocAt(struct DirEnt *dp, char *name, int attr);
+    struct DirEnt *entDup(struct DirEnt *entry);
+    void dirUpdate(struct DirEnt *entry);
+    void entTrunc(struct DirEnt *entry);
+    void entRemove(struct DirEnt *entry);
+    void entRelse(struct DirEnt *entry);
+    void entStat(struct DirEnt *ep, struct stat *st);
+    void entLock(struct DirEnt *entry);
+    void entUnlock(struct DirEnt *entry);
+    int entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count);
+    struct DirEnt *entEnter(char *path);
+    struct DirEnt *entEnterParent(char *path, char *name);
+    int entRead(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n);
+    int entWrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint n);
+    struct DirEnt *entEnterParentFrom(char *path, char *name, SharedPtr<File> f);
+    struct DirEnt *entEnterFrom(char *path, SharedPtr<File> f);
+    uint32 getBytesPerClus();
+    int entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2);
+    int entUnlink(char *path, SharedPtr<File> f);
     int remove(char *path);
     int isdirempty(struct DirEnt *dp);
     int remove2(char *path, SharedPtr<File> f);
