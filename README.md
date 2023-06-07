@@ -14,7 +14,43 @@
 
 ## 功能及运行
 
+我们的操作系统目前主要支持的功能为通过装载FAT32磁盘映像文件运行其中的用户程序。用户可以修改user/init.cc源程序后在项目根目录下运行make run命令，这将编译生成all目标——kernel-qemu内核可执行文件，并自动调用如下qemu命令运行操作系统：
+```c
+qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 -bios default -drive file=fat32.img,if=none,format=raw,id=x0  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+```
+进一步的使用可参考user目录下的文档。
 
+受限于项目实际开展的时间，这个系统的许多系统调用实现尚不完全，或不完备。初赛阶段要求的以下系统调用已全部支持（但部分不常用功能的行为尚不完整）：
+```c
+long SYS_getcwd(char *buf, size_t size);
+int SYS_pipe2(int fd[], 0);
+int SYS_dup(int fd);
+int SYS_dup3(int old, int new, 0);
+int SYS_chdir(const char *path);
+int SYS_openat(int fd, const char *filename, int flags, mode_t mode);
+int SYS_close(int fd);
+int SYS_getdents64(int fd, struct dirent *buf, size_t len);
+size_t SYS_read(int fd, void *buf, size_t count);
+size_t SYS_write(int fd, const void *buf, size_t count);
+int SYS_linkat(int olddirfd, char *oldpath, int newdirfd, char *newpath, int flags);
+int SYS_mkdirat(int dirfd, const char *path, mode_t mode);
+int SYS_umount2(const char *special, int flags);
+int SYS_mount(const char *special, const char *dir, const char *fstype, int flags, const void *data);
+int SYS_fstat(int fd, struct kstat *kst);
+pid_t SYS_clone(int flags, 0, ptid, pid_t tls, pid_t ctid);
+int SYS_execve(const char *path, char *const argv[], char *const envp[]);
+pid_t SYS_wait4(pid_t pid, int *status, int options);
+pid_t SYS_getppid();
+pid_t SYS_getpid();
+uintptr_t SYS_brk(uintptr_t brk);
+int SYS_munmap(void *start, size_t len);
+long SYS_mmap(void *start, size_t len, int prot, int flags, int fd, int off);
+clock_t SYS_times(struct tms *tms);
+int SYS_uname(struct utsname *uts);
+int SYS_sched_yield();
+int SYS_gettimeofday(struct timespec *ts, 0);
+int SYS_nanosleep(const struct timespec *req, struct timespec *rem);
+```
 
 ## 设计理念
 
@@ -145,6 +181,8 @@
 CSR设置参照[执行流程](#执行流程)部分的行为。此外还需注意的是中断处理部分的原子性，例如改变外部设备设置前需关闭中断或PLIC、退出中断处理程序时必须使用`sret`结合`sstatus::spp`等。
 
 #### 文件系统
+
+文件系统方面，fat32的设计参考了去年队伍“能run就行”队，硬件驱动移植了xv6的virtio_disk实现。该实现使用qemu的virtio-blk将img映像文件作为操作系统根目录。而由于该实现在读写硬盘中调用了进程函数sleep()，因此文件系统的初始化必须在用户进程环境下进行。内核将在初始化后的第一个用户进程中通过一个专用的系统调用对根文件系统进行初始化。受限于工作量，目前仅支持fat32文件系统，未来计划支持VFS。更详细的设计可参见docs目录下的文档。
 
 #### 辅助功能
 

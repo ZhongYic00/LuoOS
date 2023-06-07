@@ -79,9 +79,8 @@ namespace proc
         tinystl::unordered_set<Task*> tasks;
         SharedPtr<File> files[MaxOpenFile];
         tinystl::string name;
-        // @todo 以下为临时的接口，需要修改
         Tms ti;
-        DirEnt *cwd;
+        DirEnt *cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
 
         Process(prior_t prior,tid_t parent);
