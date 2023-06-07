@@ -12,15 +12,6 @@ namespace fs{
 
     struct DirEnt;
 
-    // struct INode{
-    //     enum INodeType{
-    //         dir, file, dev
-    //     };
-    //     bool m_valid;
-    //     INodeType m_type;
-    //     size_t m_size;
-    // };
-
     struct File {
         enum FileType { none,pipe,entry,dev, stdin,stdout,stderr };
         enum class FileOp:uint16_t { none=0,read=0x1,write=0x2,append=0x4, };

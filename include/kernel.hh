@@ -90,10 +90,13 @@ namespace sys
     }
     
 } // namespace sy
-namespace kernel{
+namespace kernel {
     constexpr int timerInterval=100000;
     constexpr long INTERVAL = 390000000 / 100;
     constexpr long CLK_FREQ = 8900000;
+    constexpr int NMAXSLEEP = 32;
+
+    typedef proc::Task KernelTaskObjs;
 
     struct KernelInfo{
         using segment_t=vm::segment_t;
@@ -107,7 +110,6 @@ namespace kernel{
             segment_t frames;
         }segments;
     };
-
     struct KernelObjectsBuf{
         #define OBJBUF(type,name) uint8_t name##Buf[sizeof(type)]
         OBJBUF(alloc::HeapMgr,kHeapMgr);
@@ -124,21 +126,32 @@ namespace kernel{
         xlen_t ksatp;
         xlen_t prevsatp;
     };
-    // struct KernelTaskObjs{
-    //     proc::Context ctx;
-    //     sched::tid_t curTid,curPid;
-    // };
-    typedef proc::Task KernelTaskObjs;
-    constexpr int NMAXSLEEP = 32;
     struct KernelHartObjs{
         KernelTaskObjs *curtask;
         ptr_t trapstack;
         uint g_ticks;
         proc::SleepingTask sleep_tasks[NMAXSLEEP];
     };
+    struct UtSName {
+        char sysname[65];
+        char nodename[65];
+        char release[65];
+        char version[65];
+        char machine[65];
+        char domainname[65];
+    };
+    class TimeSpec {
+        private:
+            time_t m_tv_sec;  /* 秒 */
+            long m_tv_nsec; /* 纳秒, 范围在0~999999999 */
+        public:
+            TimeSpec():m_tv_sec(0), m_tv_nsec(0) {}
+            TimeSpec(time_t a_tv_sec, long a_tv_nsec):m_tv_sec(a_tv_sec), m_tv_nsec(a_tv_nsec) {}
+            inline time_t tvSec() { return m_tv_sec; }
+            inline time_t tvNSec() { return m_tv_nsec; }
+    };
     inline int readHartId(){register int hartid asm("tp"); return hartid;}
     void createKernelMapping(vm::VMAR &vmar);
-    
 }
 
 extern kernel::KernelGlobalObjs kGlobObjs;

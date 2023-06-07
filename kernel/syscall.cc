@@ -1,6 +1,5 @@
 #include "kernel.hh"
 #include "sched.hh"
-#include "stat.h"
 #include "fat.hh"
 #include "buf.h"
 #include "ld.hh"
@@ -13,11 +12,12 @@
 syscall_t syscallPtrs[sys::syscalls::nSyscalls];
 extern void _strapexit();
 extern char _uimg_start;
-namespace syscall
-{
+namespace syscall {
     using sys::statcode;
     using klib::SharedPtr;
-    // using klib::make_shared;
+    using kernel::TimeSpec;
+    using kernel::UtSName;
+    using fs::File;
     // 前向引用
     void yield();
     xlen_t none(){return 0;}
@@ -41,7 +41,7 @@ namespace syscall
         int rt=fs::fat32Init();
         kHartObjs.curtask->getProcess()->cwd = fs::entEnter("/");
         printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
-        SharedPtr<fs::File> shit;
+        SharedPtr<File> shit;
         auto testfile=fs::pathCreateAt("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
         assert(rt==0);
         Log(info,"pathCreateAt success\n---------------------------------------------------------");
@@ -72,7 +72,7 @@ namespace syscall
         if(fs::fat32Init() != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObjs.curtask->getProcess();
         curproc->cwd = fs::entEnter("/");
-        curproc->files[3] = new fs::File(curproc->cwd,0);
+        curproc->files[3] = new File(curproc->cwd,0);
         struct fs::DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
         ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
@@ -120,7 +120,7 @@ namespace syscall
         if(fdOutRange(a_fd)) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        SharedPtr<fs::File> f = curproc->files[a_fd];
+        SharedPtr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
         // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
         int newfd = curproc->fdAlloc(f, a_newfd);
@@ -153,7 +153,7 @@ namespace syscall
         auto curproc = kHartObjs.curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
-        SharedPtr<fs::File> f;
+        SharedPtr<File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; }
         struct fs::DirEnt *ep;
 
@@ -177,7 +177,7 @@ namespace syscall
         auto curproc = kHartObjs.curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
-        SharedPtr<fs::File> f;
+        SharedPtr<File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; } // 非绝对路径
 
         return fs::entUnlink(path, f);
@@ -198,7 +198,7 @@ namespace syscall
         klib::ByteArray newpatharr = curproc->vmar.copyinstr((xlen_t)a_newpath, FAT32_MAX_PATH);
         char *oldpath = (char*)oldpatharr.buff;
         char *newpath = (char*)newpatharr.buff;
-        SharedPtr<fs::File> f1, f2;
+        SharedPtr<File> f1, f2;
         if(*oldpath != '/') { f1 = curproc->files[a_olddirfd]; }
         if(*newpath != '/') { f2 = curproc->files[a_newdirfd]; }
 
@@ -287,7 +287,7 @@ namespace syscall
 
         fs::entRelse(curproc->cwd);
         curproc->cwd = ep;
-        curproc->files[3]=new fs::File(curproc->cwd, O_RDWR);
+        curproc->files[3]=new File(curproc->cwd, O_RDWR);
 
         return statcode::ok;
     }
@@ -303,7 +303,7 @@ namespace syscall
         auto curproc = kHartObjs.curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
-        SharedPtr<fs::File> f1, f2;
+        SharedPtr<File> f1, f2;
         if(path[0] != '/') { f2 = curproc->files[a_dirfd]; }
         struct fs::DirEnt *ep;
         int fd;
@@ -328,7 +328,7 @@ namespace syscall
                 return statcode::err;
             }
         }
-        f1 = new fs::File(ep, a_flags);
+        f1 = new File(ep, a_flags);
         f1->off = (a_flags&O_APPEND) ? ep->file_size : 0;
         fd = curproc->fdAlloc(f1);
         if(fdOutRange(fd)) {
@@ -358,8 +358,8 @@ namespace syscall
         auto proc=cur->getProcess();
         xlen_t fd=ctx.x(10),flags=ctx.x(11);
         auto pipe=SharedPtr<pipe::Pipe>(new pipe::Pipe);
-        auto rfile=SharedPtr<fs::File>(new fs::File(pipe,fs::File::FileOp::read));
-        auto wfile=SharedPtr<fs::File>(new fs::File(pipe,fs::File::FileOp::write));
+        auto rfile=SharedPtr<File>(new File(pipe,File::FileOp::read));
+        auto wfile=SharedPtr<File>(new File(pipe,File::FileOp::write));
         int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
         proc->vmar[fd]=fds;
     }
@@ -371,7 +371,7 @@ namespace syscall
         if(fdOutRange(a_fd) || a_buf==nullptr || a_len<sizeof(fs::dstat)) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        SharedPtr<fs::File> f = curproc->files[a_fd];
+        SharedPtr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
         struct fs::dstat ds;
         getDStat(f->obj.ep, &ds);
@@ -406,7 +406,7 @@ namespace syscall
         if(fdOutRange(a_fd) || a_kst==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        SharedPtr<fs::File> f = curproc->files[a_fd];
+        SharedPtr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
         struct fs::kstat kst;
         fs::getKStat(f->obj.ep, &kst);
@@ -659,7 +659,7 @@ namespace syscall
 
         Log(debug,"execve(path=%s,)",path);
         auto Ent=fs::entEnter(path);
-        klib::SharedPtr<fs::File> file=new fs::File(Ent,fs::File::FileOp::read);
+        klib::SharedPtr<File> file=new File(Ent,File::FileOp::read);
         auto buf=file->read(Ent->file_size);
         // auto buf=klib::ByteArray{0};
         // buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;

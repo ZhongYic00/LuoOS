@@ -2,32 +2,8 @@
 #define FAT_HH__
 
 #include "fs.hh"
-#include "stat.h"
-
-#define ATTR_READ_ONLY      0x01  // 只读
-#define ATTR_HIDDEN         0x02  // 隐藏
-#define ATTR_SYSTEM         0x04  // 系统
-#define ATTR_VOLUME_ID      0x08  // 卷标
-#define ATTR_DIRECTORY      0x10  // 目录
-#define ATTR_ARCHIVE        0x20  // 文档
-#define ATTR_LONG_NAME      0x0F  // 长名
-#define ATTR_LINK           0x40  // link
-
-#define LAST_LONG_ENTRY     0x40  // 最后一个长文件名目录
-#define FAT32_EOC           0x0ffffff8  // 
-#define EMPTY_ENTRY         0xe5
-#define END_OF_ENTRY        0x00
-#define CHAR_LONG_NAME      13
-#define CHAR_SHORT_NAME     11
-
-#define FAT32_MAX_FILENAME  255
-#define FAT32_MAX_PATH      260
-#define ENTRY_CACHE_NUM     50
-
-#define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 namespace fs {
-    
     struct mapped_file {
         uint64 baseaddr;
         unsigned long len;
@@ -35,7 +11,6 @@ namespace fs {
         int valid;
         long off;
     };
-    // 短文件名(32bytes)
     typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）
         uint8 attr; // 属性
@@ -50,7 +25,6 @@ namespace fs {
         uint16 fst_clus_lo;  // 文件起始簇号的低16位
         uint32 file_size;  // 文件的大小
     } __attribute__((packed, aligned(4))) SNE;
-    // 长文件名(32bytes)
     typedef struct LongNameEntry {
         uint8 order; // 目录项序列号
         wchar name1[5]; // 第1~5个字符的unicode码
@@ -61,12 +35,10 @@ namespace fs {
         uint16 _fst_clus_lo; // 文件起始簇号 保留 目前常置0
         wchar name3[2]; // 第12~13个字符的unicode码
     } __attribute__((packed, aligned(4))) LNE;
-    // disk entry
     union Ent {
         SNE sne; // short name entry
         LNE lne; // long name entry
     };
-    // 目录项
     struct DirEnt {
         char  filename[FAT32_MAX_FILENAME + 1];  // 文件名
         uint8   attribute;  // 属性
@@ -85,12 +57,10 @@ namespace fs {
         uint8 mount_flag;
         // struct sleeplock lock;
     };
-    // link
     struct Link{
         union Ent de;
         uint32 link_count;
     };
-    // file system?
     struct FileSystem {
         uint32 first_data_sec; // data所在的第一个扇区
         uint32 data_sec_cnt; // 数据扇区数
@@ -110,6 +80,41 @@ namespace fs {
         struct DirEnt root; //这个文件系统的根目录文件
         uint8 mount_mode; //是否被挂载的标志
     };
+	struct dstat {
+	  uint64 d_ino;	// 索引结点号
+	  int64 d_off;	// 到下一个dirent的偏移
+	  uint16 d_reclen;	// 当前dirent的长度
+	  uint8 d_type;	// 文件类型
+	  char d_name[STAT_MAX_NAME + 1];	//文件名
+	};
+	struct stat {
+	  char name[STAT_MAX_NAME + 1]; // 文件名
+	  int dev;     // File system's disk device // 文件系统的磁盘设备
+	  short type;  // Type of file // 文件类型
+	  uint64 size; // Size of file in bytes // 文件大小(字节)
+	};
+	struct kstat {
+		dev_t st_dev;  			/* ID of device containing file */
+		ino_t st_ino;  			/* Inode number */
+		mode_t st_mode;  		/* File type and mode */
+		nlink_t st_nlink;  		/* Number of hard links */
+		uid_t st_uid;			/* User ID of owner */
+		gid_t st_gid;			/* Group ID of owner */
+		dev_t st_rdev;			/* Device ID (if special file) */
+		unsigned long __pad;	
+		size_t st_size;			/* Total size, in bytes */
+		blksize_t st_blksize;	/* Block size for filesystem I/O */
+		int __pad2; 			
+		blkcnt_t st_blocks;		/* Number of 512B blocks allocated */
+		long st_atime_sec;		/* Time of last access */
+		long st_atime_nsec;		
+		long st_mtime_sec;		/* Time of last modification */
+		long st_mtime_nsec;
+		long st_ctime_sec;		/* Time of last status change */
+		long st_ctime_nsec;
+		// unsigned __unused[2];
+		unsigned _unused[2]; // @todo 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
+	};
 
 
     int fat32Init(void);
