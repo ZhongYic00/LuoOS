@@ -621,8 +621,8 @@ void fs::entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off) {
     Allocate an entry on disk. Caller must hold dp->lock.
 */
 // 在dp目录下创建一个文件/目录，返回创建的文件/目录
-struct DirEnt *fs::entAllocAt(struct DirEnt *dp, char *name, int attr) {
-    if (!(dp->attribute & ATTR_DIRECTORY)) { panic("entAllocAt not dir"); }
+struct DirEnt *fs::entCreateAt(struct DirEnt *dp, char *name, int attr) {
+    if (!(dp->attribute & ATTR_DIRECTORY)) { panic("entCreateAt not dir"); }
     if (dp->valid != 1 || !(name = flName(name))) { return nullptr; } // detect illegal character
     struct DirEnt *ep;
     uint off = 0;
@@ -684,7 +684,7 @@ void fs::dirUpdate(struct DirEnt *entry) {
 /*
     caller must hold entry->lock
     caller must hold entry->parent->lock
-    remove the entry in its parent directory
+    pathRemove the entry in its parent directory
 */
 // 将entry从它的父目录中移除，被移除后entry的valid被置为-1
 void fs::entRemove(struct DirEnt *entry) {
@@ -935,7 +935,7 @@ struct DirEnt *fs::entEnterFrom(char *path, SharedPtr<File> f) {
     return lookup_path2(path, 0, f, name);
 }
 // 根据路径寻找目录（不进入该文件/目录）
-struct DirEnt *fs::entEnterParentFrom(char *path, char *name, SharedPtr<File> f) { return lookup_path2(path, 1, f, name); }
+struct DirEnt *fs::entEnterParentAt(char *path, char *name, SharedPtr<File> f) { return lookup_path2(path, 1, f, name); }
 
 int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2){
   struct DirEnt *dp1, *dp2;
@@ -984,7 +984,7 @@ int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File
     }
   }
   char name[FAT32_MAX_FILENAME + 1];
-  if((dp2 = entEnterParentFrom(newpath, name, f2)) == nullptr){
+  if((dp2 = entEnterParentAt(newpath, name, f2)) == nullptr){
     printf("can't find dir\n");
     return NULL;
   }
@@ -1033,11 +1033,11 @@ int fs::entUnlink(char *path, SharedPtr<File> f) {
         }
     }
   }
-  return remove2(path, f);
+  return pathRemoveAt(path, f);
 }
 // 目录是否为空
 // Is the directory dp empty except for "." and ".." ?
-int fs::isdirempty(struct DirEnt *dp) {
+int fs::dirIsEmpty(struct DirEnt *dp) {
   struct DirEnt ep;
   int count;
   int ret;
@@ -1045,14 +1045,14 @@ int fs::isdirempty(struct DirEnt *dp) {
   ret = entFindNext(dp, &ep, 2 * 32, &count);   // skip the "." and ".."
   return ret == -1;
 }
-int fs::remove(char *path) {
+int fs::pathRemove(char *path) {
   char *s = path + strlen(path) - 1;
   while (s >= path && *s == '/') { s--; }
   if (s >= path && *s == '.' && (s == path || *--s == '/')) { return -1; }
   struct DirEnt *ep;
   if((ep = entEnter(path)) == nullptr){ return -1; }
   entLock(ep);
-  if((ep->attribute & ATTR_DIRECTORY) && !isdirempty(ep)) {
+  if((ep->attribute & ATTR_DIRECTORY) && !dirIsEmpty(ep)) {
     entUnlock(ep);
     entRelse(ep);
     return -1;
@@ -1064,11 +1064,11 @@ int fs::remove(char *path) {
   entRelse(ep);
   return 0;
 }
-int fs::remove2(char *path, SharedPtr<File> f) {
+int fs::pathRemoveAt(char *path, SharedPtr<File> f) {
   struct DirEnt *ep;
   if((ep = entEnterFrom(path, f)) == nullptr){ return -1; }
   entLock(ep);
-  if((ep->attribute & ATTR_DIRECTORY) && !isdirempty(ep)){
+  if((ep->attribute & ATTR_DIRECTORY) && !dirIsEmpty(ep)){
     entUnlock(ep);
     entRelse(ep);
     return -1;
@@ -1080,7 +1080,7 @@ int fs::remove2(char *path, SharedPtr<File> f) {
   entRelse(ep);
   return 0;
 }
-int fs::syn_disk(uint64 start,long len) {
+int fs::mapFileSyn(uint64 start,long len) {
     uint i, n;
     // pte_t *pte;
     uint64 pa,va;
@@ -1109,7 +1109,7 @@ int fs::syn_disk(uint64 start,long len) {
     // entUnlock(ep);
     return 1;
 }
-int fs::do_mount(struct DirEnt *mountpoint,struct DirEnt *dev) {
+int fs::devMount(struct DirEnt *mountpoint,struct DirEnt *dev) {
     while(dev_fat[mount_num].vaild!=0) {
         mount_num++;
         mount_num=mount_num%8;
@@ -1146,13 +1146,13 @@ int fs::do_mount(struct DirEnt *mountpoint,struct DirEnt *dev) {
     mountpoint->dev=mount_num;
     return 0;
 }
-int fs::do_umount(struct DirEnt *mountpoint) {
+int fs::devUnmount(struct DirEnt *mountpoint) {
     mountpoint->mount_flag=0;
     memset(&dev_fat[mountpoint->dev],0,sizeof(dev_fat[0]));
     mountpoint->dev=0;
     return 0;
 }
-struct DirEnt *fs::create(char *path, short type, int mode) {
+struct DirEnt *fs::pathCreate(char *path, short type, int mode) {
     struct DirEnt *ep, *dp;
     char name[FAT32_MAX_FILENAME + 1];
     if((dp = entEnterParent(path, name)) == nullptr) { return nullptr; }
@@ -1160,7 +1160,7 @@ struct DirEnt *fs::create(char *path, short type, int mode) {
     else if (mode & O_RDONLY) { mode = ATTR_READ_ONLY; }
     else { mode = 0; }
     entLock(dp);
-    if ((ep = entAllocAt(dp, name, mode)) == nullptr) {
+    if ((ep = entCreateAt(dp, name, mode)) == nullptr) {
         entUnlock(dp);
         entRelse(dp);
         return nullptr;
@@ -1177,11 +1177,11 @@ struct DirEnt *fs::create(char *path, short type, int mode) {
     entLock(ep);
     return ep;
 }
-struct DirEnt *fs::create2(char *path, short type, int mode, SharedPtr<File> f) {
+struct DirEnt *fs::pathCreateAt(char *path, short type, int mode, SharedPtr<File> f) {
     struct DirEnt *ep, *dp;
     char name[FAT32_MAX_FILENAME + 1];
 
-    if((dp = entEnterParentFrom(path, name, f)) == nullptr){
+    if((dp = entEnterParentAt(path, name, f)) == nullptr){
         printf("can't find dir\n");
         return nullptr;
     }
@@ -1189,7 +1189,7 @@ struct DirEnt *fs::create2(char *path, short type, int mode, SharedPtr<File> f) 
     else if (mode & O_RDONLY) { mode = ATTR_READ_ONLY; }
     else { mode = 0; }
     entLock(dp);
-    if ((ep = entAllocAt(dp, name, mode)) == nullptr) {
+    if ((ep = entCreateAt(dp, name, mode)) == nullptr) {
         entUnlock(dp);
         entRelse(dp);
         return nullptr;

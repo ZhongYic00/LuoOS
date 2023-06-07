@@ -61,7 +61,7 @@ klib::ByteArray fs::File::read(size_t len, long a_off, bool a_update){
                 if(a_update) { off = a_off + rdbytes; }
             }
             entUnlock(obj.ep);
-            return buf;
+            return klib::ByteArray(buf.buff, rdbytes);
             break;
         }
         default:

@@ -42,9 +42,9 @@ namespace syscall
         kHartObjs.curtask->getProcess()->cwd = fs::entEnter("/");
         printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
         SharedPtr<fs::File> shit;
-        auto testfile=fs::create2("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
+        auto testfile=fs::pathCreateAt("/testfile",T_FILE,O_CREATE|O_RDWR,shit);
         assert(rt==0);
-        Log(info,"create2 success\n---------------------------------------------------------");
+        Log(info,"pathCreateAt success\n---------------------------------------------------------");
         klib::string content="test write";
         rt=fs::entWrite(testfile,0,(xlen_t)content.c_str(),0,content.size());
         assert(rt==content.size());
@@ -73,9 +73,9 @@ namespace syscall
         auto curproc = kHartObjs.curtask->getProcess();
         curproc->cwd = fs::entEnter("/");
         curproc->files[3] = new fs::File(curproc->cwd,0);
-        struct fs::DirEnt *ep = fs::create("/dev", T_DIR, 0);
+        struct fs::DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
-        ep = fs::create("/dev/vda2", T_DIR, 0);
+        ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
         Log(info,"fat initialize ok");
         return statcode::ok;
@@ -157,7 +157,7 @@ namespace syscall
         if(*path != '/') { f = curproc->files[a_dirfd]; }
         struct fs::DirEnt *ep;
 
-        if((ep = fs::create2(path, T_DIR, 0, f)) == nullptr) {
+        if((ep = fs::pathCreateAt(path, T_DIR, 0, f)) == nullptr) {
             printf("can't create %s\n", path);
             return statcode::err;
         }
@@ -223,7 +223,7 @@ namespace syscall
             return statcode::err;
         }
 
-        return fs::do_umount(ep);
+        return fs::devUnmount(ep);
     }
     xlen_t mount() {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -265,7 +265,7 @@ namespace syscall
             return statcode::err;
         }
 
-        return do_mount(ep, dev_ep);
+        return devMount(ep, dev_ep);
     }
     xlen_t chDir(void) {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -309,7 +309,7 @@ namespace syscall
         int fd;
 
         if(a_flags & O_CREATE) {
-            ep = fs::create2(path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
+            ep = fs::pathCreateAt(path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
             if(ep == nullptr) { return statcode::err; }
         }
         else {

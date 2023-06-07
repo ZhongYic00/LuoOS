@@ -114,7 +114,7 @@ namespace fs {
     struct DirEnt *dirLookUp(struct DirEnt *entry, char *filename, uint *poff);
     char* flName(char *name);
     void entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off);
-    struct DirEnt *entAllocAt(struct DirEnt *dp, char *name, int attr);
+    struct DirEnt *entCreateAt(struct DirEnt *dp, char *name, int attr);
     struct DirEnt *entDup(struct DirEnt *entry);
     void dirUpdate(struct DirEnt *entry);
     void entTrunc(struct DirEnt *entry);
@@ -128,19 +128,19 @@ namespace fs {
     struct DirEnt *entEnterParent(char *path, char *name);
     int entRead(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n);
     int entWrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint n);
-    struct DirEnt *entEnterParentFrom(char *path, char *name, SharedPtr<File> f);
+    struct DirEnt *entEnterParentAt(char *path, char *name, SharedPtr<File> f);
     struct DirEnt *entEnterFrom(char *path, SharedPtr<File> f);
     uint32 getBytesPerClus();
     int entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2);
     int entUnlink(char *path, SharedPtr<File> f);
-    int remove(char *path);
-    int isdirempty(struct DirEnt *dp);
-    int remove2(char *path, SharedPtr<File> f);
-    int syn_disk(uint64 start,long len);
-    int do_mount(struct DirEnt *mountpoint,struct DirEnt *dev);
-    int do_umount(struct DirEnt *mountpoint);
-    struct DirEnt *create(char *path, short type, int mode);
-    struct DirEnt *create2(char *path, short type, int mode, SharedPtr<File> f);
+    int pathRemove(char *path);
+    int dirIsEmpty(struct DirEnt *dp);
+    int pathRemoveAt(char *path, SharedPtr<File> f);
+    int mapFileSyn(uint64 start,long len);
+    int devMount(struct DirEnt *mountpoint,struct DirEnt *dev);
+    int devUnmount(struct DirEnt *mountpoint);
+    struct DirEnt *pathCreate(char *path, short type, int mode);
+    struct DirEnt *pathCreateAt(char *path, short type, int mode, SharedPtr<File> f);
     void getDStat(struct DirEnt *de, struct dstat *st);
     void getKStat(struct DirEnt *de, struct kstat *kst);
 
