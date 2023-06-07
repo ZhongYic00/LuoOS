@@ -13,7 +13,6 @@
 // * Only one process at a time can use a buffer,
 //     so do not keep them longer than necessary.
 
-#include "param.h"
 // #include "include/spinlock.h"
 // #include "include/sleeplock.h"
 #include "buf.h"

@@ -9,7 +9,6 @@
 
 // #include "include/types.h"
 // #include "include/riscv.h"
-#include "param.h"
 #include "kernel.hh"
 #include "virtio.h"
 #include "proc.hh"

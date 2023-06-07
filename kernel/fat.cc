@@ -1,5 +1,4 @@
 #include "fat.hh"
-#include "param.h"
 #include "buf.h"
 #include "kernel.hh"
 
