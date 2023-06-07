@@ -136,7 +136,7 @@ static void freeClus(uint32 cluster) { fatWrite(cluster, 0); }
     当write为0：将簇号为cluster、偏移为off处、长为n的数据读到data
     返回写入数据的长度
 */
-static uint rw_clus(uint32 cluster, int write, int user, uint64 data, uint off, uint n) {
+static uint rwClus(uint32 cluster, int write, int user, uint64 data, uint off, uint n) {
     if (off + n > fat.byts_per_clus) { panic("offset out of range"); }
     uint tot, m;
     struct buf *bp;
@@ -491,7 +491,7 @@ int fs::entRead(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n
     if (off > entry->file_size || off + n < off || (entry->attribute & ATTR_DIRECTORY)) { return 0; }
     if (entry->attribute & ATTR_LINK){
         struct Link li;
-        rw_clus(entry->first_clus, 0, 0, (uint64)&li, 0, 36);
+        rwClus(entry->first_clus, 0, 0, (uint64)&li, 0, 36);
         entry->first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         entry->attribute = li.de.sne.attr;
     }
@@ -501,7 +501,7 @@ int fs::entRead(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n
         relocClus(entry, off, 0);
         m = fat.byts_per_clus - off % fat.byts_per_clus;
         if (n - tot < m) { m = n - tot; }
-        if (rw_clus(entry->cur_clus, 0, user_dst, dst, off % fat.byts_per_clus, m) != m) { break; }
+        if (rwClus(entry->cur_clus, 0, user_dst, dst, off % fat.byts_per_clus, m) != m) { break; }
     }
     return tot;
 }
@@ -511,7 +511,7 @@ int fs::entWrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint 
     if (off > entry->file_size || off + n < off || (uint64)off + n > 0xffffffff || (entry->attribute & ATTR_READ_ONLY)) { return -1; }
     if (entry->attribute & ATTR_LINK){
         struct Link li;
-        rw_clus(entry->first_clus, 0, 0, (uint64)&li, 0, 36);
+        rwClus(entry->first_clus, 0, 0, (uint64)&li, 0, 36);
         entry->first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         entry->attribute = li.de.sne.attr;
     }
@@ -525,7 +525,7 @@ int fs::entWrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint 
         relocClus(entry, off, 1);
         m = fat.byts_per_clus - off % fat.byts_per_clus;
         if (n - tot < m) { m = n - tot; }
-        if (rw_clus(entry->cur_clus, 1, user_src, src, off % fat.byts_per_clus, m) != m) { break; }
+        if (rwClus(entry->cur_clus, 1, user_src, src, off % fat.byts_per_clus, m) != m) { break; }
     }
     if(n > 0) {
         if(off > entry->file_size) {
@@ -573,7 +573,7 @@ void fs::entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off) {
         de.sne.fst_clus_lo = (uint16)(ep->first_clus & 0xffff);       // low 16 bits
         de.sne.file_size = 0;                                       // filesize is updated in dirUpdate()
         off = relocClus(dp, off, 1);
-        rw_clus(dp->cur_clus, 1, 0, (uint64)&de, off, sizeof(de));
+        rwClus(dp->cur_clus, 1, 0, (uint64)&de, off, sizeof(de));
     }
     else {  // 长名
         int entcnt = (strlen(ep->filename) + CHAR_LONG_NAME - 1) / CHAR_LONG_NAME;   // count of l-n-entries, rounds up
@@ -602,7 +602,7 @@ void fs::entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off) {
                 }
             }
             uint off2 = relocClus(dp, off, 1);
-            rw_clus(dp->cur_clus, 1, 0, (uint64)&de, off2, sizeof(de));
+            rwClus(dp->cur_clus, 1, 0, (uint64)&de, off2, sizeof(de));
             off += sizeof(de);
         }
         memset(&de, 0, sizeof(de));
@@ -612,7 +612,7 @@ void fs::entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off) {
         de.sne.fst_clus_lo = (uint16)(ep->first_clus & 0xffff);     // low 16 bits
         de.sne.file_size = ep->file_size;                         // filesize is updated in dirUpdate()
         off = relocClus(dp, off, 1);
-        rw_clus(dp->cur_clus, 1, 0, (uint64)&de, off, sizeof(de));
+        rwClus(dp->cur_clus, 1, 0, (uint64)&de, off, sizeof(de));
     }
 }
 /*
@@ -668,15 +668,15 @@ void fs::dirUpdate(struct DirEnt *entry) {
     if (!entry->dirty || entry->valid != 1) { return; }
     uint entcnt = 0;
     uint32 off = relocClus(entry->parent, entry->off, 0);
-    rw_clus(entry->parent->cur_clus, 0, 0, (uint64) &entcnt, off, 1);
+    rwClus(entry->parent->cur_clus, 0, 0, (uint64) &entcnt, off, 1);
     entcnt &= ~LAST_LONG_ENTRY;
     off = relocClus(entry->parent, entry->off + (entcnt << 5), 0);
     union Ent de;
-    rw_clus(entry->parent->cur_clus, 0, 0, (uint64)&de, off, sizeof(de));
+    rwClus(entry->parent->cur_clus, 0, 0, (uint64)&de, off, sizeof(de));
     de.sne.fst_clus_hi = (uint16)(entry->first_clus >> 16);
     de.sne.fst_clus_lo = (uint16)(entry->first_clus & 0xffff);
     de.sne.file_size = entry->file_size;
-    rw_clus(entry->parent->cur_clus, 1, 0, (uint64)&de, off, sizeof(de));
+    rwClus(entry->parent->cur_clus, 1, 0, (uint64)&de, off, sizeof(de));
     entry->dirty = 0;
 }
 /*
@@ -690,11 +690,11 @@ void fs::entRemove(struct DirEnt *entry) {
     uint entcnt = 0;
     uint32 off = entry->off;
     uint32 off2 = relocClus(entry->parent, off, 0);
-    rw_clus(entry->parent->cur_clus, 0, 0, (uint64) &entcnt, off2, 1);
+    rwClus(entry->parent->cur_clus, 0, 0, (uint64) &entcnt, off2, 1);
     entcnt &= ~LAST_LONG_ENTRY;
     uint8 flag = EMPTY_ENTRY;
     for (int i = 0; i <= entcnt; i++) {
-      rw_clus(entry->parent->cur_clus, 1, 0, (uint64) &flag, off2, 1);
+      rwClus(entry->parent->cur_clus, 1, 0, (uint64) &flag, off2, 1);
       off += 32;
       off2 = relocClus(entry->parent, off, 0);
     }
@@ -795,7 +795,7 @@ int fs::entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count) 
     if (dp->valid != 1) { return -1; } // 搜索目录无效
     if (dp->attribute & ATTR_LINK){
         struct Link li;
-        rw_clus(dp->first_clus, 0, 0, (uint64)&li, 0, 36);
+        rwClus(dp->first_clus, 0, 0, (uint64)&li, 0, 36);
         dp->first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         dp->attribute = li.de.sne.attr;
     }
@@ -805,7 +805,7 @@ int fs::entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count) 
     // 遍历dp的簇
     for (int off2; (off2 = relocClus(dp, off, 0)) != -1; off += 32) { // off2: 簇内偏移 off: 目录内偏移
         // 没对齐或在非"."和"..."目录的情形下到达结尾
-        auto bytes = rw_clus(dp->cur_clus, 0, 0, (uint64)&de, off2, 32);
+        auto bytes = rwClus(dp->cur_clus, 0, 0, (uint64)&de, off2, 32);
         auto fchar = ((char*)&de)[0];
         auto leorder = de.lne.order;
         static bool first = true;
@@ -871,7 +871,7 @@ struct DirEnt *fs::dirLookUp(struct DirEnt *dp, char *filename, uint *poff) {
     if (!(dp->attribute & ATTR_DIRECTORY)) { panic("dirLookUp not DIR"); }
     if (dp->attribute & ATTR_LINK){
         struct Link li;
-        rw_clus(dp->first_clus, 0, 0, (uint64)&li, 0, 36);
+        rwClus(dp->first_clus, 0, 0, (uint64)&li, 0, 36);
         dp->first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         dp->attribute = li.de.sne.attr;
     }
@@ -946,7 +946,7 @@ int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File
   int off2;
   off2 = relocClus(parent1, dp1->off, 0);
   union Ent de;
-  if (rw_clus(parent1->cur_clus, 0, 0, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
+  if (rwClus(parent1->cur_clus, 0, 0, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
     printf("can't read Ent\n");
     return -1;
   }
@@ -956,7 +956,7 @@ int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File
     clus = allocClus(dp1->dev);
     li.de = de;
     li.link_count = 2;
-    if(rw_clus(clus, 1, 0, (uint64)&li, 0, 36) != 36){
+    if(rwClus(clus, 1, 0, (uint64)&li, 0, 36) != 36){
         printf("write li wrong\n");
         return -1;
     }
@@ -965,7 +965,7 @@ int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File
     de.sne.fst_clus_lo = (uint16)(clus & 0xffff);
     de.sne.file_size = 36;
     entLock(parent1);
-    if(rw_clus(parent1->cur_clus, 1, 0, (uint64)&de, off2, 32) != 32){
+    if(rwClus(parent1->cur_clus, 1, 0, (uint64)&de, off2, 32) != 32){
         printf("write parent1 wrong\n");
         entUnlock(parent1);
         return -1;
@@ -974,9 +974,9 @@ int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File
   }
   else {
     clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
-    rw_clus(clus, 0, 0, (uint64)&li, 0, 36);
+    rwClus(clus, 0, 0, (uint64)&li, 0, 36);
     li.link_count++;
-    if(rw_clus(clus, 1, 0, (uint64)&li, 0, 36) != 36){
+    if(rwClus(clus, 1, 0, (uint64)&li, 0, 36) != 36){
         printf("write li wrong\n");
         return -1;
     }
@@ -994,7 +994,7 @@ int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File
     return -1;
   }
   off = relocClus(dp2, off, 1);
-  if(rw_clus(dp2->cur_clus, 1, 0, (uint64)&de, off, 32) != 32){
+  if(rwClus(dp2->cur_clus, 1, 0, (uint64)&de, off, 32) != 32){
     printf("write de into %s wrong",dp2->filename);
     entUnlock(dp2);
     return -1;
@@ -1010,7 +1010,7 @@ int fs::entUnlink(char *path, SharedPtr<File> f) {
   int off;
   off = relocClus(parent, dp->off, 0);
   union Ent de;
-  if (rw_clus(parent->cur_clus, 0, 0, (uint64)&de, off, 32) != 32 || de.lne.order == END_OF_ENTRY) {
+  if (rwClus(parent->cur_clus, 0, 0, (uint64)&de, off, 32) != 32 || de.lne.order == END_OF_ENTRY) {
     printf("can't read Ent\n");
     return -1;
   }
@@ -1018,14 +1018,14 @@ int fs::entUnlink(char *path, SharedPtr<File> f) {
     int clus;
     struct Link li;
     clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
-    if(rw_clus(clus, 0, 0, (uint64)&li, 0, 36) != 36){
+    if(rwClus(clus, 0, 0, (uint64)&li, 0, 36) != 36){
       printf("read li wrong\n");
       return -1;
     }
     if(--li.link_count == 0){
         freeClus(clus);
         de = li.de;
-        if(rw_clus(parent->cur_clus, 1, 0, (uint64)&de, off, 32) != 32){
+        if(rwClus(parent->cur_clus, 1, 0, (uint64)&de, off, 32) != 32){
             printf("write de into %s wrong\n",parent->filename);
             return -1;
         }

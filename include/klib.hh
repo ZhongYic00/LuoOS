@@ -323,9 +323,6 @@ struct list:public Seq<T>{
     private:
       T *m_ptr;
       MDB *m_meta;
-      // template<typename T1, typename... T1s>
-      // friend SharedPtr<T1> make_shared(T1s&& ...params);
-      // SharedPtr(T *a_ptr): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB):nullptr) {}
     public:
       // 构造与析构
       SharedPtr(): m_ptr(nullptr), m_meta(nullptr) {}
@@ -352,23 +349,6 @@ struct list:public Seq<T>{
       T& operator*() const { return *m_ptr; }
       T* operator->() const { return m_ptr; }
       T& operator[](int a_offset) const { return m_ptr[a_offset]; }
-      // 算术运算——不再支持
-      // const SharedPtr<T> operator+(int a_offset) const { return (m_ptr!=nullptr) ? (SharedPtr<T>(m_ptr+a_offset,true)) : nullptr; }
-      // const SharedPtr<T> operator-(int a_offset) const { return (m_ptr!=nullptr) ? (SharedPtr<T>(m_ptr-a_offset,true)) : nullptr; }
-      // const int operator-(T *a_ptr) const { return m_ptr - a_ptr; }
-      // const int operator-(const SharedPtr<T> &a_sptr) const { return m_ptr - a_sptr.m_ptr; }
-      // const SharedPtr<T> operator++() { return *this = *this + 1; }
-      // const SharedPtr<T> operator--() { return *this = *this - 1; }
-      // const SharedPtr<T> operator++(int) {
-      //   SharedPtr<T> tmp = *this;
-      //   *this = *this + 1;
-      //   return tmp;
-      // }
-      // const SharedPtr<T> operator--(int) {
-      //   SharedPtr<T> tmp = *this;
-      //   *this = *this - 1;
-      //   return tmp;
-      // }
       // 逻辑运算
       const bool operator!() const { return !m_ptr; }
       const bool operator>(T *a_ptr) const { return m_ptr > a_ptr; }
@@ -398,10 +378,6 @@ struct list:public Seq<T>{
       inline const MDB& metaData() const { return *m_meta; }
       inline const int refCount() const { return (m_meta!=nullptr) ? (m_meta->m_ref) : 0; }
       inline const bool expired() const { return (m_meta!=nullptr) ? (m_meta->m_ref<=0) : true; }
-      // inline const bool valid() const { return m_ptr != nullptr; }
-      void print() const {
-        // Log(debug,"SharedPtr: [addr=0x%lx, MDB:(addr=0x%lx, ref=%d)]\n", m_ptr, m_meta, (m_meta!=nullptr)?(m_meta->m_ref):0);
-      }
   };
   /*
     SharedPtr的创建方式:
