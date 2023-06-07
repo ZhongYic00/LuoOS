@@ -24,6 +24,8 @@
 #define FAT32_MAX_PATH      260
 #define ENTRY_CACHE_NUM     50
 
+#define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
 namespace fs {
     
     struct mapped_file {

@@ -7,7 +7,6 @@ typedef __UINT32_TYPE__ word_t;
 typedef __UINT8_TYPE__ uint8_t;
 typedef void (*hook_t)(void);
 typedef xlen_t (*syscall_t)(void);
-// 搬FAT时顺便搬过来的
 typedef unsigned int   uint;
 typedef unsigned short ushort;
 typedef unsigned char  uchar;
@@ -49,34 +48,11 @@ class TimeSpec {
         inline time_t tvNSec() { return m_tv_nsec; }
 };
 #define NULL 0
-#define readb(addr) (*(volatile uint8 *)(addr))     
-#define readw(addr) (*(volatile uint16 *)(addr))    
-#define readd(addr) (*(volatile uint32 *)(addr))    
-#define readq(addr) (*(volatile uint64 *)(addr))    
-#define writeb(v, addr)                      \
-    {                                        \
-        (*(volatile uint8 *)(addr)) = (v); \
-    }
-#define writew(v, addr)                       \
-    {                                         \
-        (*(volatile uint16 *)(addr)) = (v); \
-    }
-#define writed(v, addr)                       \
-    {                                         \
-        (*(volatile uint32 *)(addr)) = (v); \
-    }
-#define writeq(v, addr)                       \
-    {                                         \
-        (*(volatile uint64 *)(addr)) = (v); \
-    }
-#define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
-#include <stddef.h>
 #include <stdarg.h>
 #include <limits.h>
 
 #define INTERVAL     (390000000 / 100) // timer interrupt interval
 #define CLK_FREQ 		8900000
-#define NMAXSLEEP   32
 
 #endif

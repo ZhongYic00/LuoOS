@@ -429,7 +429,7 @@ namespace syscall
         klib::ByteArray tvarray = curproc->vmar.copyin((xlen_t)a_tv, sizeof(TimeSpec));
         TimeSpec *tv = (TimeSpec*)tvarray.buff;
         struct proc::SleepingTask tosleep(cur, kHartObjs.g_ticks+tv->tvSec()*CLK_FREQ/INTERVAL+tv->tvNSec()*(CLK_FREQ/100000)/10/INTERVAL);
-        for(int i = 0; i < NMAXSLEEP; ++i) {
+        for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
             if(kHartObjs.sleep_tasks[i].m_task == nullptr) {
                 kHartObjs.sleep_tasks[i] = tosleep;
                 return sleep();

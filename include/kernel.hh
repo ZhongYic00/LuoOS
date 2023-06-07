@@ -127,6 +127,7 @@ namespace kernel{
     //     sched::tid_t curTid,curPid;
     // };
     typedef proc::Task KernelTaskObjs;
+    constexpr int NMAXSLEEP = 32;
     struct KernelHartObjs{
         KernelTaskObjs *curtask;
         ptr_t trapstack;

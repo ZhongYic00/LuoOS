@@ -18,7 +18,7 @@ void timerInterruptHandler(){
         else {curproc->ti.sTick(); }
     }
     ++kHartObjs.g_ticks;
-    for(int i = 0; i < NMAXSLEEP; ++i) {
+    for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
         auto towake = kHartObjs.sleep_tasks[i];
         if(towake.m_task!=nullptr && towake.m_wakeup_tick<kHartObjs.g_ticks) {
             kGlobObjs.scheduler.wakeup(towake.m_task);
