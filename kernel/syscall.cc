@@ -428,7 +428,7 @@ namespace syscall
         auto curproc = cur->getProcess();
         klib::ByteArray tvarray = curproc->vmar.copyin((xlen_t)a_tv, sizeof(TimeSpec));
         TimeSpec *tv = (TimeSpec*)tvarray.buff;
-        struct proc::SleepingTask tosleep(cur, kHartObjs.g_ticks+tv->tvSec()*CLK_FREQ/INTERVAL+tv->tvNSec()*(CLK_FREQ/100000)/10/INTERVAL);
+        struct proc::SleepingTask tosleep(cur, kHartObjs.g_ticks + tv->tvSec()*kernel::CLK_FREQ/kernel::INTERVAL + tv->tvNSec()*kernel::CLK_FREQ/(1000000*kernel::INTERVAL));
         for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
             if(kHartObjs.sleep_tasks[i].m_task == nullptr) {
                 kHartObjs.sleep_tasks[i] = tosleep;
@@ -454,7 +454,7 @@ namespace syscall
         auto curproc = kHartObjs.curtask->getProcess();
         if(a_tms != nullptr) { curproc->vmar.copyout((xlen_t)a_tms, klib::ByteArray((uint8_t*)&curproc->ti, sizeof(proc::Tms))); }
         // acquire(&tickslock);
-        int ticks = (int)(kHartObjs.g_ticks/INTERVAL);
+        int ticks = (int)(kHartObjs.g_ticks/kernel::INTERVAL);
         // release(&tickslock);
 
         return ticks;
@@ -483,8 +483,8 @@ namespace syscall
     
         auto curproc = kHartObjs.curtask->getProcess();
         xlen_t ticks;
-        asm volatile("rdtime %0" : "=r" (ticks) ); // todo@ 优化
-        TimeSpec ts(ticks/CLK_FREQ, ((ticks/(CLK_FREQ/100000))%100000)*10);
+        asm volatile("rdtime %0" : "=r" (ticks) );
+        TimeSpec ts(ticks/kernel::CLK_FREQ, ((100000*ticks/kernel::CLK_FREQ)%100000)*10);
         curproc->vmar.copyout((xlen_t)a_ts, klib::ByteArray((uint8_t*)&ts, sizeof(ts)));
 
         return statcode::ok;

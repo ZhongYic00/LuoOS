@@ -92,6 +92,8 @@ namespace sys
 } // namespace sy
 namespace kernel{
     constexpr int timerInterval=100000;
+    constexpr long INTERVAL = 390000000 / 100;
+    constexpr long CLK_FREQ = 8900000;
 
     struct KernelInfo{
         using segment_t=vm::segment_t;

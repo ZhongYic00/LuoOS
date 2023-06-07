@@ -52,7 +52,5 @@ class TimeSpec {
 #include <stdarg.h>
 #include <limits.h>
 
-#define INTERVAL     (390000000 / 100) // timer interrupt interval
-#define CLK_FREQ 		8900000
 
 #endif
