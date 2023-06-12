@@ -8,6 +8,7 @@
 
 
 #include <EABase/eabase.h>
+#include <type_traits>
 #if defined(EA_PRAGMA_ONCE_SUPPORTED)
 	#pragma once
 #endif

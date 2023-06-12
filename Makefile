@@ -12,7 +12,7 @@ OS := $(objdir)/os.elf
 
 UCFLAGS = $(CFLAGS) -T user/user.ld
 # linuxheaders = /usr/src/linux-headers-$(shell uname -r)/include/
-CFLAGS += -Iinclude/ -Ithirdparty/tinystl/include -O0 -g
+CFLAGS += -Iinclude/ -Ithirdparty/tinystl/include -Ithirdparty/eastl-port/include -Ithirdparty/eastl-port/test/packages/EABase/include/Common -O0 -g
 compile = $(CC) $(depflags) $(CFLAGS)
 
 # SBI: sbi/sbi.elf;
@@ -25,16 +25,22 @@ ksrcs = kernel/start.S\
 utilsrcs = $(shell find utils/ -name "*.cc")
 utilobjs = $(patsubst %.cc,$(objdir)/%.o,$(utilsrcs))
 src3party = $(shell find thirdparty/ -name "*.cc")
-ksrcs += $(utilsrcs) $(src3party)
-kobjs0 = $(patsubst %.S,$(objdir)/%.o,$(ksrcs))
-# kobjs1 = $(patsubst %.c,$(objdir)/%.o,$(kobjs0))
-kobjs = $(patsubst %.cc,$(objdir)/%.o,$(kobjs0))
+eastl-srcs = $(wildcard thirdparty/eastl-port/source/*.cpp)
+ksrcs += $(utilsrcs) $(src3party) $(eastl-srcs)
+
+kobjs = $(addprefix $(objdir)/,$(addsuffix .o,$(basename $(ksrcs))))
 
 depfiles := $(patsubst $(objdir)/%.o,$(depdir)/%.d,$(kobjs))
 $(depfiles):
 include $(wildcard $(depfiles))
 $(info ksrcs=$(ksrcs), kobjs=$(kobjs), depfils=$(depfiles))
 
+
+$(objdir)/%.o : %.cpp
+		@echo + CC $<
+		@mkdir -p $(dir $(depdir)/$*.d)
+		@mkdir -p $(dir $@)
+		$(compile) -c -o $@ $<
 $(objdir)/%.o : %.cc
 		@echo + CC $<
 		@mkdir -p $(dir $(depdir)/$*.d)
@@ -66,7 +72,7 @@ $(uimg): $(userprogs)
 	$(OBJCOPY) -I binary -O elf64-littleriscv --binary-architecture riscv --prefix-sections=uimg $< $@
 
 
-TEXTMODE=-nographic > obj/output
+# TEXTMODE=-nographic > obj/output
 run: all
 	@echo "Press Ctrl-A and then X to exit QEMU"
 	@echo "------------------------------------"

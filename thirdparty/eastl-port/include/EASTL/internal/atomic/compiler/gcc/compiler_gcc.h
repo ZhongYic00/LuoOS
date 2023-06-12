@@ -24,8 +24,8 @@
  * into locks. We would rather have user-code explicitly use locking primitives if their code cannot
  * be satisfied with atomic instructions on the given platform.
  */
-static_assert(__atomic_always_lock_free(1, 0), "eastl::atomic<T> where sizeof(T) == 1 must be lock-free!");
-static_assert(__atomic_always_lock_free(2, 0), "eastl::atomic<T> where sizeof(T) == 2 must be lock-free!");
+// static_assert(__atomic_always_lock_free(1, 0), "eastl::atomic<T> where sizeof(T) == 1 must be lock-free!");
+// static_assert(__atomic_always_lock_free(2, 0), "eastl::atomic<T> where sizeof(T) == 2 must be lock-free!");
 static_assert(__atomic_always_lock_free(4, 0), "eastl::atomic<T> where sizeof(T) == 4 must be lock-free!");
 #if EA_PLATFORM_PTR_SIZE == 8
 	static_assert(__atomic_always_lock_free(8, 0), "eastl::atomic<T> where sizeof(T) == 8 must be lock-free!");

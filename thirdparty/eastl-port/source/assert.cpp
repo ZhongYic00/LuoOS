@@ -21,6 +21,8 @@
 	EA_RESTORE_ALL_VC_WARNINGS();
 #elif defined(EA_PLATFORM_ANDROID)
 	#include <android/log.h>
+#elif defined(EA_PLATFORM_LUOOS)
+	#include <klib.h>
 #else
 	#include <stdio.h>
 #endif

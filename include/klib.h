@@ -46,6 +46,7 @@ int    strncmp   (const char *s1, const char *s2, size_t n);
 int    strncmpamb(const char *s1, const char *s2, size_t n);
 char  *strchr    (const char *s, char c);
 void   snstr     (char *dst, wchar const *src, int len);
+void * memchr    (const void *src_void,int c,size_t length);
 #endif
 
 // stdlib.h
@@ -80,6 +81,9 @@ int    putchar   (char c);
       } \
     } while (0)
 #endif
+
+//libm
+float ceilf(float x);
 
 int __cxa_atexit(void (*func)(void*), void* arg, void* dso);
 

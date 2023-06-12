@@ -242,6 +242,7 @@
 #endif
 
 // #include <pthread.h>
+#define EA_NO_HAVE_PTHREAD_H 1
 #if !defined(EA_HAVE_PTHREAD_H) && !defined(EA_NO_HAVE_PTHREAD_H)
 	#if defined(EA_PLATFORM_UNIX) || defined(EA_PLATFORM_APPLE) || defined(EA_PLATFORM_POSIX)
 		#define EA_HAVE_PTHREAD_H 1 /* It can be had under Microsoft/Windows with the http://sourceware.org/pthreads-win32/ library */
@@ -344,6 +345,7 @@
 #endif
 
 // #include <mutex>
+#define EA_NO_HAVE_CPP11_MUTEX 1
 #if !defined(EA_HAVE_CPP11_MUTEX) && !defined(EA_NO_HAVE_CPP11_MUTEX)
 	#if defined(EA_HAVE_DINKUMWARE_CPP_LIBRARY) && (_CPPLIB_VER >= 540) // Dinkumware. VS2012+
 		#define EA_HAVE_CPP11_MUTEX 1
@@ -357,6 +359,7 @@
 #endif
 
 // #include <thread>
+#define EA_NO_HAVE_CPP11_THREAD 1
 #if !defined(EA_HAVE_CPP11_THREAD) && !defined(EA_NO_HAVE_CPP11_THREAD)
 	#if defined(EA_HAVE_DINKUMWARE_CPP_LIBRARY) && (_CPPLIB_VER >= 540) // Dinkumware. VS2012+
 		#define EA_HAVE_CPP11_THREAD 1

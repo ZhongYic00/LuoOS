@@ -96,6 +96,8 @@
 	#define EA_PLATFORM_DESKTOP 1
 #endif
 
+#define EA_PLATFORM_LUOOS 1
+
 #if defined(EA_PLATFORM_PS4) || defined(__ORBIS__) || defined(EA_PLATFORM_KETTLE)
 	// PlayStation 4
 	// Orbis was Sony's code-name for the platform, which is now obsolete.
@@ -615,6 +617,8 @@
 // __sun is defined by the GCC compiler.
 // __i386 is defined by the Sun and GCC compilers.
 // __sparc is defined by the Sun and GCC compilers.
+#elif defined(EA_PLATFORM_LUOOS)
+	#define EA_PLATFORM_NAME "LuoOS"
 #else
 	#error Unknown platform
 	#error Unknown processor

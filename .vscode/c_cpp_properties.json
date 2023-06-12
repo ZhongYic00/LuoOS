@@ -4,7 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/thirdparty/tinystl/include"
+                "${workspaceFolder}/thirdparty/tinystl/include",
+                "${workspaceFolder}/thirdparty/eastl-port/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

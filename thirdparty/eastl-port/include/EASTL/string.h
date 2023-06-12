@@ -102,7 +102,7 @@ EA_DISABLE_ALL_VC_WARNINGS()
 #include <stdarg.h>             // vararg functionality.
 
 #include <stdlib.h>             // malloc, free.
-#include <stdio.h>              // snprintf, etc.
+// #include <stdio.h>              // snprintf, etc.
 #include <ctype.h>              // toupper, etc.
 
 EA_DISABLE_GCC_WARNING(-Wtype-limits)
