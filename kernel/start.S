@@ -6,7 +6,6 @@
 _start:
     la sp,kstack_start + STACK_SIZE
     call start_kernel
-    j halt
 
 .section .kstack
 kstack_start:

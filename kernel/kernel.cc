@@ -19,7 +19,8 @@ kernel::KernelGlobalObjs kGlobObjs;
 kernel::KernelHartObjs kHartObjs;
 kernel::KernelInfo kInfo={
     .segments={
-        .dev=(vm::segment_t){0x0,0x40000000}
+        .dev=(vm::segment_t){0x0,0x40000000},
+        .kstack=vm::segment_t{0x81200000,0x81208000}
     }
 };
 using vm::pgtbl_t,vm::PageTable;
@@ -142,52 +143,65 @@ void idle(){
         ExecInst(wfi);
     }
 }
+std::atomic<uint32_t> started;
 extern void schedule();
 extern void program0();
 extern "C" void strapwrapper();
 extern void _strapexit();
+
+xlen_t irqStackOf(int hart){return kInfo.segments.kstack.first+hart*0x1000+0x1000;}
 extern "C" //__attribute__((section("init")))
 void start_kernel(int hartid){
     register int tp asm("tp")=hartid;
-    register ptr_t sp asm("sp");
+    register xlen_t sp asm("sp");
+    sp=irqStackOf(hartid);
     // auto &ctx=kHartObjs.curtask->ctx; //TODO fixbug
     // ctx.kstack=sp;
     puts=IO::_sbiputs;
     puts("\n\n>>>Hello LuoOS<<<\n\n");
     sbi_init();
+    int prevStarted=std::atomic_fetch_add(&started,1);
+    Log(info,"Hart %d online!",hartid);
     
-    // @todo needs plic and uart init?
-    puts=IO::_blockingputs;
+    if(!prevStarted){
+        // @todo needs plic and uart init?
+        puts=IO::_blockingputs;
 
-    infoInit();
-    memInit();
-    syscall::init();
-    // csrWrite(sscratch,ctx.gpr);
-    csrWrite(stvec,strapwrapper);
-    csrSet(sstatus,BIT(csr::mstatus::sum));
-    // csrSet(sstatus,BIT(csr::mstatus::sie));
-    csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));
-    // halt();
-    // while(true);
-    for(int i=0;i<10;i++)
-        printf("%d:Hello LuoOS!\n",i);
-    extern char _uimg_start;
-    auto kidle=proc::createKProcess(sched::maxPrior);
-    kidle->defaultTask()->kctx.ra()=(xlen_t)idle;
-    auto uproc=proc::createProcess();
-    uproc->name="uprog00";
-    uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
-    plicInit();
-    timerInit();
-    // csrClear(sstatus,1l<<csr::mstatus::spp);
-    // csrSet(sstatus,BIT(csr::mstatus::spie));
-    virtio_disk_init();
-    Log(info,"virtio disk init over");
-    binit();
-    Log(info,"binit over");
-    schedule();
-    Log(info,"first schedule");
-    volatile register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
-    _strapexit();
+        infoInit();
+        memInit();
+        syscall::init();
+        // csrWrite(sscratch,ctx.gpr);
+        csrWrite(stvec,strapwrapper);
+        csrSet(sstatus,BIT(csr::mstatus::sum));
+        // csrSet(sstatus,BIT(csr::mstatus::sie));
+        csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));
+        // halt();
+        // while(true);
+        for(int i=0;i<10;i++)
+            printf("%d:Hello LuoOS!\n",i);
+        extern char _uimg_start;
+        auto kidle=proc::createKProcess(sched::maxPrior);
+        kidle->defaultTask()->kctx.ra()=(xlen_t)idle;
+        auto uproc=proc::createProcess();
+        uproc->name="uprog00";
+        uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
+        plicInit();
+        timerInit();
+        // csrClear(sstatus,1l<<csr::mstatus::spp);
+        // csrSet(sstatus,BIT(csr::mstatus::spie));
+        virtio_disk_init();
+        Log(info,"virtio disk init over");
+        binit();
+        Log(info,"binit over");
+        sbi_hsm_hart_start(1,(xlen_t)0x80200000,0);
+        while(started<2){
+            auto rt=sbi_hsm_hart_get_status(1);
+        }
+        schedule();
+        Log(info,"first schedule");
+        volatile register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
+        _strapexit();
+    }
+    while(true)ExecInst(wfi);
     // halt();
 }
