@@ -6,6 +6,8 @@
 #include "sbi.hh"
 #include "TINYSTL/vector.h"
 #include "linux/reboot.h"
+#include "thirdparty/expected.hpp"
+using nonstd::expected;
 
 #define moduleLevel LogLevel::info
 
@@ -673,13 +675,21 @@ namespace syscall {
         /// @brief get envs
         return execve(buf,args,0);
     }
-    xlen_t reboot(){
+    expected<xlen_t,tinystl::string> reboot(){
         auto &ctx=kHartObjs.curtask->ctx;
         int magic=ctx.x(10),magic2=ctx.x(11),cmd=ctx.x(12);
-        if(!(magic==LINUX_REBOOT_MAGIC1 && magic2==LINUX_REBOOT_MAGIC2))return statcode::err;
+        if(!(magic==LINUX_REBOOT_MAGIC1 && magic2==LINUX_REBOOT_MAGIC2))return nonstd::make_unexpected("magic num unmatched!");
         if(cmd==LINUX_REBOOT_CMD_POWER_OFF){
             Log(error,"LuoOS Shutdown! Bye-Bye");
             sbi_shutdown();
+        }
+    }
+    xlen_t reboot1(){
+        if(auto ret=reboot()){
+            return ret.value();
+        } else {
+            Log(warning,"syscall failed, reason: %s",ret.error().c_str());
+            return statcode::err;
         }
     }
     void init(){
@@ -692,7 +702,7 @@ namespace syscall {
         syscallPtrs[syscalls::testidle]=testIdle;
         syscallPtrs[syscalls::testmount]=testMount;
         syscallPtrs[syscalls::testfatinit]=testFATInit;
-        syscallPtrs[syscalls::reboot]=reboot;
+        syscallPtrs[syscalls::reboot]=reboot1;
         // syscallPtrs[SYS_fcntl] = sys_fcntl;
         // syscallPtrs[SYS_ioctl] = sys_ioctl;
         // syscallPtrs[SYS_flock] = sys_flock;
