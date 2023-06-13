@@ -30,7 +30,8 @@ extern "C" {
 
 extern void (*puts)(const char *s);
 void halt(int errno=0);
-void panic(char *s);
+void panic(const char *s);
+void assert_(bool cond,const char *s);
 // string.h
 #ifdef STRING
 void  *memset    (void *s, int c, size_t n);
@@ -74,12 +75,7 @@ int    putchar   (char c);
   #define assert(ignore) ((void)0)
 #else
   #define assert(cond) \
-    do { \
-      if (!(cond)) { \
-        printf("Assertion fail at %s:%d\n", __FILE__, __LINE__); \
-        halt(1); \
-      } \
-    } while (0)
+    assert_(cond,"Assertion " #cond " failed at " __FILE__)
 #endif
 
 //libm

@@ -146,10 +146,13 @@ int printf(const char* s, ...)
 	return res;
 }
 
-void panic(char *s)
+void panic(const char *s)
 {
 	printf("panic: %s",s);
 	halt();
+}
+void assert_(bool cond,const char *s){
+	if(!cond)panic(s);
 }
 void halt(int errno){
 	while(1)asm("wfi");
