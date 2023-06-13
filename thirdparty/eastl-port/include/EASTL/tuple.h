@@ -948,15 +948,18 @@ EA_CONSTEXPR decltype(auto) apply(F&& f, Tuple&& t)
 // C++17 structured bindings support for eastl::tuple
 //
 #ifndef EA_COMPILER_NO_STRUCTURED_BINDING
-	#include <tuple>
+	// #include <tuple>
 	namespace std
 	{
 		// NOTE(rparolin): Some platform implementations didn't check the standard specification and implemented the
 		// "tuple_size" and "tuple_element" primary template with as a struct.  The standard specifies they are
 		// implemented with the class keyword so we provide the template specializations as a class and disable the
 		// generated warning.
+		template<class... Ts>
+		class tuple_size;
+		template<size_t I,class... T>
+		class tuple_element;
 		EA_DISABLE_CLANG_WARNING(-Wmismatched-tags)
-
 		template <class... Ts>
 		class tuple_size<::eastl::tuple<Ts...>> : public ::eastl::integral_constant<size_t, sizeof...(Ts)>
 		{

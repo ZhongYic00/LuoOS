@@ -938,7 +938,7 @@ namespace eastl
 // C++17 structured bindings support for eastl::pair
 //
 #ifndef EA_COMPILER_NO_STRUCTURED_BINDING
-	#include <tuple>
+	// #include <tuple>
 	namespace std
 	{
 		// NOTE(rparolin): Some platform implementations didn't check the standard specification and implemented the
@@ -946,7 +946,10 @@ namespace eastl
 		// implemented with the class keyword so we provide the template specializations as a class and disable the
 		// generated warning.
 		EA_DISABLE_CLANG_WARNING(-Wmismatched-tags)
-
+		template<class... Ts>
+		class tuple_size;
+		template<size_t I,class... T>
+		class tuple_element;
 		template <class... Ts>
 		class tuple_size<::eastl::pair<Ts...>> : public ::eastl::integral_constant<size_t, sizeof...(Ts)>
 		{
