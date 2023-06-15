@@ -4,12 +4,13 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/thirdparty/tinystl/include"
+                "${workspaceFolder}/thirdparty/tinystl/include",
+                "${workspaceFolder}/thirdparty/eastl-port/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c17",
-            "cppStandard": "c++14",
+            "cppStandard": "c++17",
             "intelliSenseMode": "linux-clang-x64",
             "configurationProvider": "ms-vscode.makefile-tools"
         }

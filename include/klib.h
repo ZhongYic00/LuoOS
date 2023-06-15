@@ -30,7 +30,8 @@ extern "C" {
 
 extern void (*puts)(const char *s);
 void halt(int errno=0);
-void panic(char *s);
+void panic(const char *s);
+void assert_(bool cond,const char *s);
 // string.h
 #ifdef STRING
 void  *memset    (void *s, int c, size_t n);
@@ -46,6 +47,7 @@ int    strncmp   (const char *s1, const char *s2, size_t n);
 int    strncmpamb(const char *s1, const char *s2, size_t n);
 char  *strchr    (const char *s, char c);
 void   snstr     (char *dst, wchar const *src, int len);
+void * memchr    (const void *src_void,int c,size_t length);
 #endif
 
 // stdlib.h
@@ -73,13 +75,11 @@ int    putchar   (char c);
   #define assert(ignore) ((void)0)
 #else
   #define assert(cond) \
-    do { \
-      if (!(cond)) { \
-        printf("Assertion fail at %s:%d\n", __FILE__, __LINE__); \
-        halt(1); \
-      } \
-    } while (0)
+    assert_(cond,"Assertion " #cond " failed at " __FILE__)
 #endif
+
+//libm
+float ceilf(float x);
 
 int __cxa_atexit(void (*func)(void*), void* arg, void* dso);
 

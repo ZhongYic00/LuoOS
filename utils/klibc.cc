@@ -146,10 +146,13 @@ int printf(const char* s, ...)
 	return res;
 }
 
-void panic(char *s)
+void panic(const char *s)
 {
 	printf("panic: %s",s);
 	halt();
+}
+void assert_(bool cond,const char *s){
+	if(!cond)panic(s);
 }
 void halt(int errno){
 	while(1)asm("wfi");
@@ -257,6 +260,130 @@ int memcmp(const void *s1, const void *s2, size_t n) {
   }
   return *i<*j?-1:1;
 }
+void *
+memchr (const void *src_void,
+	int c,
+	size_t length)
+{
+  const unsigned char *src = (const unsigned char *) src_void;
+  unsigned char d = c;
+
+  while (length--)
+    {
+      if (*src == d)
+        return (void *) src;
+      src++;
+    }
+
+  return NULL;
+}
+
+static FORCEDINLINE uint32_t
+asuint (float f)
+{
+#if defined(__riscv_flen) && __riscv_flen >= 32
+  uint32_t result;
+  __asm__("fmv.x.w\t%0, %1" : "=r" (result) : "f" (f));
+  return result;
+#else
+  union
+  {
+    float f;
+    uint32_t i;
+  } u = {f};
+  return u.i;
+#endif
+}
+static FORCEDINLINE float
+asfloat (uint32_t i)
+{
+#if defined(__riscv_flen) && __riscv_flen >= 32
+  float result;
+  __asm__("fmv.w.x\t%0, %1" : "=f" (result) : "r" (i));
+  return result;
+#else
+  union
+  {
+    uint32_t i;
+    float f;
+  } u = {i};
+  return u.f;
+#endif
+}
+#define GET_FLOAT_WORD(i,d) ((i) = asuint(d))
+#define SET_FLOAT_WORD(d,i) ((d) = asfloat(i))
+
+#ifdef _FLT_LARGEST_EXPONENT_IS_NORMAL
+#define FLT_UWORD_IS_FINITE(x) 1
+#define FLT_UWORD_IS_NAN(x) 0
+#define FLT_UWORD_IS_INFINITE(x) 0
+#define FLT_UWORD_MAX 0x7fffffff
+#define FLT_UWORD_EXP_MAX 0x43010000
+#define FLT_UWORD_LOG_MAX 0x42b2d4fc
+#define FLT_UWORD_LOG_2MAX 0x42b437e0
+#define HUGE ((float)0X1.FFFFFEP128)
+#else
+#define FLT_UWORD_IS_FINITE(x) ((x)<0x7f800000L)
+#define FLT_UWORD_IS_NAN(x) ((x)>0x7f800000L)
+#define FLT_UWORD_IS_INFINITE(x) ((x)==0x7f800000L)
+#define FLT_UWORD_MAX 0x7f7fffffL
+#define FLT_UWORD_EXP_MAX 0x43000000
+#define FLT_UWORD_LOG_MAX 0x42b17217
+#define FLT_UWORD_LOG_2MAX 0x42b2d4fc
+#define HUGE ((float)3.40282346638528860e+38)
+#endif
+#define FLT_UWORD_HALF_MAX (FLT_UWORD_MAX-(1L<<23))
+#define FLT_LARGEST_EXP (FLT_UWORD_MAX>>23)
+
+#ifdef _FLT_NO_DENORMALS
+#define FLT_UWORD_IS_ZERO(x) ((x)<0x00800000L)
+#define FLT_UWORD_IS_SUBNORMAL(x) 0
+#define FLT_UWORD_MIN 0x00800000
+#define FLT_UWORD_EXP_MIN 0x42fc0000
+#define FLT_UWORD_LOG_MIN 0x42aeac50
+#define FLT_SMALLEST_EXP 1
+#else
+#define FLT_UWORD_IS_ZERO(x) ((x)==0)
+#define FLT_UWORD_IS_SUBNORMAL(x) ((x)<0x00800000L)
+#define FLT_UWORD_MIN 0x00000001
+#define FLT_UWORD_EXP_MIN 0x43160000
+#define FLT_UWORD_LOG_MIN 0x42cff1b5
+#define FLT_SMALLEST_EXP -22
+#endif
+
+float
+ceilf(float x)
+{
+    __int32_t i0, j0;
+    __uint32_t i, ix;
+    GET_FLOAT_WORD(i0, x);
+    ix = (i0 & 0x7fffffff);
+    j0 = (ix >> 23) - 0x7f;
+    if (j0 < 23) {
+        if (j0 < 0) {
+            if (i0 < 0) {
+                i0 = 0x80000000;
+            } else if (!FLT_UWORD_IS_ZERO(ix)) {
+                i0 = 0x3f800000;
+            }
+        } else {
+            i = (0x007fffff) >> j0;
+            if ((i0 & i) == 0)
+                return x; /* x is integral */
+            if (i0 > 0)
+                i0 += (0x00800000) >> j0;
+            i0 &= (~i);
+        }
+    } else {
+        if (!FLT_UWORD_IS_FINITE(ix))
+            return x + x; /* inf or NaN */
+        else
+            return x; /* x is integral */
+    }
+    SET_FLOAT_WORD(x, i0);
+    return x;
+}
+
 
 #ifdef ALLOC_HH__
 extern "C" int __cxa_atexit(void (*func)(void*), void* arg, void* dso) {

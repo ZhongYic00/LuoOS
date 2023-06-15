@@ -16,3 +16,12 @@ void Logger::log(const char *fmt,...){
     _vsnprintf(item.buf,300,fmt,vl);
     va_end(vl);
 }
+
+void EASTL_DEBUG_BREAK(){ExecInst(ebreak);}
+void* operator new[](size_t size, const char* pName, int flags, unsigned debugFlags, const char* file, int line){
+    return operator new(size);
+}
+void* operator new[](size_t size, size_t alignment, size_t alignmentOffset, const char* pName, int flags, unsigned debugFlags, const char* file, int line){
+    panic("unimplemented!");
+    return operator new(size);
+}
