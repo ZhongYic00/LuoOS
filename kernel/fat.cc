@@ -27,7 +27,7 @@ static struct entry_cache {
     struct DirEnt entries[ENTRY_CACHE_NUM];
 } ecache; // 目录缓冲区
 static struct DirEnt root; // 根目录
-struct FileSystem dev_fat[8]; //挂载设备集合
+FileSystem dev_fat[8]; //挂载设备集合
 int mount_num=0; //表示寻找在挂载集合的下标
 
 int bufCopyOut(int user_dst, uint64 dst, void *src, uint64 len) {
@@ -479,7 +479,7 @@ int fs::fat32Init() {
     dev_fat[0].bpb.tot_sec = dev_fat->bpb.tot_sec;
     dev_fat[0].mount_mode = 0;
     dev_fat[0].root = root;
-    dev_fat[0].vaild = 1;
+    dev_fat[0].valid = 1;
     return 0;
 }
 uint32 fs::getBytesPerClus() { return fat.byts_per_clus; }
@@ -1078,7 +1078,7 @@ int fs::pathRemoveAt(char *path, SharedPtr<File> f) {
   return 0;
 }
 int fs::devMount(struct DirEnt *mountpoint,struct DirEnt *dev) {
-    while(dev_fat[mount_num].vaild!=0) {
+    while(dev_fat[mount_num].valid!=0) {
         mount_num++;
         mount_num=mount_num%8;
     }

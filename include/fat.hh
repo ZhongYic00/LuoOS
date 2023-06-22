@@ -54,24 +54,33 @@ namespace fs {
         union Ent de;
         uint32 link_count;
     };
-    struct FileSystem {
-        uint32 first_data_sec; // data所在的第一个扇区
-        uint32 data_sec_cnt; // 数据扇区数
-        uint32 data_clus_cnt; // 数据簇数
-        uint32 byts_per_clus; // 每簇字节数
-        struct { 
-            uint16 byts_per_sec;  // 扇区字节数
-            uint8 sec_per_clus;  // 每簇扇区数
-            uint16 rsvd_sec_cnt;  // 保留扇区数
-            uint8 fat_cnt;  // fat数          
-            uint32 hidd_sec;  // 隐藏扇区数         
-            uint32 tot_sec;  // 总扇区数          
-            uint32 fat_sz;   // 一个fat所占扇区数           
-            uint32 root_clus; // 根目录簇号 
-        } bpb;
-        int vaild;
-        struct DirEnt root; //这个文件系统的根目录文件
-        uint8 mount_mode; //是否被挂载的标志
+    class FileSystem {
+        public:
+            uint32 first_data_sec; // data所在的第一个扇区
+            uint32 data_sec_cnt; // 数据扇区数
+            uint32 data_clus_cnt; // 数据簇数
+            uint32 byts_per_clus; // 每簇字节数
+            struct { 
+                uint16 byts_per_sec;  // 扇区字节数
+                uint8 sec_per_clus;  // 每簇扇区数
+                uint16 rsvd_sec_cnt;  // 保留扇区数
+                uint8 fat_cnt;  // fat数          
+                uint32 hidd_sec;  // 隐藏扇区数         
+                uint32 tot_sec;  // 总扇区数          
+                uint32 fat_sz;   // 一个fat所占扇区数           
+                uint32 root_clus; // 根目录簇号 
+            } bpb;
+            int valid;
+            struct DirEnt root; //这个文件系统的根目录文件
+            uint8 mount_mode; //是否被挂载的标志
+        // public:
+            FileSystem() {}
+            FileSystem(const FileSystem& a_fs):first_data_sec(a_fs.first_data_sec), data_sec_cnt(a_fs.data_sec_cnt), data_clus_cnt(a_fs.data_clus_cnt), byts_per_clus(a_fs.byts_per_clus), bpb(a_fs.bpb), valid(a_fs.valid), root(a_fs.root), mount_mode(a_fs.mount_mode) {}
+            ~FileSystem() {}
+            const FileSystem& operator=(const FileSystem& a_fs) {
+                memmove((void*)this, (void*)&a_fs, sizeof(*this));
+                return *this;
+            }
     };
 	struct DStat {
 	  uint64 d_ino;	// 索引结点号
