@@ -20,6 +20,7 @@ typedef unsigned long uint64;
 typedef long int64;
 typedef unsigned long uintptr_t;
 #define NULL 0
+#define typeof __typeof__
 
 #include <stdarg.h>
 #include <limits.h>

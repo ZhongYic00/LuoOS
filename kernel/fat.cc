@@ -6,22 +6,23 @@ using namespace fs;
 // #define moduleLevel LogLevel::trace
 
 ///////////////////FAT////////////////////
-static struct {
-    uint32 first_data_sec; // data所在的第一个扇区
-    uint32 data_sec_cnt; // 数据扇区数
-    uint32 data_clus_cnt; // 数据簇数
-    uint32 byts_per_clus; // 每簇字节数
-    struct {
-        uint16  byts_per_sec;  // 扇区字节数
-        uint8   sec_per_clus;  // 每簇扇区数
-        uint16  rsvd_sec_cnt;  // 保留扇区数
-        uint8   fat_cnt;  // fat数          
-        uint32  hidd_sec;  // 隐藏扇区数         
-        uint32  tot_sec;  // 总扇区数          
-        uint32  fat_sz;   // 一个fat所占扇区数           
-        uint32  root_clus; // 根目录簇号 
-    } bpb;
-} fat;
+// static struct {
+//     uint32 first_data_sec; // data所在的第一个扇区
+//     uint32 data_sec_cnt; // 数据扇区数
+//     uint32 data_clus_cnt; // 数据簇数
+//     uint32 byts_per_clus; // 每簇字节数
+//     struct {
+//         uint16  byts_per_sec;  // 扇区字节数
+//         uint8   sec_per_clus;  // 每簇扇区数
+//         uint16  rsvd_sec_cnt;  // 保留扇区数
+//         uint8   fat_cnt;  // fat数          
+//         uint32  hidd_sec;  // 隐藏扇区数         
+//         uint32  tot_sec;  // 总扇区数          
+//         uint32  fat_sz;   // 一个fat所占扇区数           
+//         uint32  root_clus; // 根目录簇号 
+//     } bpb;
+// } fat;
+static FileSystem fat;
 static struct entry_cache {
     // struct spinlock lock;
     struct DirEnt entries[ENTRY_CACHE_NUM];
@@ -42,7 +43,7 @@ int bufCopyIn(void *dst, int user_src, uint64 src, uint64 len) {
 }
 // @param   cluster   cluster number starts from 2, which means no 0 and 1
 // 根据簇号得到起始扇区号
-static inline uint32 firstSec(uint32 cluster) { return ((cluster - 2) * fat.bpb.sec_per_clus) + fat.first_data_sec; }
+static inline uint32 firstSec(uint32 cluster) { return ((cluster - 2) * fat.rSPC()) + fat.rFDS(); }
 /*
     For the given number of a data cluster, return the number of the sector in a FAT table.
     @param   cluster     number of a data cluster
@@ -50,14 +51,14 @@ static inline uint32 firstSec(uint32 cluster) { return ((cluster - 2) * fat.bpb.
 */
 // 根据簇号得到在第fat_num个FAT表中的扇区号
 static inline uint32 numthSec(uint32 cluster, uint8 fat_num) {
-    return fat.bpb.rsvd_sec_cnt + (cluster << 2) / fat.bpb.byts_per_sec + fat.bpb.fat_sz * (fat_num - 1);
+    return fat.rRSC() + (cluster << 2) / fat.rBPS() + fat.rFS() * (fat_num - 1);
 }
 /*
     For the given number of a data cluster, return the offest in the corresponding sector in a FAT table.
     @param   cluster   number of a data cluster
 */
 // 根据簇号得到在FAT中的扇区偏移
-static inline uint32 secOffset(uint32 cluster) { return (cluster << 2) % fat.bpb.byts_per_sec; }
+static inline uint32 secOffset(uint32 cluster) { return (cluster << 2) % fat.rBPS(); }
 /*
     Read the FAT table content corresponded to the given cluster number.
     @param   cluster     the number of cluster which you want to read its content in FAT table
@@ -67,7 +68,7 @@ static uint32 fatRead(uint32 cluster) {
     if (cluster >= FAT32_EOC) {
         return cluster;
     }
-    if (cluster > fat.data_clus_cnt + 1) {     // because cluster number starts at 2, not 0
+    if (cluster > fat.rDCC() + 1) {     // because cluster number starts at 2, not 0
         return 0;
     }
     uint32 fat_sec = numthSec(cluster, 1);
@@ -84,7 +85,7 @@ static uint32 fatRead(uint32 cluster) {
 */
 // 根据簇号将内容写入fat1，return 0 成功 1 失败
 static int fatWrite(uint32 cluster, uint32 content) {
-    if (cluster > fat.data_clus_cnt + 1) {
+    if (cluster > fat.rDCC() + 1) {
         return -1;
     }
     uint32 fat_sec = numthSec(cluster, 1);
@@ -99,7 +100,7 @@ static int fatWrite(uint32 cluster, uint32 content) {
 static void clearClus(uint32 cluster) {
     uint32 sec = firstSec(cluster);
     struct buf *b;
-    for (int i = 0; i < fat.bpb.sec_per_clus; i++) {
+    for (int i = 0; i < fat.rSPC(); i++) {
         b = bread(0, sec++);
         memset(b->data, 0, BSIZE);
         bwrite(b);
@@ -110,9 +111,9 @@ static void clearClus(uint32 cluster) {
 static uint32 allocClus(uint8 dev) {
     // should we keep a free cluster list? instead of searching fat every time.
     struct buf *b;
-    uint32 sec = fat.bpb.rsvd_sec_cnt;
-    uint32 const ent_per_sec = fat.bpb.byts_per_sec / sizeof(uint32);
-    for (uint32 i = 0; i < fat.bpb.fat_sz; i++, sec++) {
+    uint32 sec = fat.rRSC();
+    uint32 const ent_per_sec = fat.rBPS() / sizeof(uint32);
+    for (uint32 i = 0; i < fat.rFS(); i++, sec++) {
         b = bread(dev, sec);
         for (uint32 j = 0; j < ent_per_sec; j++) {
             if (((uint32 *)(b->data))[j] == 0) {
@@ -136,11 +137,11 @@ static void freeClus(uint32 cluster) { fatWrite(cluster, 0); }
     返回写入数据的长度
 */
 static uint rwClus(uint32 cluster, int write, int user, uint64 data, uint off, uint n) {
-    if (off + n > fat.byts_per_clus) { panic("offset out of range"); }
+    if (off + n > fat.rBPC()) { panic("offset out of range"); }
     uint tot, m;
     struct buf *bp;
-    uint sec = firstSec(cluster) + off / fat.bpb.byts_per_sec;
-    off = off % fat.bpb.byts_per_sec;
+    uint sec = firstSec(cluster) + off / fat.rBPS();
+    off = off % fat.rBPS();
     int bad = 0;
     for (tot = 0; tot < n; tot += m, off += m, data += m, sec++) {
         bp = bread(0, sec);
@@ -170,7 +171,7 @@ static uint rwClus(uint32 cluster, int write, int user, uint64 data, uint off, u
     返回off在该簇的偏移（off % fat.byts_per_clus）
 */
 static int relocClus(struct DirEnt *entry, uint off, int alloc) {
-    int clus_num = off / fat.byts_per_clus;
+    int clus_num = off / fat.rBPC();
     while (clus_num > entry->clus_cnt) {
         int clus = fatRead(entry->cur_clus);
         if (clus >= FAT32_EOC) {
@@ -198,7 +199,7 @@ static int relocClus(struct DirEnt *entry, uint off, int alloc) {
             entry->clus_cnt++;
         }
     }
-    return off % fat.byts_per_clus;
+    return off % fat.rBPC();
 }
 /*
     Returns a DirEnt struct. If name is given, check ecache. It is difficult to cache entries
@@ -427,26 +428,16 @@ static struct DirEnt *pathLookUpAt(char *path, int parent, SharedPtr<File> f ,ch
 int fs::fat32Init() {
     struct buf *b = bread(0, 0);
     if (strncmp((char const*)(b->data + 82), "FAT32", 5)) { panic("not FAT32 volume"); }
-    memmove(&fat.bpb.byts_per_sec, b->data + 11, 2); // avoid misaligned load on k210
-    fat.bpb.sec_per_clus = *(b->data + 13);  
-    fat.bpb.rsvd_sec_cnt = *(uint16 *)(b->data + 14);
-    fat.bpb.fat_cnt = *(b->data + 16);
-    fat.bpb.hidd_sec = *(uint32 *)(b->data + 28);
-    fat.bpb.tot_sec = *(uint32 *)(b->data + 32);
-    fat.bpb.fat_sz = *(uint32 *)(b->data + 36);
-    fat.bpb.root_clus = *(uint32 *)(b->data + 44);
-    fat.first_data_sec = fat.bpb.rsvd_sec_cnt + fat.bpb.fat_cnt * fat.bpb.fat_sz;
-    fat.data_sec_cnt = fat.bpb.tot_sec - fat.first_data_sec;
-    fat.data_clus_cnt = fat.data_sec_cnt / fat.bpb.sec_per_clus;
-    fat.byts_per_clus = fat.bpb.sec_per_clus * fat.bpb.byts_per_sec;
+    fat = FileSystem(*(uint16*)(b->data+11), *(uint8*)(b->data+13), *(uint16*)(b->data+14), *(uint8*)(b->data+16), *(uint32*)(b->data+28), *(uint32*)(b->data+32), *(uint32*)(b->data+36), *(uint32*)(b->data+44));
     brelse(b);
     // make sure that byts_per_sec has the same value with BSIZE 
-    if (BSIZE != fat.bpb.byts_per_sec) { panic("byts_per_sec != BSIZE"); }
+    if (BSIZE != fat.rBPS()) { panic("byts_per_sec != BSIZE"); }
     // initlock(&ecache.lock, "ecache");
+    // root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, fat.rRC(), 0, fat.rRC(), 0, 0, 0, true, 0, 0, nullptr, root, root, 0 };
     memset(&root, 0, sizeof(root));
     // initsleeplock(&root.lock, "entry");
     root.attribute = (ATTR_DIRECTORY | ATTR_SYSTEM); 
-    root.first_clus = root.cur_clus = fat.bpb.root_clus;
+    root.first_clus = root.cur_clus = fat.rRC();
     root.valid = 1; 
     root.prev = &root;
     root.next = &root;
@@ -464,25 +455,11 @@ int fs::fat32Init() {
         root.next->prev = de;
         root.next = de;
     }
-     //将主存的系统存入设备管理
-    dev_fat[0].byts_per_clus = fat.byts_per_clus;
-    dev_fat[0].data_clus_cnt = fat.data_clus_cnt;
-    dev_fat[0].data_sec_cnt = fat.data_sec_cnt;
-    dev_fat[0].first_data_sec = fat.first_data_sec;
-    dev_fat[0].bpb.byts_per_sec = fat.bpb.byts_per_sec;
-    dev_fat[0].bpb.fat_cnt = fat.bpb.fat_cnt;
-    dev_fat[0].bpb.fat_sz = fat.bpb.fat_sz;
-    dev_fat[0].bpb.hidd_sec = fat.bpb.hidd_sec;
-    dev_fat[0].bpb.root_clus = fat.bpb.root_clus;
-    dev_fat[0].bpb.rsvd_sec_cnt = fat.bpb.rsvd_sec_cnt;
-    dev_fat[0].bpb.sec_per_clus = fat.bpb.sec_per_clus;
-    dev_fat[0].bpb.tot_sec = dev_fat->bpb.tot_sec;
-    dev_fat[0].mount_mode = 0;
-    dev_fat[0].root = root;
-    dev_fat[0].valid = 1;
+    //将主存的系统存入设备管理
+    dev_fat[0] = fat;
     return 0;
 }
-uint32 fs::getBytesPerClus() { return fat.byts_per_clus; }
+uint32 fs::getBytesPerClus() { return fat.rBPC(); }
 /* like the original readi, but "reade" is odd, let alone "writee" */
 // Caller must hold entry->lock.
 // 读取偏移为off，长为n的数据到dst处，并将cur_clus移动到结束处所在的簇（off是相对于数据区起始位置的偏移）
@@ -498,9 +475,9 @@ int fs::entRead(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n
     uint tot, m;
     for (tot = 0; entry->cur_clus < FAT32_EOC && tot < n; tot += m, off += m, dst += m) {
         relocClus(entry, off, 0);
-        m = fat.byts_per_clus - off % fat.byts_per_clus;
+        m = fat.rBPC() - off % fat.rBPC();
         if (n - tot < m) { m = n - tot; }
-        if (rwClus(entry->cur_clus, 0, user_dst, dst, off % fat.byts_per_clus, m) != m) { break; }
+        if (rwClus(entry->cur_clus, 0, user_dst, dst, off % fat.rBPC(), m) != m) { break; }
     }
     return tot;
 }
@@ -522,9 +499,9 @@ int fs::entWrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint 
     uint tot, m;
     for (tot = 0; tot < n; tot += m, off += m, src += m) {
         relocClus(entry, off, 1);
-        m = fat.byts_per_clus - off % fat.byts_per_clus;
+        m = fat.rBPC() - off % fat.rBPC();
         if (n - tot < m) { m = n - tot; }
-        if (rwClus(entry->cur_clus, 1, user_src, src, off % fat.byts_per_clus, m) != m) { break; }
+        if (rwClus(entry->cur_clus, 1, user_src, src, off % fat.rBPC(), m) != m) { break; }
     }
     if(n > 0) {
         if(off > entry->file_size) {
@@ -851,20 +828,9 @@ int fs::entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count) 
 // 在dp目录中搜索文件名为filename的文件，poff记录了偏移，返回找到的文件
 struct DirEnt *fs::dirLookUp(struct DirEnt *dp, char *filename, uint *poff) {
      if(dp->mount_flag==1) {
-        fat.bpb.byts_per_sec=dev_fat[dp->dev].bpb.byts_per_sec;
-        fat.bpb.fat_cnt=dev_fat[dp->dev].bpb.fat_cnt;
-        fat.bpb.fat_sz=dev_fat[dp->dev].bpb.fat_sz;
-        fat.bpb.hidd_sec=dev_fat[dp->dev].bpb.hidd_sec;
-        fat.bpb.root_clus=dev_fat[dp->dev].bpb.root_clus;
-        fat.bpb.rsvd_sec_cnt=dev_fat[dp->dev].bpb.rsvd_sec_cnt;
-        fat.bpb.sec_per_clus=dev_fat[dp->dev].bpb.sec_per_clus;
-        fat.bpb.tot_sec=dev_fat[dp->dev].bpb.tot_sec;
-        fat.byts_per_clus=dev_fat[dp->dev].byts_per_clus;
-        fat.data_clus_cnt=dev_fat[dp->dev].data_clus_cnt;
-        fat.data_sec_cnt=dev_fat[dp->dev].data_sec_cnt;
-        fat.first_data_sec=dev_fat[dp->dev].data_sec_cnt;
-        root=dev_fat[dp->dev].root;
-        dp=&root;
+        fat = dev_fat[dp->dev];
+        root = *(dev_fat[dp->dev].findRoot());
+        dp = &root;
     }
     // 当前“目录”非目录
     if (!(dp->attribute & ATTR_DIRECTORY)) { panic("dirLookUp not DIR"); }
@@ -1078,38 +1044,20 @@ int fs::pathRemoveAt(char *path, SharedPtr<File> f) {
   return 0;
 }
 int fs::devMount(struct DirEnt *mountpoint,struct DirEnt *dev) {
-    while(dev_fat[mount_num].valid!=0) {
+    while(dev_fat[mount_num].isValid()) {
         mount_num++;
         mount_num=mount_num%8;
     }
     struct buf *b = bread(dev->dev, 0);
     if (strncmp((char const*)(b->data + 82), "FAT32", 5)) { panic("not FAT32 volume"); }
-    memmove(&dev_fat[mount_num].bpb.byts_per_sec, b->data + 11, 2);            // avoid misaligned load on k210
-    dev_fat[mount_num].bpb.sec_per_clus = *(b->data + 13);  
-    dev_fat[mount_num].bpb.rsvd_sec_cnt = *(uint16 *)(b->data + 14);
-    dev_fat[mount_num].bpb.fat_cnt = *(b->data + 16);
-    dev_fat[mount_num].bpb.hidd_sec = *(uint32 *)(b->data + 28);
-    dev_fat[mount_num].bpb.tot_sec = *(uint32 *)(b->data + 32);
-    dev_fat[mount_num].bpb.fat_sz = *(uint32 *)(b->data + 36);
-    dev_fat[mount_num].bpb.root_clus = *(uint32 *)(b->data + 44);
-    dev_fat[mount_num].first_data_sec = fat.bpb.rsvd_sec_cnt + fat.bpb.fat_cnt * fat.bpb.fat_sz;
-    dev_fat[mount_num].data_sec_cnt = fat.bpb.tot_sec - fat.first_data_sec;
-    dev_fat[mount_num].data_clus_cnt = fat.data_sec_cnt / fat.bpb.sec_per_clus;
-    dev_fat[mount_num].byts_per_clus = fat.bpb.sec_per_clus * fat.bpb.byts_per_sec;
+    dev_fat[mount_num] = FileSystem(fat.rRSC()+fat.rFC()*fat.rFS(), fat.rTS()-fat.rFDS(), fat.rDSC()/fat.rSPC(), fat.rSPC()*fat.rBPS(), *(uint16*)(b->data+11), *(uint8*)(b->data+13), *(uint16*)(b->data+14), *(uint8*)(b->data+16), *(uint32*)(b->data+28), *(uint32*)(b->data+32), *(uint32*)(b->data+36), *(uint32*)(b->data+44), true, {0}, 1);
     brelse(b);
     // make sure that byts_per_sec has the same value with BSIZE 
-    if (BSIZE != dev_fat[mount_num].bpb.byts_per_sec) { panic("byts_per_sec != BSIZE"); }
+    if (BSIZE != dev_fat[mount_num].rBPS()) { panic("byts_per_sec != BSIZE"); }
     // initlock(&ecache.lock, "ecache");
-    memset(&dev_fat[mount_num].root, 0, sizeof(dev_fat[mount_num].root));
+    struct DirEnt *nroot = dev_fat[mount_num].getRoot();
+    *nroot = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, 0, 0, true, 0, 0, nullptr, nroot, nroot, 0 };
     // initsleeplock(&root.lock, "entry");
-    dev_fat[mount_num].root.attribute = (ATTR_DIRECTORY | ATTR_SYSTEM); 
-    dev_fat[mount_num].root.first_clus =dev_fat[mount_num].root.cur_clus = dev_fat[mount_num].bpb.root_clus;
-    dev_fat[mount_num].root.valid = 1; 
-    dev_fat[mount_num].root.prev = &dev_fat[mount_num].root;
-    dev_fat[mount_num].root.next = &dev_fat[mount_num].root;
-    dev_fat[mount_num].root.filename[0] = '/';
-    dev_fat[mount_num].root.filename[1] = '\0';
-    dev_fat[mount_num].mount_mode=1;
     mountpoint->mount_flag=1;
     mountpoint->dev=mount_num;
     return 0;
