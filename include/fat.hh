@@ -54,13 +54,15 @@ namespace fs {
         union Ent de;
         uint32 link_count;
     };
-    class FileSystem {
+    class FileSystem;
+    class SuperBlock {
         private:
+            // friend class FileSystem;
             uint32 first_data_sec; // data所在的第一个扇区
             uint32 data_sec_cnt; // 数据扇区数
             uint32 data_clus_cnt; // 数据簇数
             uint32 byts_per_clus; // 每簇字节数
-            struct { 
+            struct BPB_t { 
                 uint16 byts_per_sec;  // 扇区字节数
                 uint8 sec_per_clus;  // 每簇扇区数
                 uint16 rsvd_sec_cnt;  // 保留扇区数
@@ -69,39 +71,78 @@ namespace fs {
                 uint32 tot_sec;  // 总扇区数          
                 uint32 fat_sz;   // 一个fat所占扇区数           
                 uint32 root_clus; // 根目录簇号 
+                BPB_t() {}
+                BPB_t(const BPB_t& a_bpb):byts_per_sec(a_bpb.byts_per_sec), sec_per_clus(a_bpb.sec_per_clus), rsvd_sec_cnt(a_bpb.rsvd_sec_cnt), fat_cnt(a_bpb.fat_cnt), hidd_sec(a_bpb.hidd_sec), tot_sec(a_bpb.tot_sec), fat_sz(a_bpb.fat_sz), root_clus(a_bpb.root_clus) {}
+                BPB_t(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):byts_per_sec(a_bps), sec_per_clus(a_spc), rsvd_sec_cnt(a_rsc), fat_cnt(a_fc), hidd_sec(a_hs), tot_sec(a_ts), fat_sz(a_fs), root_clus(a_rc) {}
+                ~BPB_t() {}
+                const BPB_t& operator=(const BPB_t& a_bpb) {
+                    memmove((void*)this, (void*)&a_bpb, sizeof(*this));
+                    return *this;
+                }
             } bpb;
+        public:
+            SuperBlock() {}
+            SuperBlock(const SuperBlock& a_spblk):first_data_sec(a_spblk.first_data_sec), data_sec_cnt(a_spblk.data_sec_cnt), data_clus_cnt(a_spblk.data_clus_cnt), byts_per_clus(a_spblk.byts_per_clus), bpb(a_spblk.bpb) {}
+            SuperBlock(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, BPB_t a_bpb):first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bpb) {}
+            SuperBlock(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc) {}
+            SuperBlock(BPB_t a_bpb):first_data_sec(a_bpb.rsvd_sec_cnt+a_bpb.fat_cnt*a_bpb.fat_sz), data_sec_cnt(a_bpb.tot_sec-first_data_sec), data_clus_cnt(data_sec_cnt/a_bpb.sec_per_clus), byts_per_clus(a_bpb.sec_per_clus*a_bpb.byts_per_sec), bpb(a_bpb) {}
+            SuperBlock(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):first_data_sec(a_rsc+a_fc*a_fs), data_sec_cnt(a_ts-first_data_sec), data_clus_cnt(data_sec_cnt/a_spc), byts_per_clus(a_spc*a_bps), bpb(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc) {}
+            ~SuperBlock() {}
+            const SuperBlock& operator=(const SuperBlock& a_spblk) {
+                memmove((void*)this, (void*)&a_spblk, sizeof(*this));
+                return *this;
+            }
+            inline const uint32 rFDS() const { return first_data_sec; }
+            inline const uint32 rDSC() const { return data_sec_cnt; }
+            inline const uint32 rDCC() const { return data_clus_cnt; }
+            inline const uint32 rBPC() const { return byts_per_clus; }
+            inline const BPB_t rBPB() const { return bpb; }
+            inline const uint16 rBPS() const { return bpb.byts_per_sec; }
+            inline const uint8 rSPC() const { return bpb.sec_per_clus; }
+            inline const uint16 rRSC() const { return bpb.rsvd_sec_cnt; }
+            inline const uint8 rFC() const { return bpb.fat_cnt; }
+            inline const uint32 rHS() const { return bpb.hidd_sec; }
+            inline const uint32 rTS() const { return bpb.tot_sec; }
+            inline const uint32 rFS() const { return bpb.fat_sz; }
+            inline const uint32 rRC() const { return bpb.root_clus; }
+    };
+    class FileSystem {
+        private:
+            SuperBlock spblk;
             bool valid;
             struct DirEnt root; //这个文件系统的根目录文件
             uint8 mount_mode; //是否被挂载的标志
         public:
             FileSystem() {}
-            FileSystem(const FileSystem& a_fs):first_data_sec(a_fs.first_data_sec), data_sec_cnt(a_fs.data_sec_cnt), data_clus_cnt(a_fs.data_clus_cnt), byts_per_clus(a_fs.byts_per_clus), bpb(a_fs.bpb), valid(a_fs.valid), root(a_fs.root), mount_mode(a_fs.mount_mode) {}
-            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, typeof(bpb) a_bpb, bool a_valid = true, struct DirEnt a_root = {0}, uint8 a_mm = 0):first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid = true, struct DirEnt a_root = {0}, uint8 a_mm = 0):first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb({ a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc }), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(typeof(bpb) a_bpb, bool a_valid = true, struct DirEnt a_root = {0}, uint8 a_mm = 0):first_data_sec(a_bpb.rsvd_sec_cnt+a_bpb.fat_cnt*a_bpb.fat_sz), data_sec_cnt(a_bpb.tot_sec-first_data_sec), data_clus_cnt(data_sec_cnt/a_bpb.sec_per_clus), byts_per_clus(a_bpb.sec_per_clus*a_bpb.byts_per_sec), bpb(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid = true, struct DirEnt a_root = {0}, uint8 a_mm = 0):first_data_sec(a_rsc+a_fc*a_fs), data_sec_cnt(a_ts-first_data_sec), data_clus_cnt(data_sec_cnt/a_spc), byts_per_clus(a_spc*a_bps), bpb({ a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc }), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(const FileSystem& a_fs):spblk(a_fs.spblk), valid(a_fs.valid), root(a_fs.root), mount_mode(a_fs.mount_mode) {}
+            FileSystem(SuperBlock a_spblk, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_spblk), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, typeof(spblk.rBPB()) a_bpb, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_fds, a_dsc, a_dcc, a_bpc, a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_fds, a_dsc, a_dcc, a_bpc, a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(typeof(spblk.rBPB()) a_bpb, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             ~FileSystem() {}
             const FileSystem& operator=(const FileSystem& a_fs) {
                 memmove((void*)this, (void*)&a_fs, sizeof(*this));
                 return *this;
             }
-            const uint32 rFDS() const { return first_data_sec; }
-            const uint32 rDSC() const { return data_sec_cnt; }
-            const uint32 rDCC() const { return data_clus_cnt; }
-            const uint32 rBPC() const { return byts_per_clus; }
-            const typeof(bpb) rBPB() const { return bpb; }
-            const uint16 rBPS() const { return bpb.byts_per_sec; }
-            const uint8 rSPC() const { return bpb.sec_per_clus; }
-            const uint16 rRSC() const { return bpb.rsvd_sec_cnt; }
-            const uint8 rFC() const { return bpb.fat_cnt; }
-            const uint32 rHS() const { return bpb.hidd_sec; }
-            const uint32 rTS() const { return bpb.tot_sec; }
-            const uint32 rFS() const { return bpb.fat_sz; }
-            const uint32 rRC() const { return bpb.root_clus; }
-            const bool isValid() const { return valid; }
-            struct DirEnt *const getRoot() { return &root; }
-            const struct DirEnt *const findRoot() const { return &root; }
-            const uint8 rMM() const { return mount_mode; }
+            inline const SuperBlock rSpBlk() const { return spblk; }
+            inline const uint32 rFDS() const { return spblk.rFDS(); }
+            inline const uint32 rDSC() const { return spblk.rDSC(); }
+            inline const uint32 rDCC() const { return spblk.rDCC(); }
+            inline const uint32 rBPC() const { return spblk.rBPC(); }
+            inline const typeof(spblk.rBPB()) rBPB() const { return spblk.rBPB(); }
+            inline const uint16 rBPS() const { return spblk.rBPS(); }
+            inline const uint8 rSPC() const { return spblk.rSPC(); }
+            inline const uint16 rRSC() const { return spblk.rRSC(); }
+            inline const uint8 rFC() const { return spblk.rFC(); }
+            inline const uint32 rHS() const { return spblk.rHS(); }
+            inline const uint32 rTS() const { return spblk.rTS(); }
+            inline const uint32 rFS() const { return spblk.rFS(); }
+            inline const uint32 rRC() const { return spblk.rRC(); }
+            inline const bool isValid() const { return valid; }
+            inline struct DirEnt *const getRoot() { return &root; }
+            inline const struct DirEnt *const findRoot() const { return &root; }
+            inline const uint8 rMM() const { return mount_mode; }
     };
 	struct DStat {
 	  uint64 d_ino;	// 索引结点号

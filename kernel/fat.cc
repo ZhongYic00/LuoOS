@@ -6,23 +6,7 @@ using namespace fs;
 // #define moduleLevel LogLevel::trace
 
 ///////////////////FAT////////////////////
-// static struct {
-//     uint32 first_data_sec; // data所在的第一个扇区
-//     uint32 data_sec_cnt; // 数据扇区数
-//     uint32 data_clus_cnt; // 数据簇数
-//     uint32 byts_per_clus; // 每簇字节数
-//     struct {
-//         uint16  byts_per_sec;  // 扇区字节数
-//         uint8   sec_per_clus;  // 每簇扇区数
-//         uint16  rsvd_sec_cnt;  // 保留扇区数
-//         uint8   fat_cnt;  // fat数          
-//         uint32  hidd_sec;  // 隐藏扇区数         
-//         uint32  tot_sec;  // 总扇区数          
-//         uint32  fat_sz;   // 一个fat所占扇区数           
-//         uint32  root_clus; // 根目录簇号 
-//     } bpb;
-// } fat;
-static FileSystem fat;
+static SuperBlock fat;
 static struct entry_cache {
     // struct spinlock lock;
     struct DirEnt entries[ENTRY_CACHE_NUM];
@@ -428,7 +412,7 @@ static struct DirEnt *pathLookUpAt(char *path, int parent, SharedPtr<File> f ,ch
 int fs::fat32Init() {
     struct buf *b = bread(0, 0);
     if (strncmp((char const*)(b->data + 82), "FAT32", 5)) { panic("not FAT32 volume"); }
-    fat = FileSystem(*(uint16*)(b->data+11), *(uint8*)(b->data+13), *(uint16*)(b->data+14), *(uint8*)(b->data+16), *(uint32*)(b->data+28), *(uint32*)(b->data+32), *(uint32*)(b->data+36), *(uint32*)(b->data+44));
+    fat = SuperBlock(*(uint16*)(b->data+11), *(uint8*)(b->data+13), *(uint16*)(b->data+14), *(uint8*)(b->data+16), *(uint32*)(b->data+28), *(uint32*)(b->data+32), *(uint32*)(b->data+36), *(uint32*)(b->data+44));
     brelse(b);
     // make sure that byts_per_sec has the same value with BSIZE 
     if (BSIZE != fat.rBPS()) { panic("byts_per_sec != BSIZE"); }
@@ -456,7 +440,7 @@ int fs::fat32Init() {
         root.next = de;
     }
     //将主存的系统存入设备管理
-    dev_fat[0] = fat;
+    dev_fat[0] = FileSystem(fat, true, root, 0);
     return 0;
 }
 uint32 fs::getBytesPerClus() { return fat.rBPC(); }
@@ -828,7 +812,7 @@ int fs::entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count) 
 // 在dp目录中搜索文件名为filename的文件，poff记录了偏移，返回找到的文件
 struct DirEnt *fs::dirLookUp(struct DirEnt *dp, char *filename, uint *poff) {
      if(dp->mount_flag==1) {
-        fat = dev_fat[dp->dev];
+        fat = dev_fat[dp->dev].rSpBlk();
         root = *(dev_fat[dp->dev].findRoot());
         dp = &root;
     }
