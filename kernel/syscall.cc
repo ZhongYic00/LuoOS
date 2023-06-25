@@ -70,7 +70,6 @@ namespace syscall {
         if(fs::fat32Init() != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObjs.curtask->getProcess();
         curproc->cwd = fs::entEnter("/");
-        auto testent = fs::Path("/").pathSearch();  // Path测试
         curproc->files[3] = new File(curproc->cwd,0);
         struct DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }

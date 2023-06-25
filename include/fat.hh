@@ -145,13 +145,13 @@ namespace fs {
             inline const uint8 rMM() const { return mount_mode; }
     };
     using eastl::string;
-    using eastl::vector
+    using eastl::vector;
     class Path {
         private:
             string pathname;
             vector<string> dirname;
         public:
-            Path():pathname(), dirname(), dirnum(0) {}
+            Path():pathname(), dirname() {}
             Path(const Path& a_path):pathname(a_path.pathname), dirname(a_path.dirname) {}
             Path(const string& a_str):pathname(a_str), dirname() {
                 size_t len = pathname.length();

@@ -1139,11 +1139,11 @@ void fs::getKStat(struct DirEnt *de, struct KStat *kst) {
 struct DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  // @todo 改成返回File
     struct DirEnt *entry, *next;
     int dirnum = dirname.size();
-    if(dirnum < 1) { return nullptr; }  // 空路径
-    else if(dirname[0] == "") { entry = entDup(&root); }  // 绝对路径
+    if(pathname.length() < 1) { return nullptr; }  // 空路径
+    else if(pathname[0] == '/') { entry = entDup(&root); }  // 绝对路径
     else if(a_file != nullptr) { entry = entDup(a_file->obj.ep); }  // 相对路径（指定目录）
     else { entry = entDup(kHartObjs.curtask->getProcess()->cwd); }  // 相对路径（工作目录）
-    for(size_t i = 0; i < dirnum; ++i) {
+    for(int i = 0; i < dirnum; ++i) {
         entLock(entry);
         if (!(entry->attribute & ATTR_DIRECTORY)) {
             entUnlock(entry);
