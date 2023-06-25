@@ -52,16 +52,16 @@ namespace fs {
             DirEnt *prev; // 
             uint8 mount_flag;
             // struct sleeplock lock;
-            DirEnt *dirSearch(string a_dirname, uint *a_off = nullptr);
+        // public:
+            DirEnt *entSearch(string a_dirname, uint *a_off = nullptr);
+            int entNext(DirEnt *ep, uint off, int *count);
     };
     struct Link{
         union Ent de;
         uint32 link_count;
     };
-    class FileSystem;
     class SuperBlock {
         private:
-            // friend class FileSystem;
             uint32 first_data_sec; // data所在的第一个扇区
             uint32 data_sec_cnt; // 数据扇区数
             uint32 data_clus_cnt; // 数据簇数
@@ -79,10 +79,7 @@ namespace fs {
                 BPB_t(const BPB_t& a_bpb):byts_per_sec(a_bpb.byts_per_sec), sec_per_clus(a_bpb.sec_per_clus), rsvd_sec_cnt(a_bpb.rsvd_sec_cnt), fat_cnt(a_bpb.fat_cnt), hidd_sec(a_bpb.hidd_sec), tot_sec(a_bpb.tot_sec), fat_sz(a_bpb.fat_sz), root_clus(a_bpb.root_clus) {}
                 BPB_t(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):byts_per_sec(a_bps), sec_per_clus(a_spc), rsvd_sec_cnt(a_rsc), fat_cnt(a_fc), hidd_sec(a_hs), tot_sec(a_ts), fat_sz(a_fs), root_clus(a_rc) {}
                 ~BPB_t() {}
-                const BPB_t& operator=(const BPB_t& a_bpb) {
-                    memmove((void*)this, (void*)&a_bpb, sizeof(*this));
-                    return *this;
-                }
+                const BPB_t& operator=(const BPB_t& a_bpb);
             } bpb;
         public:
             SuperBlock() {}
@@ -92,10 +89,7 @@ namespace fs {
             SuperBlock(BPB_t a_bpb):first_data_sec(a_bpb.rsvd_sec_cnt+a_bpb.fat_cnt*a_bpb.fat_sz), data_sec_cnt(a_bpb.tot_sec-first_data_sec), data_clus_cnt(data_sec_cnt/a_bpb.sec_per_clus), byts_per_clus(a_bpb.sec_per_clus*a_bpb.byts_per_sec), bpb(a_bpb) {}
             SuperBlock(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):first_data_sec(a_rsc+a_fc*a_fs), data_sec_cnt(a_ts-first_data_sec), data_clus_cnt(data_sec_cnt/a_spc), byts_per_clus(a_spc*a_bps), bpb(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc) {}
             ~SuperBlock() {}
-            const SuperBlock& operator=(const SuperBlock& a_spblk) {
-                memmove((void*)this, (void*)&a_spblk, sizeof(*this));
-                return *this;
-            }
+            const SuperBlock& operator=(const SuperBlock& a_spblk);
             inline const uint32 rFDS() const { return first_data_sec; }
             inline const uint32 rDSC() const { return data_sec_cnt; }
             inline const uint32 rDCC() const { return data_clus_cnt; }
@@ -109,6 +103,8 @@ namespace fs {
             inline const uint32 rTS() const { return bpb.tot_sec; }
             inline const uint32 rFS() const { return bpb.fat_sz; }
             inline const uint32 rRC() const { return bpb.root_clus; }
+            uint rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrdst, uint64 a_data, uint a_off, uint a_len) const;
+            inline const uint32 firstSec(uint32 a_cluster) const { return (a_cluster-2)*rSPC() + rFDS(); }
     };
     class FileSystem {
         private:
@@ -125,10 +121,7 @@ namespace fs {
             FileSystem(typeof(spblk.rBPB()) a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):spblk(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             FileSystem(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, DirEnt a_root, uint8 a_mm):spblk(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             ~FileSystem() {}
-            const FileSystem& operator=(const FileSystem& a_fs) {
-                memmove((void*)this, (void*)&a_fs, sizeof(*this));
-                return *this;
-            }
+            const FileSystem& operator=(const FileSystem& a_fs);
             inline const SuperBlock rSpBlk() const { return spblk; }
             inline const uint32 rFDS() const { return spblk.rFDS(); }
             inline const uint32 rDSC() const { return spblk.rDSC(); }
@@ -147,48 +140,20 @@ namespace fs {
             inline DirEnt *const getRoot() { return &root; }
             inline const DirEnt *const findRoot() const { return &root; }
             inline const uint8 rMM() const { return mount_mode; }
+            inline uint rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrdst, uint64 a_data, uint a_off, uint a_len) const { return spblk.rwClus(a_cluster, a_iswrite, a_usrdst, a_data, a_off, a_len); }
+            inline const uint32 firstSec(uint32 a_cluster) const { return spblk.firstSec(a_cluster); }
     };
     class Path {
         private:
             string pathname;
             vector<string> dirname;
         public:
-            Path():pathname(), dirname() {}
+            Path() {}
             Path(const Path& a_path):pathname(a_path.pathname), dirname(a_path.dirname) {}
-            Path(const string& a_str):pathname(a_str), dirname() {
-                size_t len = pathname.length();
-                if(len > 0) {  // 保证数组长度不为0
-                    auto ind = new size_t[len][2] { { 0, 0 } };
-                    bool rep = true;
-                    int dirnum = 0;
-                    for(size_t i = 0; i < len; ++i) {  // 识别以'/'结尾的目录
-                        if(pathname[i] == '/') {
-                            if(!rep) {
-                                rep = true;
-                                ++dirnum;
-                            }
-                        }
-                        else {
-                            ++(ind[dirnum][1]);
-                            if(rep) {
-                                rep = false;
-                                ind[dirnum][0] = i;
-                            }
-                        }
-                    }
-                    if(!rep) { ++dirnum; }  // 补齐末尾'/'
-                    dirname = vector<string>(dirnum);
-                    for(size_t i = 0; i < dirnum; ++i) { dirname[i] = pathname.substr(ind[i][0], ind[i][1]); }
-                    delete[] ind;
-                }
-            }
-            const Path& operator=(const Path& a_path) {
-                pathname = a_path.pathname;
-                dirname = a_path.dirname;
-                return *this;
-            }
-            // ~Path() { delete dirname; }
-            DirEnt *pathSearch(SharedPtr<File> a_file, bool a_parent) const;  // @todo 改成返回File
+            Path(const string& a_str);
+            const Path& operator=(const Path& a_path);
+            ~Path() {}
+            DirEnt *pathSearch(SharedPtr<File> a_file, bool a_parent) const;  // @todo 返回值改为File类型
             inline DirEnt *pathSearch(SharedPtr<File> a_file) const { return pathSearch(a_file, false); }
             inline DirEnt *pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
             inline DirEnt *pathSearch() const { return pathSearch(nullptr, false); }
