@@ -71,10 +71,11 @@ namespace syscall {
         auto curproc = kHartObjs.curtask->getProcess();
         curproc->cwd = fs::entEnter("/");
         curproc->files[3] = new File(curproc->cwd,0);
-        struct DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
+        DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
         ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
+        // auto tmp = fs::Path("/dev/vda2").pathSearch();  // new fs test
         Log(info,"fat initialize ok");
         return statcode::ok;
     }
@@ -89,7 +90,7 @@ namespace syscall {
         }
 
         auto curproc = kHartObjs.curtask->getProcess();
-        struct DirEnt *de = curproc->cwd;
+        DirEnt *de = curproc->cwd;
         char path[FAT32_MAX_PATH];
         char *s;  // s为path的元素指针
         // @todo 路径处理过程考虑包装成类
@@ -153,7 +154,7 @@ namespace syscall {
         char *path = (char*)patharr.buff;
         SharedPtr<File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; }
-        struct DirEnt *ep;
+        DirEnt *ep;
 
         if((ep = fs::pathCreateAt(path, T_DIR, 0, f)) == nullptr) {
             printf("can't create %s\n", path);
@@ -215,7 +216,7 @@ namespace syscall {
             printf("path error\n");
             return statcode::err;
         }
-        struct DirEnt *ep = fs::entEnter(devpath);
+        DirEnt *ep = fs::entEnter(devpath);
         if(ep == nullptr) {
             printf("not found file\n");
             return statcode::err;
@@ -248,8 +249,8 @@ namespace syscall {
             return statcode::err;
         }
 
-        struct DirEnt *dev_ep = fs::entEnter(devpath);
-        struct DirEnt *ep = fs::entEnter(mountpath);
+        DirEnt *dev_ep = fs::entEnter(devpath);
+        DirEnt *ep = fs::entEnter(mountpath);
         if(dev_ep == nullptr) {
             printf("dev not found file\n");
             return statcode::err;
@@ -273,7 +274,7 @@ namespace syscall {
         auto curproc = kHartObjs.curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
-        struct DirEnt *ep = fs::entEnter(path);
+        DirEnt *ep = fs::entEnter(path);
         if(ep == nullptr) { return statcode::err; }
         fs::entLock(ep);
         if(!(ep->attribute & ATTR_DIRECTORY)){
@@ -303,7 +304,7 @@ namespace syscall {
         char *path = (char*)patharr.buff;
         SharedPtr<File> f1, f2;
         if(path[0] != '/') { f2 = curproc->files[a_dirfd]; }
-        struct DirEnt *ep;
+        DirEnt *ep;
         int fd;
 
         if(a_flags & O_CREATE) {

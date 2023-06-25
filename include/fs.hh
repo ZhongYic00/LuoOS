@@ -10,7 +10,7 @@ namespace fs{
     using klib::SharedPtr;
     using pipe::Pipe;
 
-    struct DirEnt;
+    class DirEnt;
 
     struct File {
         enum FileType { none,pipe,entry,dev, stdin,stdout,stderr };
@@ -34,10 +34,10 @@ namespace fs{
         }ops;
         union Data {
             SharedPtr<Pipe> pipe;
-            struct DirEnt *ep;
+            DirEnt *ep;
             Data(FileType a_type){ assert(a_type==none || a_type==stdin || a_type==stdout || a_type==stderr); }
             Data(const SharedPtr<Pipe> &a_pipe): pipe(a_pipe) {}
-            Data(struct DirEnt *a_ep): ep(a_ep) {}
+            Data(DirEnt *a_ep): ep(a_ep) {}
             ~Data() {}
         }obj;
         const FileType type;
@@ -50,8 +50,8 @@ namespace fs{
             if(ops.fields.r)obj.pipe->addReader();
             if(ops.fields.w)obj.pipe->addWriter();
         }
-        File(struct DirEnt *a_ep, FileOp a_ops): type(FileType::entry), obj(a_ep), ops(a_ops) {}
-        File(struct DirEnt *a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags) {}
+        File(DirEnt *a_ep, FileOp a_ops): type(FileType::entry), obj(a_ep), ops(a_ops) {}
+        File(DirEnt *a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags) {}
         ~File();
         xlen_t write(xlen_t addr,size_t len);
         klib::ByteArray read(size_t len, long a_off=-1, bool a_update=true);

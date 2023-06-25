@@ -9,9 +9,9 @@ using namespace fs;
 static SuperBlock fat;
 static struct entry_cache {
     // struct spinlock lock;
-    struct DirEnt entries[ENTRY_CACHE_NUM];
+    DirEnt entries[ENTRY_CACHE_NUM];
 } ecache; // 目录缓冲区
-static struct DirEnt root; // 根目录
+static DirEnt root; // 根目录
 FileSystem dev_fat[8]; //挂载设备集合
 int mount_num=0; //表示寻找在挂载集合的下标
 
@@ -154,7 +154,7 @@ static uint rwClus(uint32 cluster, int write, int user, uint64 data, uint off, u
     2.当alloc为0，则将cur_clus置为first_clus
     返回off在该簇的偏移（off % fat.byts_per_clus）
 */
-static int relocClus(struct DirEnt *entry, uint off, int alloc) {
+static int relocClus(DirEnt *entry, uint off, int alloc) {
     int clus_num = off / fat.rBPC();
     while (clus_num > entry->clus_cnt) {
         int clus = fatRead(entry->cur_clus);
@@ -193,8 +193,8 @@ static int relocClus(struct DirEnt *entry, uint off, int alloc) {
     Should never get root by entHit, it's easy to understand.
 */
 // 在目录缓冲区中根据parent和name寻找目录，如果没有找到则将其放到缓冲区，并将vaild设为0（如果缓冲区有空余的话）（没有置换算法）
-static struct DirEnt *entHit(struct DirEnt *parent, const char *name) {
-    struct DirEnt *ep;
+static DirEnt *entHit(DirEnt *parent, const char *name) {
+    DirEnt *ep;
     // acquire(&ecache.lock);
     if (name) {
         for (ep = root.next; ep != &root; ep = ep->next) {          // LRU algo
@@ -301,7 +301,7 @@ static void readEntName(char *buffer, union Ent *d) {
     @param   raw_entry   pointer to the entry in a sector buffer
 */
 // 将目录项d的信息读取到entry
-static void readEntInfo(struct DirEnt *entry, union Ent *d) {
+static void readEntInfo(DirEnt *entry, union Ent *d) {
     entry->attribute = d->sne.attr;
     entry->first_clus = ((uint32)d->sne.fst_clus_hi << 16) | d->sne.fst_clus_lo;
     entry->file_size = d->sne.file_size;
@@ -334,8 +334,8 @@ static char *readNextElem(char *path, char *name) {
     1. 如果parent=1，返回d
     2. 如果parent=0，返回d/
 */
-static struct DirEnt *pathLookUp(char *path, int parent, char *name) {
-    struct DirEnt *entry, *next;
+static DirEnt *pathLookUp(char *path, int parent, char *name) {
+    DirEnt *entry, *next;
     if (*path == '/') { entry = entDup(&root); }
     else if (*path != '\0') { entry = entDup(kHartObjs.curtask->getProcess()->cwd); }
     else { return nullptr; }
@@ -365,8 +365,8 @@ static struct DirEnt *pathLookUp(char *path, int parent, char *name) {
     }
     return entry;
 }
-static struct DirEnt *pathLookUpAt(char *path, int parent, SharedPtr<File> f ,char *name) {
-    struct DirEnt *entry, *next;
+static DirEnt *pathLookUpAt(char *path, int parent, SharedPtr<File> f ,char *name) {
+    DirEnt *entry, *next;
     if (*path == '\0') {
         printf("nothing in path\n");
         return nullptr;
@@ -427,7 +427,7 @@ int fs::fat32Init() {
     root.next = &root;
     root.filename[0] = '/';
     root.filename[1] = '\0';
-    for(struct DirEnt *de = ecache.entries; de < ecache.entries + ENTRY_CACHE_NUM; de++) {
+    for(DirEnt *de = ecache.entries; de < ecache.entries + ENTRY_CACHE_NUM; de++) {
         de->dev = 0;
         de->valid = 0;
         de->ref = 0;
@@ -447,7 +447,7 @@ uint32 fs::getBytesPerClus() { return fat.rBPC(); }
 /* like the original readi, but "reade" is odd, let alone "writee" */
 // Caller must hold entry->lock.
 // 读取偏移为off，长为n的数据到dst处，并将cur_clus移动到结束处所在的簇（off是相对于数据区起始位置的偏移）
-int fs::entRead(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n) {
+int fs::entRead(DirEnt *entry, int user_dst, uint64 dst, uint off, uint n) {
     if (off > entry->file_size || off + n < off || (entry->attribute & ATTR_DIRECTORY)) { return 0; }
     if (entry->attribute & ATTR_LINK){
         struct Link li;
@@ -467,7 +467,7 @@ int fs::entRead(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n
 }
 // Caller must hold entry->lock.
 // 将首地址为src，长为n的数据写入偏移为off处，并将cur_clus移动到结束处所在的簇（off是相对于数据区起始位置的偏移）
-int fs::entWrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint n) {
+int fs::entWrite(DirEnt *entry, int user_src, uint64 src, uint off, uint n) {
     if (off > entry->file_size || off + n < off || (uint64)off + n > 0xffffffff || (entry->attribute & ATTR_READ_ONLY)) { return -1; }
     if (entry->attribute & ATTR_LINK){
         struct Link li;
@@ -520,7 +520,7 @@ char *fs::flName(char *name) {
     @param   off         offset int the dp, should be calculated via dirLookUp before calling this
 */
 // 在dp中生成一个目录并写入磁盘，如果off==0，生成'.'目录，如果0<off<=32，生成'..'目录，如果off>32，生成长名目录，长名保存自ep中，将ep->first_clus设为目录的起始簇
-void fs::entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off) {
+void fs::entSynAt(DirEnt *dp, DirEnt *ep, uint off) {
     if (!(dp->attribute & ATTR_DIRECTORY)) { panic("entSynAt: not dir"); }
     if (off % sizeof(union Ent)) { panic("entSynAt: not aligned"); }
     union Ent de;
@@ -579,10 +579,10 @@ void fs::entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off) {
     Allocate an entry on disk. Caller must hold dp->lock.
 */
 // 在dp目录下创建一个文件/目录，返回创建的文件/目录
-struct DirEnt *fs::entCreateAt(struct DirEnt *dp, char *name, int attr) {
+DirEnt *fs::entCreateAt(DirEnt *dp, char *name, int attr) {
     if (!(dp->attribute & ATTR_DIRECTORY)) { panic("entCreateAt not dir"); }
     if (dp->valid != 1 || !(name = flName(name))) { return nullptr; } // detect illegal character
-    struct DirEnt *ep;
+    DirEnt *ep;
     uint off = 0;
     if ((ep = dirLookUp(dp, name, &off)) != 0) { return ep; } // entry exists
     ep = entHit(dp, name);
@@ -611,7 +611,7 @@ struct DirEnt *fs::entCreateAt(struct DirEnt *dp, char *name, int attr) {
     return ep;
 }
 // entry引用数加一
-struct DirEnt *fs::entDup(struct DirEnt *entry) {
+DirEnt *fs::entDup(DirEnt *entry) {
     if (entry != 0) {
         // acquire(&ecache.lock);
         entry->ref++;
@@ -624,7 +624,7 @@ struct DirEnt *fs::entDup(struct DirEnt *entry) {
     caller must hold entry->parent->lock
 */
 // 在entry的父目录中更新entry的目录项
-void fs::dirUpdate(struct DirEnt *entry) {
+void fs::dirUpdate(DirEnt *entry) {
     if (!entry->dirty || entry->valid != 1) { return; }
     uint entcnt = 0;
     uint32 off = relocClus(entry->parent, entry->off, 0);
@@ -645,7 +645,7 @@ void fs::dirUpdate(struct DirEnt *entry) {
     pathRemove the entry in its parent directory
 */
 // 将entry从它的父目录中移除，被移除后entry的valid被置为-1
-void fs::entRemove(struct DirEnt *entry) {
+void fs::entRemove(DirEnt *entry) {
     if (entry->valid != 1) { return; }
     uint entcnt = 0;
     uint32 off = entry->off;
@@ -665,7 +665,7 @@ void fs::entRemove(struct DirEnt *entry) {
     caller must hold entry->lock
 */
 // 在数据区清空文件/目录
-void fs::entTrunc(struct DirEnt *entry) {
+void fs::entTrunc(DirEnt *entry) {
     if(!(entry->attribute & ATTR_LINK)){
         for (uint32 clus = entry->first_clus; clus >= 2 && clus < FAT32_EOC; ) {
             uint32 next = fatRead(clus);
@@ -678,18 +678,18 @@ void fs::entTrunc(struct DirEnt *entry) {
     entry->dirty = 1;
 }
 // 请求睡眠锁，要求引用数大于0
-void fs::entLock(struct DirEnt *entry) {
+void fs::entLock(DirEnt *entry) {
     // if (entry == 0 || entry->ref < 1) { panic("entLock"); }
     // acquiresleep(&entry->lock);
 }
 // 释放睡眠锁
-void fs::entUnlock(struct DirEnt *entry) {
+void fs::entUnlock(DirEnt *entry) {
     // if (entry == 0 || !holdingsleep(&entry->lock) || entry->ref < 1) { panic("entUnlock"); }
     // if (entry == 0 || entry->ref < 1) { panic("entUnlock"); }
     // releasesleep(&entry->lock);
 }
 // 将entry引用数减少1，如果entry的引用数减少为0，则将entry放置缓冲区最前面，并执行eput(entry->parent)
-void fs::entRelse(struct DirEnt *entry) {
+void fs::entRelse(DirEnt *entry) {
     // acquire(&ecache.lock);
     if (entry != &root && entry->valid != 0 && entry->ref == 1) {
         // ref == 1 means no other process can have entry locked,
@@ -712,7 +712,7 @@ void fs::entRelse(struct DirEnt *entry) {
         // releasesleep(&entry->lock);
         // Once entry->ref decreases down to 0, we can't guarantee the entry->parent field remains unchanged.
         // Because entHit() may take the entry away and write it.
-        struct DirEnt *eparent = entry->parent;
+        DirEnt *eparent = entry->parent;
         // acquire(&ecache.lock);
         entry->ref--;
         // release(&ecache.lock);
@@ -723,7 +723,7 @@ void fs::entRelse(struct DirEnt *entry) {
     // release(&ecache.lock);
 }
 // 将dirent的信息copy到stat中，包括文件名、文件类型、所在设备号、文件大小
-void fs::entStat(struct DirEnt *de, struct Stat *st) {
+void fs::entStat(DirEnt *de, struct Stat *st) {
     strncpy(st->name, de->filename, STAT_MAX_NAME);
     st->type = (de->attribute & ATTR_DIRECTORY) ? T_DIR : T_FILE;
     st->dev = de->dev;
@@ -745,7 +745,7 @@ void fs::entStat(struct DirEnt *de, struct Stat *st) {
     找到返回1，文件被删除返回0，后面没有文件了返回-1
     count记录了向后遍历了几个目录项
 */
-int fs::entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count) {
+int fs::entFindNext(DirEnt *dp, DirEnt *ep, uint off, int *count) {
     Log(trace,"entFindNext(dp=%p,ep=%p)",dp);
     if (!(dp->attribute & ATTR_DIRECTORY)) {
         panic("entFindNext not dir");
@@ -810,7 +810,7 @@ int fs::entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count) 
     @param   poff        offset of proper empty entry slots from the beginning of the dir
 */
 // 在dp目录中搜索文件名为filename的文件，poff记录了偏移，返回找到的文件
-struct DirEnt *fs::dirLookUp(struct DirEnt *dp, const char *filename, uint *poff) {
+DirEnt *fs::dirLookUp(DirEnt *dp, const char *filename, uint *poff) {
      if(dp->mount_flag==1) {
         fat = dev_fat[dp->dev].rSpBlk();
         root = *(dev_fat[dp->dev].findRoot());
@@ -836,7 +836,7 @@ struct DirEnt *fs::dirLookUp(struct DirEnt *dp, const char *filename, uint *poff
         printf("valid is not 1\n");
         return nullptr;
     }
-    struct DirEnt *ep = entHit(dp, filename); // 从缓冲区中找
+    DirEnt *ep = entHit(dp, filename); // 从缓冲区中找
     if (ep->valid == 1) { return ep; }                               // ecache hits
     // 缓冲区找不到则往下执行
     int len = strlen(filename);
@@ -870,27 +870,27 @@ struct DirEnt *fs::dirLookUp(struct DirEnt *dp, const char *filename, uint *poff
     return nullptr;
 }
 // 根据路径寻找目录（进入该目录）
-struct DirEnt *fs::entEnter(char *path) {
+DirEnt *fs::entEnter(char *path) {
     char name[FAT32_MAX_FILENAME + 1];
     return pathLookUp(path, 0, name);
 }
 // 根据路径寻找目录（不进入该目录）
-struct DirEnt *fs::entEnterParent(char *path, char *name) { return pathLookUp(path, 1, name); }
+DirEnt *fs::entEnterParent(char *path, char *name) { return pathLookUp(path, 1, name); }
 // 根据路径寻找目录（进入该文件/目录）
-struct DirEnt *fs::entEnterFrom(char *path, SharedPtr<File> f) {
+DirEnt *fs::entEnterFrom(char *path, SharedPtr<File> f) {
     char name[FAT32_MAX_FILENAME + 1];
     return pathLookUpAt(path, 0, f, name);
 }
 // 根据路径寻找目录（不进入该文件/目录）
-struct DirEnt *fs::entEnterParentAt(char *path, char *name, SharedPtr<File> f) { return pathLookUpAt(path, 1, f, name); }
+DirEnt *fs::entEnterParentAt(char *path, char *name, SharedPtr<File> f) { return pathLookUpAt(path, 1, f, name); }
 
 int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2){
-  struct DirEnt *dp1, *dp2;
+  DirEnt *dp1, *dp2;
   if((dp1 = entEnterFrom(oldpath, f1)) == nullptr) {
     printf("can't find dir\n");
     return -1;
   }
-  struct DirEnt *parent1;
+  DirEnt *parent1;
   parent1 = dp1->parent;
   int off2;
   off2 = relocClus(parent1, dp1->off, 0);
@@ -935,7 +935,7 @@ int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File
     printf("can't find dir\n");
     return NULL;
   }
-  struct DirEnt *ep;
+  DirEnt *ep;
   entLock(dp2);
   uint off = 0;
   if((ep = dirLookUp(dp2, name, &off)) != 0) {
@@ -952,9 +952,9 @@ int fs::entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File
   return 0;
 }
 int fs::entUnlink(char *path, SharedPtr<File> f) {
-  struct DirEnt *dp;
+  DirEnt *dp;
   if((dp = entEnterFrom(path, f)) == nullptr) { return -1; }
-  struct DirEnt *parent;
+  DirEnt *parent;
   parent = dp->parent;
   int off;
   off = relocClus(parent, dp->off, 0);
@@ -984,8 +984,8 @@ int fs::entUnlink(char *path, SharedPtr<File> f) {
 }
 // 目录是否为空
 // Is the directory dp empty except for "." and ".." ?
-int fs::dirIsEmpty(struct DirEnt *dp) {
-  struct DirEnt ep;
+int fs::dirIsEmpty(DirEnt *dp) {
+  DirEnt ep;
   int count;
   int ret;
   ep.valid = 0;
@@ -996,7 +996,7 @@ int fs::pathRemove(char *path) {
   char *s = path + strlen(path) - 1;
   while (s >= path && *s == '/') { s--; }
   if (s >= path && *s == '.' && (s == path || *--s == '/')) { return -1; }
-  struct DirEnt *ep;
+  DirEnt *ep;
   if((ep = entEnter(path)) == nullptr){ return -1; }
   entLock(ep);
   if((ep->attribute & ATTR_DIRECTORY) && !dirIsEmpty(ep)) {
@@ -1012,7 +1012,7 @@ int fs::pathRemove(char *path) {
   return 0;
 }
 int fs::pathRemoveAt(char *path, SharedPtr<File> f) {
-  struct DirEnt *ep;
+  DirEnt *ep;
   if((ep = entEnterFrom(path, f)) == nullptr){ return -1; }
   entLock(ep);
   if((ep->attribute & ATTR_DIRECTORY) && !dirIsEmpty(ep)){
@@ -1027,7 +1027,7 @@ int fs::pathRemoveAt(char *path, SharedPtr<File> f) {
   entRelse(ep);
   return 0;
 }
-int fs::devMount(struct DirEnt *mountpoint,struct DirEnt *dev) {
+int fs::devMount(DirEnt *mountpoint,DirEnt *dev) {
     while(dev_fat[mount_num].isValid()) {
         mount_num++;
         mount_num=mount_num%8;
@@ -1039,21 +1039,21 @@ int fs::devMount(struct DirEnt *mountpoint,struct DirEnt *dev) {
     // make sure that byts_per_sec has the same value with BSIZE 
     if (BSIZE != dev_fat[mount_num].rBPS()) { panic("byts_per_sec != BSIZE"); }
     // initlock(&ecache.lock, "ecache");
-    struct DirEnt *nroot = dev_fat[mount_num].getRoot();
+    DirEnt *nroot = dev_fat[mount_num].getRoot();
     *nroot = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, 0, 0, true, 0, 0, nullptr, nroot, nroot, 0 };
     // initsleeplock(&root.lock, "entry");
     mountpoint->mount_flag=1;
     mountpoint->dev=mount_num;
     return 0;
 }
-int fs::devUnmount(struct DirEnt *mountpoint) {
+int fs::devUnmount(DirEnt *mountpoint) {
     mountpoint->mount_flag=0;
     memset(&dev_fat[mountpoint->dev],0,sizeof(dev_fat[0]));
     mountpoint->dev=0;
     return 0;
 }
-struct DirEnt *fs::pathCreate(char *path, short type, int mode) {
-    struct DirEnt *ep, *dp;
+DirEnt *fs::pathCreate(char *path, short type, int mode) {
+    DirEnt *ep, *dp;
     char name[FAT32_MAX_FILENAME + 1];
     if((dp = entEnterParent(path, name)) == nullptr) { return nullptr; }
     if (type == T_DIR) { mode = ATTR_DIRECTORY; }
@@ -1077,8 +1077,8 @@ struct DirEnt *fs::pathCreate(char *path, short type, int mode) {
     entLock(ep);
     return ep;
 }
-struct DirEnt *fs::pathCreateAt(char *path, short type, int mode, SharedPtr<File> f) {
-    struct DirEnt *ep, *dp;
+DirEnt *fs::pathCreateAt(char *path, short type, int mode, SharedPtr<File> f) {
+    DirEnt *ep, *dp;
     char name[FAT32_MAX_FILENAME + 1];
 
     if((dp = entEnterParentAt(path, name, f)) == nullptr){
@@ -1106,14 +1106,14 @@ struct DirEnt *fs::pathCreateAt(char *path, short type, int mode, SharedPtr<File
     entLock(ep);
     return ep;
 }
-void fs::getDStat(struct DirEnt *de, struct DStat *st) {
+void fs::getDStat(DirEnt *de, struct DStat *st) {
     strncpy(st->d_name, de->filename, STAT_MAX_NAME);
     st->d_type = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
     st->d_ino = de->first_clus;
     st->d_off = 0;
     st->d_reclen = de->file_size;
 }
-void fs::getKStat(struct DirEnt *de, struct KStat *kst) {
+void fs::getKStat(DirEnt *de, struct KStat *kst) {
     kst->st_dev = de->dev;
     kst->st_ino = de->first_clus;
     kst->st_mode = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
@@ -1136,8 +1136,8 @@ void fs::getKStat(struct DirEnt *de, struct KStat *kst) {
     kst->_unused[0] = 0;
     kst->_unused[1] = 0;
 }
-struct DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  // @todo 改成返回File
-    struct DirEnt *entry, *next;
+DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  // @todo 改成返回File
+    DirEnt *entry, *next;
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
     else if(pathname[0] == '/') { entry = entDup(&root); }  // 绝对路径
@@ -1154,7 +1154,7 @@ struct DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  
             entUnlock(entry);
             return entry;
         }
-        if ((next = dirLookUp(entry, dirname[i].c_str(), 0)) == 0) {
+        if ((next = entry->dirSearch(dirname[i])) == nullptr) {
             entUnlock(entry);
             entRelse(entry);
             return nullptr;
@@ -1164,4 +1164,64 @@ struct DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  
         entry = next;
     }
     return entry;
+}
+DirEnt *DirEnt::dirSearch(string a_dirname, uint *a_off) {
+    DirEnt *dp = this;
+    if(mount_flag == 1) {
+        fat = dev_fat[dev].rSpBlk();
+        root = *(dev_fat[dev].findRoot());
+        dp = &root;
+    }
+    // 当前“目录”非目录
+    if (!(dp->attribute & ATTR_DIRECTORY)) { panic("dirLookUp not DIR"); }
+    if (dp->attribute & ATTR_LINK){
+        struct Link li;
+        rwClus(dp->first_clus, 0, 0, (uint64)&li, 0, 36);
+        dp->first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
+        dp->attribute = li.de.sne.attr;
+    }
+    // '.'表示当前目录，则增加当前目录引用计数并返回当前目录
+    if (a_dirname == ".") { return entDup(dp); }
+    // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
+    else if (a_dirname == "..") {
+        if (dp == &root) { return entDup(&root); }
+        else { return entDup(dp->parent); }
+    }
+    // 当前目录无效
+    if (dp->valid != 1) {
+        printf("valid is not 1\n");
+        return nullptr;
+    }
+    DirEnt *ep = entHit(dp, a_dirname.c_str());  // 从缓冲区中找
+    if (ep->valid == 1) { return ep; }  // ecache hits
+    // 缓冲区找不到则往下执行
+    size_t len = a_dirname.length();
+    int entcnt = (len+CHAR_LONG_NAME-1) / CHAR_LONG_NAME + 1;   // count of l-n-entries, rounds up. plus s-n-e
+    int count = 0; 
+    int type;
+    uint off = 0;
+    relocClus(dp, 0, 0); // 将当前目录的cur_clus设为0
+    while ((type = entFindNext(dp, ep, off, &count) != -1)) { // 每轮从off开始往后搜索
+        // 文件已被删除
+        if (type == 0) {
+            printf("%s has been deleted\n", ep->filename);
+            if (a_off != nullptr && count >= entcnt) {
+                *a_off = off;
+                a_off = nullptr;
+            }
+        }
+        // 找到了一个有效文件
+        // @todo 不区分大小写？
+        else if (strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME) == 0) {
+            ep->parent = entDup(dp);
+            ep->off = off;
+            ep->valid = 1;
+            return ep;
+        }
+        off += count << 5; // off += count*32
+    }
+    // 没找到有效文件
+    if (a_off != nullptr) { *a_off = off; } // 从未找到过同名文件（包括已删除的）
+    entRelse(ep);
+    return nullptr;
 }

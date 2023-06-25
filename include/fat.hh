@@ -4,6 +4,8 @@
 #include "fs.hh"
 
 namespace fs {
+    using eastl::string;
+    using eastl::vector;
     typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）
         uint8 attr; // 属性
@@ -32,23 +34,25 @@ namespace fs {
         SNE sne; // short name entry
         LNE lne; // long name entry
     };
-    struct DirEnt {
-        char  filename[FAT32_MAX_FILENAME + 1];  // 文件名
-        uint8   attribute;  // 属性
-        uint32  first_clus;  // 起始簇号
-        uint32  file_size;  // 文件大小
-        uint32  cur_clus;  // 当前簇号
-        uint clus_cnt;  // 当前簇是该文件的第几个簇
-        uint8 dev;   // 设备号
-        uint8 dirty;  // 浊/清
-        short valid;  // 合法性
-        int ref; // 关联数
-        uint32 off; // 父目录的entry的偏移 // offset in the parent dir entry, for writing convenience
-        struct DirEnt *parent; // because FAT32 doesn't have such thing like inum, use this for cache trick
-        struct DirEnt *next; // 
-        struct DirEnt *prev; // 
-        uint8 mount_flag;
-        // struct sleeplock lock;
+    class DirEnt {
+        public:
+            char  filename[FAT32_MAX_FILENAME + 1];  // 文件名
+            uint8   attribute;  // 属性
+            uint32  first_clus;  // 起始簇号
+            uint32  file_size;  // 文件大小
+            uint32  cur_clus;  // 当前簇号
+            uint clus_cnt;  // 当前簇是该文件的第几个簇
+            uint8 dev;   // 设备号
+            uint8 dirty;  // 浊/清
+            short valid;  // 合法性
+            int ref; // 关联数
+            uint32 off; // 父目录的entry的偏移 // offset in the parent dir entry, for writing convenience
+            DirEnt *parent; // because FAT32 doesn't have such thing like inum, use this for cache trick
+            DirEnt *next; // 
+            DirEnt *prev; // 
+            uint8 mount_flag;
+            // struct sleeplock lock;
+            DirEnt *dirSearch(string a_dirname, uint *a_off = nullptr);
     };
     struct Link{
         union Ent de;
@@ -110,16 +114,16 @@ namespace fs {
         private:
             SuperBlock spblk;
             bool valid;
-            struct DirEnt root; //这个文件系统的根目录文件
+            DirEnt root; //这个文件系统的根目录文件
             uint8 mount_mode; //是否被挂载的标志
         public:
             FileSystem() {}
             FileSystem(const FileSystem& a_fs):spblk(a_fs.spblk), valid(a_fs.valid), root(a_fs.root), mount_mode(a_fs.mount_mode) {}
-            FileSystem(SuperBlock a_spblk, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_spblk), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, typeof(spblk.rBPB()) a_bpb, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_fds, a_dsc, a_dcc, a_bpc, a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_fds, a_dsc, a_dcc, a_bpc, a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(typeof(spblk.rBPB()) a_bpb, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, struct DirEnt a_root, uint8 a_mm):spblk(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(SuperBlock a_spblk, bool a_valid, DirEnt a_root, uint8 a_mm):spblk(a_spblk), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, typeof(spblk.rBPB()) a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):spblk(a_fds, a_dsc, a_dcc, a_bpc, a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, DirEnt a_root, uint8 a_mm):spblk(a_fds, a_dsc, a_dcc, a_bpc, a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(typeof(spblk.rBPB()) a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):spblk(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, DirEnt a_root, uint8 a_mm):spblk(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             ~FileSystem() {}
             const FileSystem& operator=(const FileSystem& a_fs) {
                 memmove((void*)this, (void*)&a_fs, sizeof(*this));
@@ -140,12 +144,10 @@ namespace fs {
             inline const uint32 rFS() const { return spblk.rFS(); }
             inline const uint32 rRC() const { return spblk.rRC(); }
             inline const bool isValid() const { return valid; }
-            inline struct DirEnt *const getRoot() { return &root; }
-            inline const struct DirEnt *const findRoot() const { return &root; }
+            inline DirEnt *const getRoot() { return &root; }
+            inline const DirEnt *const findRoot() const { return &root; }
             inline const uint8 rMM() const { return mount_mode; }
     };
-    using eastl::string;
-    using eastl::vector;
     class Path {
         private:
             string pathname;
@@ -156,7 +158,7 @@ namespace fs {
             Path(const string& a_str):pathname(a_str), dirname() {
                 size_t len = pathname.length();
                 if(len > 0) {  // 保证数组长度不为0
-                    auto ind = new size_t[len][2];
+                    auto ind = new size_t[len][2] { { 0, 0 } };
                     bool rep = true;
                     int dirnum = 0;
                     for(size_t i = 0; i < len; ++i) {  // 识别以'/'结尾的目录
@@ -176,7 +178,7 @@ namespace fs {
                     }
                     if(!rep) { ++dirnum; }  // 补齐末尾'/'
                     dirname = vector<string>(dirnum);
-                    for(size_t i = 0; i < dirnum; ++i) { dirname[i] = pathname.substr(ind[dirnum][0], ind[dirnum][1]); }
+                    for(size_t i = 0; i < dirnum; ++i) { dirname[i] = pathname.substr(ind[i][0], ind[i][1]); }
                     delete[] ind;
                 }
             }
@@ -186,10 +188,10 @@ namespace fs {
                 return *this;
             }
             // ~Path() { delete dirname; }
-            struct DirEnt *pathSearch(SharedPtr<File> a_file, bool a_parent) const;  // @todo 改成返回File
-            inline struct DirEnt *pathSearch(SharedPtr<File> a_file) const { return pathSearch(a_file, 0); }
-            inline struct DirEnt *pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
-            inline struct DirEnt *pathSearch() const { return pathSearch(nullptr, 0); }
+            DirEnt *pathSearch(SharedPtr<File> a_file, bool a_parent) const;  // @todo 改成返回File
+            inline DirEnt *pathSearch(SharedPtr<File> a_file) const { return pathSearch(a_file, false); }
+            inline DirEnt *pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
+            inline DirEnt *pathSearch() const { return pathSearch(nullptr, false); }
     };
 	struct DStat {
 	  uint64 d_ino;	// 索引结点号
@@ -229,37 +231,37 @@ namespace fs {
 
 
     int fat32Init(void);
-    struct DirEnt *dirLookUp(struct DirEnt *entry, const char *filename, uint *poff);
+    DirEnt *dirLookUp(DirEnt *entry, const char *filename, uint *poff);
     char* flName(char *name);
-    void entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off);
-    struct DirEnt *entCreateAt(struct DirEnt *dp, char *name, int attr);
-    struct DirEnt *entDup(struct DirEnt *entry);
-    void dirUpdate(struct DirEnt *entry);
-    void entTrunc(struct DirEnt *entry);
-    void entRemove(struct DirEnt *entry);
-    void entRelse(struct DirEnt *entry);
-    void entStat(struct DirEnt *ep, struct Stat *st);
-    void entLock(struct DirEnt *entry);
-    void entUnlock(struct DirEnt *entry);
-    int entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count);
-    struct DirEnt *entEnter(char *path);
-    struct DirEnt *entEnterParent(char *path, char *name);
-    int entRead(struct DirEnt *entry, int user_dst, uint64 dst, uint off, uint n);
-    int entWrite(struct DirEnt *entry, int user_src, uint64 src, uint off, uint n);
-    struct DirEnt *entEnterParentAt(char *path, char *name, SharedPtr<File> f);
-    struct DirEnt *entEnterFrom(char *path, SharedPtr<File> f);
+    void entSynAt(DirEnt *dp, DirEnt *ep, uint off);
+    DirEnt *entCreateAt(DirEnt *dp, char *name, int attr);
+    DirEnt *entDup(DirEnt *entry);
+    void dirUpdate(DirEnt *entry);
+    void entTrunc(DirEnt *entry);
+    void entRemove(DirEnt *entry);
+    void entRelse(DirEnt *entry);
+    void entStat(DirEnt *ep, struct Stat *st);
+    void entLock(DirEnt *entry);
+    void entUnlock(DirEnt *entry);
+    int entFindNext(DirEnt *dp, DirEnt *ep, uint off, int *count);
+    DirEnt *entEnter(char *path);
+    DirEnt *entEnterParent(char *path, char *name);
+    int entRead(DirEnt *entry, int user_dst, uint64 dst, uint off, uint n);
+    int entWrite(DirEnt *entry, int user_src, uint64 src, uint off, uint n);
+    DirEnt *entEnterParentAt(char *path, char *name, SharedPtr<File> f);
+    DirEnt *entEnterFrom(char *path, SharedPtr<File> f);
     uint32 getBytesPerClus();
     int entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2);
     int entUnlink(char *path, SharedPtr<File> f);
     int pathRemove(char *path);
-    int dirIsEmpty(struct DirEnt *dp);
+    int dirIsEmpty(DirEnt *dp);
     int pathRemoveAt(char *path, SharedPtr<File> f);
-    int devMount(struct DirEnt *mountpoint,struct DirEnt *dev);
-    int devUnmount(struct DirEnt *mountpoint);
-    struct DirEnt *pathCreate(char *path, short type, int mode);
-    struct DirEnt *pathCreateAt(char *path, short type, int mode, SharedPtr<File> f);
-    void getDStat(struct DirEnt *de, struct DStat *st);
-    void getKStat(struct DirEnt *de, struct KStat *kst);
+    int devMount(DirEnt *mountpoint,DirEnt *dev);
+    int devUnmount(DirEnt *mountpoint);
+    DirEnt *pathCreate(char *path, short type, int mode);
+    DirEnt *pathCreateAt(char *path, short type, int mode, SharedPtr<File> f);
+    void getDStat(DirEnt *de, struct DStat *st);
+    void getKStat(DirEnt *de, struct KStat *kst);
 
 }
 

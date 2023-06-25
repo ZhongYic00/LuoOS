@@ -19,7 +19,7 @@ void test_getdents(void){
 
 	/*
 	for(int bpos = 0; bpos < nread;){
-	    d = (struct DirEnt *)(buf + bpos);
+	    d = (DirEnt *)(buf + bpos);
 	    printf(  "%s\t", d->d_name);
 	    bpos += d->d_reclen;
 	}
