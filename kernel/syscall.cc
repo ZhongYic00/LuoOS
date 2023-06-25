@@ -70,7 +70,7 @@ namespace syscall {
         if(fs::fat32Init() != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObjs.curtask->getProcess();
         curproc->cwd = fs::entEnter("/");
-        curproc->files[3] = new File(curproc->cwd,0);
+        curproc->files[3] = eastl::make_shared<File>(curproc->cwd,0);
         struct DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
         ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
@@ -285,7 +285,7 @@ namespace syscall {
 
         fs::entRelse(curproc->cwd);
         curproc->cwd = ep;
-        curproc->files[3]=new File(curproc->cwd, O_RDWR);
+        curproc->files[3]=eastl::make_shared<File>(curproc->cwd, O_RDWR);
 
         return statcode::ok;
     }
@@ -326,7 +326,7 @@ namespace syscall {
                 return statcode::err;
             }
         }
-        f1 = new File(ep, a_flags);
+        f1=eastl::make_shared<File>(ep, a_flags);
         f1->off = (a_flags&O_APPEND) ? ep->file_size : 0;
         fd = curproc->fdAlloc(f1);
         if(fdOutRange(fd)) {
@@ -346,7 +346,7 @@ namespace syscall {
         auto curproc = kHartObjs.curtask->getProcess();
         if(curproc->files[a_fd] == nullptr) { return statcode::err; } // 不能关闭一个已关闭的文件
         // 不能用新的局部变量代替，局部变量和files[a_fd]是两个不同的SharedPtr
-        curproc->files[a_fd].deRef();
+        curproc->files[a_fd].reset();
 
         return statcode::ok;
     }
@@ -356,8 +356,8 @@ namespace syscall {
         auto proc=cur->getProcess();
         xlen_t fd=ctx.x(10),flags=ctx.x(11);
         auto pipe=SharedPtr<pipe::Pipe>(new pipe::Pipe);
-        auto rfile=SharedPtr<File>(new File(pipe,File::FileOp::read));
-        auto wfile=SharedPtr<File>(new File(pipe,File::FileOp::write));
+        auto rfile=SharedPtr<File>(new File(pipe,fs::FileOp::read));
+        auto wfile=SharedPtr<File>(new File(pipe,fs::FileOp::write));
         int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
         proc->vmar[fd]=fds;
     }
@@ -657,7 +657,7 @@ namespace syscall {
 
         Log(debug,"execve(path=%s,)",path);
         auto Ent=fs::entEnter(path);
-        klib::SharedPtr<File> file=new File(Ent,File::FileOp::read);
+        auto file=eastl::make_shared<File>(Ent,fs::FileOp::read);
         auto buf=file->read(Ent->file_size);
         // auto buf=klib::ByteArray{0};
         // buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;

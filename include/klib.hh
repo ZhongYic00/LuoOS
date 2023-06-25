@@ -7,6 +7,7 @@
 #include "safestl.hh"
 #include "TINYSTL/string.h"
 #include "new.hh"
+#include "EASTL/shared_ptr.h"
 
 namespace klib
 {
@@ -308,90 +309,12 @@ struct list:public Seq<T>{
   };
   typedef ArrayBuff<uint8_t> ByteArray;
 
-  // meta data block
-  typedef int ref_t;
-  struct MDB{
-    ref_t m_ref;
-    bool m_weak;
-    MDB(bool a_weak=false): m_ref(1), m_weak(a_weak) {};
-  };
   template<typename T>
+  using SharedPtr=::eastl::shared_ptr<T>;
   /*
     SharedPtr, by Ct_Unvs
     SharedPtr只能用于动态对象，且SharedPtr本身不应使用new创建
   */
-  class SharedPtr {
-    private:
-      T *m_ptr;
-      MDB *m_meta;
-    public:
-      // 构造与析构
-      SharedPtr(): m_ptr(nullptr), m_meta(nullptr) {}
-      SharedPtr(T *a_ptr): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB):nullptr) {}
-      SharedPtr(T *a_ptr, bool a_weak): m_ptr(a_ptr), m_meta((a_ptr!=nullptr)?(new MDB(a_weak)):nullptr) {}
-      SharedPtr(const SharedPtr<T> &a_sptr): m_ptr(a_sptr.m_ptr), m_meta(a_sptr.m_meta) { if(m_meta)++(m_meta->m_ref); }
-      ~SharedPtr() { deRef(); }
-      // 赋值运算
-      const SharedPtr<T> operator=(T *a_ptr) {
-        deRef();
-        m_ptr = a_ptr;
-        if(a_ptr != nullptr) { m_meta = new MDB; }
-        else { m_meta = nullptr; }
-        return *this;
-      }
-      const SharedPtr<T> operator=(const SharedPtr<T> &a_sptr) {
-        deRef();
-        m_ptr = a_sptr.m_ptr;
-        m_meta = a_sptr.m_meta;
-        if(m_meta != nullptr) { ++(m_meta->m_ref); }
-        return *this;
-      }
-      // 引用运算
-      T& operator*() const { return *m_ptr; }
-      T* operator->() const { return m_ptr; }
-      T& operator[](int a_offset) const { return m_ptr[a_offset]; }
-      // 逻辑运算
-      const bool operator!() const { return !m_ptr; }
-      const bool operator>(T *a_ptr) const { return m_ptr > a_ptr; }
-      const bool operator<(T *a_ptr) const { return m_ptr < a_ptr; }
-      const bool operator>=(T *a_ptr) const { return m_ptr >= a_ptr; }
-      const bool operator<=(T *a_ptr) const { return m_ptr <= a_ptr; }
-      const bool operator==(T *a_ptr) const { return m_ptr == a_ptr; }
-      const bool operator!=(T *a_ptr) const { return m_ptr != a_ptr; }
-      const bool operator>(const SharedPtr<T> &a_sptr) const { return m_ptr > a_sptr.m_ptr; }
-      const bool operator<(const SharedPtr<T> &a_sptr) const { return m_ptr < a_sptr.m_ptr; }
-      const bool operator>=(const SharedPtr<T> &a_sptr) const { return m_ptr >= a_sptr.m_ptr; }
-      const bool operator<=(const SharedPtr<T> &a_sptr) const { return m_ptr <= a_sptr.m_ptr; }
-      const bool operator==(const SharedPtr<T> &a_sptr) const { return m_ptr == a_sptr.m_ptr; }
-      // 功能函数
-      void deRef() {
-        if(m_meta != nullptr) {
-          if(!(m_meta->m_weak) && ((--(m_meta->m_ref))<=0)) {
-            delete m_meta;
-            delete m_ptr;
-          }
-        }
-        m_ptr = nullptr;
-        m_meta = nullptr;
-        return;
-      }
-      inline T *const rawPtr() const { return m_ptr; }
-      inline const MDB& metaData() const { return *m_meta; }
-      inline const int refCount() const { return (m_meta!=nullptr) ? (m_meta->m_ref) : 0; }
-      inline const bool expired() const { return (m_meta!=nullptr) ? (m_meta->m_ref<=0) : true; }
-  };
-  /*
-    SharedPtr的创建方式:
-      SharedPtr<T> sptr;
-      SharedPtr<T> sptr = nullptr;
-      SharedPtr<T> sptr = new T;
-      SharedPtr<T> sptr = sptr2;
-  */
-  // template<typename T, typename... Ts>
-  // SharedPtr<T> make_shared(Ts&& ...params){
-  //   auto obj = new T(std::forward<Ts>(params)...);
-  //   return SharedPtr<T>(obj);
-  // }
 } // namespace klib
 
 static klib::ringbuf<char> buf;
