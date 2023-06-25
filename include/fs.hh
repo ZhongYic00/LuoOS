@@ -41,7 +41,7 @@ namespace fs{
             ~Data() {}
         }obj;
         const FileType type;
-        uint off;
+        uint off=0;
 
         File(FileType a_type): type(a_type), obj(a_type) {}
         File(FileType a_type, FileOp a_ops=FileOp::none): type(a_type), obj(a_type), ops(a_ops) {}
