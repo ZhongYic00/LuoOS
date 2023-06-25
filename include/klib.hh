@@ -6,6 +6,7 @@
 #include "klib.h"
 #include "safestl.hh"
 // #include "TINYSTL/string.h"
+#include "new.hh"
 #include "EASTL/string.h"
 #include "EASTL/vector.h"
 

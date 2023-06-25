@@ -80,7 +80,7 @@
 #include <EASTL/initializer_list.h>
 
 EA_DISABLE_ALL_VC_WARNINGS()
-#include <new>
+#include <new.hh>
 #include <stddef.h>
 EA_RESTORE_ALL_VC_WARNINGS()
 
