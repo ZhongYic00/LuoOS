@@ -144,6 +144,47 @@ namespace fs {
             inline const struct DirEnt *const findRoot() const { return &root; }
             inline const uint8 rMM() const { return mount_mode; }
     };
+    using tinystl::string;
+    class Path {
+        private:
+            string pathname;
+            string *dirname;
+            size_t dirnum;
+        public:
+            Path():pathname(), dirname(nullptr), dirnum(0) {}
+            Path(const Path& a_path):pathname(a_path.pathname), dirname(new string[a_path.dirnum]), dirnum(a_path.dirnum) {
+                for(int i = 0; i < dirnum; ++i) { dirname[i] = a_path.dirname[i]; }
+            }
+            Path(const string& a_str):pathname(a_str), dirname(nullptr), dirnum(0) {
+                size_t len = a_str.length();
+                size_t **ind = new size_t[len][2] { 0 };
+                bool rep = true;
+                if(a_str[0] == '/') {  // 识别根目录
+                    ind[0][0] = ind[0][1] = 0;
+                    ++dirnum;
+                }
+                for(size_t i = 0; i < len; ++i) {  // 识别以'/'结尾的目录
+                    if(a_str[i] == '/') {
+                        if(!rep) {
+                            rep = true;
+                            ++dirnum;
+                        }
+                    }
+                    else {
+                        ++(ind[dirnum][1]);
+                        if(rep) {
+                            rep = false;
+                            ind[dirnum][0] = i;
+                        }
+                    }
+                }
+                if(!rep) { ++dirnum; }  // 补齐末尾'/'
+                dirname = new string[dirnum];
+                for(size_t i = 0; i < dirnum; ++i) { dirname[i] = pathname.substr(ind[dirnum][0], ind[idrnum][1]); }
+                delete[] ind;
+            }
+            ~Path() { delete[] dirname; }
+    };
 	struct DStat {
 	  uint64 d_ino;	// 索引结点号
 	  int64 d_off;	// 到下一个dirent的偏移
