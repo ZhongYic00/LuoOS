@@ -144,46 +144,52 @@ namespace fs {
             inline const struct DirEnt *const findRoot() const { return &root; }
             inline const uint8 rMM() const { return mount_mode; }
     };
-    using tinystl::string;
+    using eastl::string;
+    using eastl::vector
     class Path {
         private:
             string pathname;
-            string *dirname;
-            size_t dirnum;
+            vector<string> dirname;
         public:
-            Path():pathname(), dirname(nullptr), dirnum(0) {}
-            Path(const Path& a_path):pathname(a_path.pathname), dirname(new string[a_path.dirnum]), dirnum(a_path.dirnum) {
-                for(int i = 0; i < dirnum; ++i) { dirname[i] = a_path.dirname[i]; }
-            }
-            Path(const string& a_str):pathname(a_str), dirname(nullptr), dirnum(0) {
-                size_t len = a_str.length();
-                size_t **ind = new size_t[len][2] { 0 };
-                bool rep = true;
-                if(a_str[0] == '/') {  // 识别根目录
-                    ind[0][0] = ind[0][1] = 0;
-                    ++dirnum;
-                }
-                for(size_t i = 0; i < len; ++i) {  // 识别以'/'结尾的目录
-                    if(a_str[i] == '/') {
-                        if(!rep) {
-                            rep = true;
-                            ++dirnum;
+            Path():pathname(), dirname(), dirnum(0) {}
+            Path(const Path& a_path):pathname(a_path.pathname), dirname(a_path.dirname) {}
+            Path(const string& a_str):pathname(a_str), dirname() {
+                size_t len = pathname.length();
+                if(len > 0) {  // 保证数组长度不为0
+                    auto ind = new size_t[len][2];
+                    bool rep = true;
+                    int dirnum = 0;
+                    for(size_t i = 0; i < len; ++i) {  // 识别以'/'结尾的目录
+                        if(pathname[i] == '/') {
+                            if(!rep) {
+                                rep = true;
+                                ++dirnum;
+                            }
+                        }
+                        else {
+                            ++(ind[dirnum][1]);
+                            if(rep) {
+                                rep = false;
+                                ind[dirnum][0] = i;
+                            }
                         }
                     }
-                    else {
-                        ++(ind[dirnum][1]);
-                        if(rep) {
-                            rep = false;
-                            ind[dirnum][0] = i;
-                        }
-                    }
+                    if(!rep) { ++dirnum; }  // 补齐末尾'/'
+                    dirname = vector<string>(dirnum);
+                    for(size_t i = 0; i < dirnum; ++i) { dirname[i] = pathname.substr(ind[dirnum][0], ind[dirnum][1]); }
+                    delete[] ind;
                 }
-                if(!rep) { ++dirnum; }  // 补齐末尾'/'
-                dirname = new string[dirnum];
-                for(size_t i = 0; i < dirnum; ++i) { dirname[i] = pathname.substr(ind[dirnum][0], ind[idrnum][1]); }
-                delete[] ind;
             }
-            ~Path() { delete[] dirname; }
+            const Path& operator=(const Path& a_path) {
+                pathname = a_path.pathname;
+                dirname = a_path.dirname;
+                return *this;
+            }
+            // ~Path() { delete dirname; }
+            struct DirEnt *pathSearch(SharedPtr<File> a_file, bool a_parent) const;  // @todo 改成返回File
+            inline struct DirEnt *pathSearch(SharedPtr<File> a_file) const { return pathSearch(a_file, 0); }
+            inline struct DirEnt *pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
+            inline struct DirEnt *pathSearch() const { return pathSearch(nullptr, 0); }
     };
 	struct DStat {
 	  uint64 d_ino;	// 索引结点号
@@ -223,7 +229,7 @@ namespace fs {
 
 
     int fat32Init(void);
-    struct DirEnt *dirLookUp(struct DirEnt *entry, char *filename, uint *poff);
+    struct DirEnt *dirLookUp(struct DirEnt *entry, const char *filename, uint *poff);
     char* flName(char *name);
     void entSynAt(struct DirEnt *dp, struct DirEnt *ep, uint off);
     struct DirEnt *entCreateAt(struct DirEnt *dp, char *name, int attr);

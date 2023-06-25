@@ -5,11 +5,13 @@
 #include "platform.h"
 #include "klib.h"
 #include "safestl.hh"
-#include "TINYSTL/string.h"
+// #include "TINYSTL/string.h"
+#include "EASTL/string.h"
+#include "EASTL/vector.h"
 
 namespace klib
 {
-  using tinystl::string;
+  using eastl::string;
   template<typename T>
   inline T min(T a,T b){ return a<b?a:b; }
   template<typename T>

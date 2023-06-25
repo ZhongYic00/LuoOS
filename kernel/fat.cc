@@ -193,7 +193,7 @@ static int relocClus(struct DirEnt *entry, uint off, int alloc) {
     Should never get root by entHit, it's easy to understand.
 */
 // 在目录缓冲区中根据parent和name寻找目录，如果没有找到则将其放到缓冲区，并将vaild设为0（如果缓冲区有空余的话）（没有置换算法）
-static struct DirEnt *entHit(struct DirEnt *parent, char *name) {
+static struct DirEnt *entHit(struct DirEnt *parent, const char *name) {
     struct DirEnt *ep;
     // acquire(&ecache.lock);
     if (name) {
@@ -810,7 +810,7 @@ int fs::entFindNext(struct DirEnt *dp, struct DirEnt *ep, uint off, int *count) 
     @param   poff        offset of proper empty entry slots from the beginning of the dir
 */
 // 在dp目录中搜索文件名为filename的文件，poff记录了偏移，返回找到的文件
-struct DirEnt *fs::dirLookUp(struct DirEnt *dp, char *filename, uint *poff) {
+struct DirEnt *fs::dirLookUp(struct DirEnt *dp, const char *filename, uint *poff) {
      if(dp->mount_flag==1) {
         fat = dev_fat[dp->dev].rSpBlk();
         root = *(dev_fat[dp->dev].findRoot());
@@ -1135,4 +1135,33 @@ void fs::getKStat(struct DirEnt *de, struct KStat *kst) {
     kst->st_mtime_sec = 0;
     kst->_unused[0] = 0;
     kst->_unused[1] = 0;
+}
+struct DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  // @todo 改成返回File
+    struct DirEnt *entry, *next;
+    int dirnum = dirname.size();
+    if(dirnum < 1) { return nullptr; }  // 空路径
+    else if(dirname[0] == "") { entry = entDup(&root); }  // 绝对路径
+    else if(a_file != nullptr) { entry = entDup(a_file->obj.ep); }  // 相对路径（指定目录）
+    else { entry = entDup(kHartObjs.curtask->getProcess()->cwd); }  // 相对路径（工作目录）
+    for(size_t i = 0; i < dirnum; ++i) {
+        entLock(entry);
+        if (!(entry->attribute & ATTR_DIRECTORY)) {
+            entUnlock(entry);
+            entRelse(entry);
+            return nullptr;
+        }
+        if (a_parent && i == dirnum-1) {
+            entUnlock(entry);
+            return entry;
+        }
+        if ((next = dirLookUp(entry, dirname[i].c_str(), 0)) == 0) {
+            entUnlock(entry);
+            entRelse(entry);
+            return nullptr;
+        }
+        entUnlock(entry);
+        entRelse(entry);
+        entry = next;
+    }
+    return entry;
 }
