@@ -4,34 +4,52 @@
 #include "ipc.hh"
 #include "resmgr.hh"
 #include "linux/fcntl.h"
-
+#include "error.hh"
 
 namespace fs{
     using klib::SharedPtr;
     using pipe::Pipe;
 
+    class SuperBlock{};
+    class Dentry{};
+    class FileSystem_{};
+    enum class FileOp:uint16_t { none=0,read=0x1,write=0x2,append=0x4, };
+    union FileOps {
+        struct{
+            int r:1;
+            int w:1;
+            int a:1;
+            int gc:1;
+            int defer:1;
+        }fields;
+        FileOp raw;
+        FileOps(FileOp a_ops=FileOp::none):raw(a_ops){}
+        FileOps(int a_flags) {
+            fields.r = !(a_flags & O_WRONLY);
+            fields.w = (a_flags & O_WRONLY) || (a_flags & O_RDWR);
+            fields.a = a_flags & O_APPEND;
+        }
+    };
+    namespace internal{
+        class Inode{
+            const SharedPtr<FileSystem_> fs;
+        public:
+            const ino_t ino;    // from types.h, may be too small?
+            const FileOps ops;
+            const uid_t uid;
+            const gid_t gid;
+            size_t size;
+            ///@todo other metadata
+            virtual expected<klib::ByteArray,Err> read(size_t len);
+            virtual expected<xlen_t,Err> write();
+        };
+    }
+
     struct DirEnt;
 
     struct File {
         enum FileType { none,pipe,entry,dev, stdin,stdout,stderr };
-        enum class FileOp:uint16_t { none=0,read=0x1,write=0x2,append=0x4, };
-
-        union FileOps {
-            struct{
-                int r:1;
-                int w:1;
-                int a:1;
-                int gc:1;
-                int defer:1;
-            }fields;
-            FileOp raw;
-            FileOps(FileOp a_ops=FileOp::none):raw(a_ops){}
-            FileOps(int a_flags) {
-                fields.r = !(a_flags & O_WRONLY);
-                fields.w = (a_flags & O_WRONLY) || (a_flags & O_RDWR);
-                fields.a = a_flags & O_APPEND;
-            }
-        }ops;
+        FileOps ops;
         union Data {
             SharedPtr<Pipe> pipe;
             struct DirEnt *ep;
