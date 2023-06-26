@@ -108,7 +108,7 @@ Process* proc::createProcess(){
     proc->newTask();
     static bool inited = false;
     if(inited) {
-        if(proc->cwd == nullptr) { proc->cwd = fs::entEnter("/"); };
+        if(proc->cwd == nullptr) { proc->cwd = fs::Path("/").pathSearch(); };
         proc->files[3]=new fs::File(proc->cwd,0);
     }
     else { inited = true; }

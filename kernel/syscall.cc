@@ -45,7 +45,7 @@ namespace syscall {
     }
     xlen_t testMount() {
         int rt = fs::fat32Init();
-        kHartObjs.curtask->getProcess()->cwd = fs::entEnter("/");
+        kHartObjs.curtask->getProcess()->cwd = fs::Path("/").pathSearch();
         printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
         SharedPtr<File> f;
         auto testfile = fs::pathCreateAt("/testfile", T_FILE, O_CREATE|O_RDWR, f);
@@ -69,7 +69,7 @@ namespace syscall {
         Log(info, "initializing fat\n");
         if(fs::fat32Init() != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObjs.curtask->getProcess();
-        curproc->cwd = fs::entEnter("/");
+        curproc->cwd = fs::Path("/").pathSearch();
         curproc->files[3] = new File(curproc->cwd,0);
         DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
@@ -216,7 +216,7 @@ namespace syscall {
             printf("path error\n");
             return statcode::err;
         }
-        DirEnt *ep = fs::entEnter(devpath);
+        DirEnt *ep = fs::Path(devpath).pathSearch();
         if(ep == nullptr) {
             printf("not found file\n");
             return statcode::err;
@@ -249,8 +249,8 @@ namespace syscall {
             return statcode::err;
         }
 
-        DirEnt *dev_ep = fs::entEnter(devpath);
-        DirEnt *ep = fs::entEnter(mountpath);
+        DirEnt *dev_ep = fs::Path(devpath).pathSearch();
+        DirEnt *ep = fs::Path(mountpath).pathSearch();
         if(dev_ep == nullptr) {
             printf("dev not found file\n");
             return statcode::err;

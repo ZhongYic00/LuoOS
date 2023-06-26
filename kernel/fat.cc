@@ -214,7 +214,7 @@ static DirEnt *entHit(DirEnt *parent, const char *name) {
             ep->dev = parent->dev;
             ep->off = 0;
             ep->valid = 0;
-            ep->dirty = 0;
+            ep->dirty = false;
             // release(&ecache.lock);
             return ep;
         }
@@ -431,7 +431,7 @@ int fs::fat32Init() {
         de->dev = 0;
         de->valid = 0;
         de->ref = 0;
-        de->dirty = 0;
+        de->dirty = false;
         de->parent = 0;
         de->next = root.next;
         de->prev = &root;
@@ -478,7 +478,7 @@ int fs::entWrite(DirEnt *entry, int user_src, uint64 src, uint off, uint n) {
     if (entry->first_clus == 0) {   // so file_size if 0 too, which requests off == 0
         entry->cur_clus = entry->first_clus = allocClus(entry->dev);
         entry->clus_cnt = 0;
-        entry->dirty = 1;
+        entry->dirty = true;
     }
     uint tot, m;
     for (tot = 0; tot < n; tot += m, off += m, src += m) {
@@ -490,7 +490,7 @@ int fs::entWrite(DirEnt *entry, int user_src, uint64 src, uint off, uint n) {
     if(n > 0) {
         if(off > entry->file_size) {
             entry->file_size = off;
-            entry->dirty = 1;
+            entry->dirty = true;
         }
     }
     return tot;
@@ -594,7 +594,7 @@ DirEnt *fs::entCreateAt(DirEnt *dp, char *name, int attr) {
     ep->off = off;
     ep->clus_cnt = 0;
     ep->cur_clus = 0;
-    ep->dirty = 0;
+    ep->dirty = false;
     strncpy(ep->filename, name, FAT32_MAX_FILENAME);
     ep->filename[FAT32_MAX_FILENAME] = '\0';
     if (attr == ATTR_DIRECTORY) {    // generate "." and ".." for ep
@@ -637,7 +637,7 @@ void fs::dirUpdate(DirEnt *entry) {
     de.sne.fst_clus_lo = (uint16)(entry->first_clus & 0xffff);
     de.sne.file_size = entry->file_size;
     rwClus(entry->parent->cur_clus, 1, 0, (uint64)&de, off, sizeof(de));
-    entry->dirty = 0;
+    entry->dirty = false;
 }
 /*
     caller must hold entry->lock
@@ -675,7 +675,7 @@ void fs::entTrunc(DirEnt *entry) {
     }
     entry->file_size = 0;
     entry->first_clus = 0;
-    entry->dirty = 1;
+    entry->dirty = true;
 }
 // 请求睡眠锁，要求引用数大于0
 void fs::entLock(DirEnt *entry) {
@@ -812,7 +812,7 @@ int fs::entFindNext(DirEnt *dp, DirEnt *ep, uint off, int *count) {
 // 在dp目录中搜索文件名为filename的文件，poff记录了偏移，返回找到的文件
 DirEnt *fs::dirLookUp(DirEnt *dp, const char *filename, uint *poff) {
      if(dp->mount_flag==1) {
-        fat = dev_fat[dp->dev].rSpBlk();
+        fat = dev_fat[dp->dev];
         root = *(dev_fat[dp->dev].findRoot());
         dp = &root;
     }
@@ -1136,9 +1136,42 @@ void fs::getKStat(DirEnt *de, struct KStat *kst) {
     kst->_unused[0] = 0;
     kst->_unused[1] = 0;
 }
+void LNE::readEntName(char *a_buf) const {
+    wchar temp[NELEM(name1)];
+    memmove(temp, name1, sizeof(temp));
+    snstr(a_buf, temp, NELEM(name1));
+    a_buf += NELEM(name1);
+    snstr(a_buf, name2, NELEM(name2));
+    a_buf += NELEM(name2);
+    snstr(a_buf, name3, NELEM(name3));
+    return;
+}
+void SNE::readEntName(char *a_buf) const {
+    // assert: only "." and ".." will enter this branch
+    memset(a_buf, 0, CHAR_SHORT_NAME + 2);  // plus '.' and '\0'
+    int i;
+    for (i = 0; name[i] != ' ' && i < 8; i++) { a_buf[i] = name[i]; }
+    if (name[8] != ' ') { a_buf[i++] = '.'; }
+    for (int j = 8; j < CHAR_SHORT_NAME; j++, i++) {
+        if (name[j] == ' ') { break; }
+        a_buf[i] = name[j];
+    }
+    return;
+}
+void Ent::readEntName(char *a_buf) const {
+    if (lne.attr == ATTR_LONG_NAME) { lne.readEntName(a_buf); }
+    else { sne.readEntName(a_buf); }
+    return;
+}
+DirEnt& DirEnt::operator=(const union Ent& a_ent) {
+    attribute = a_ent.sne.attr;
+    cur_clus = first_clus = ((uint32)a_ent.sne.fst_clus_hi<<16) | a_ent.sne.fst_clus_lo;
+    file_size = a_ent.sne.file_size;
+    clus_cnt = 0;
+}
 DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     if(mount_flag == 1) {
-        fat = dev_fat[dev].rSpBlk();
+        fat = dev_fat[dev];
         root = *(dev_fat[dev].findRoot());
         return root.entSearch(a_dirname, a_off);
     }
@@ -1151,18 +1184,18 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         attribute = li.de.sne.attr;
     }
     // '.'表示当前目录，则增加当前目录引用计数并返回当前目录
-    if (a_dirname == ".") { return entDup(this); }
+    if (a_dirname == ".") { return entDup(); }
     // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
     else if (a_dirname == "..") {
-        if (this == &root) { return entDup(&root); }
-        else { return entDup(parent); }
+        if (this == &root) { return root.entDup(); }
+        else { return parent->entDup(); }
     }
     // 当前目录无效
     if (valid != 1) {
         printf("valid is not 1\n");
         return nullptr;
     }
-    DirEnt *ep = entHit(this, a_dirname.c_str());  // 从缓冲区中找
+    DirEnt *ep = eCacheHit(a_dirname);  // 从缓冲区中找
     if (ep->valid == 1) { return ep; }  // ecache hits
     // 缓冲区找不到则往下执行
     size_t len = a_dirname.length();
@@ -1170,7 +1203,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     int count = 0; 
     int type;
     uint off = 0;
-    relocClus(this, 0, 0); // 将当前目录的cur_clus设为0
+    relocClus(0, false); // 将当前目录的cur_clus设为0
     while ((type = entNext(ep, off, &count) != -1)) { // 每轮从off开始往后搜索
         // 文件已被删除
         if (type == 0) {
@@ -1183,7 +1216,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         // 找到了一个有效文件
         // @todo 不区分大小写？
         else if (strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME) == 0) {
-            ep->parent = entDup(this);
+            ep->parent = entDup();
             ep->off = off;
             ep->valid = 1;
             return ep;
@@ -1192,13 +1225,13 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     }
     // 没找到有效文件
     if (a_off != nullptr) { *a_off = off; } // 从未找到过同名文件（包括已删除的）
-    entRelse(ep);
+    ep->entRelse();
     return nullptr;
 }
-int DirEnt::entNext(DirEnt *ep, uint off, int *count) {
+int DirEnt::entNext(DirEnt *a_entry, uint a_off, int *a_count) {
     if (!(attribute & ATTR_DIRECTORY)) { panic("entFindNext not dir"); } // 不是目录
-    if (ep->valid) { panic("entFindNext ep valid"); } // 存放结果的结构无效
-    if (off % 32) { panic("entFindNext not align"); } // 未对齐
+    if (a_entry->valid) { panic("entFindNext ep valid"); } // 存放结果的结构无效
+    if (a_off % 32) { panic("entFindNext not align"); } // 未对齐
     if (valid != 1) { return -1; } // 搜索目录无效
     if (attribute & ATTR_LINK){
         struct Link li;
@@ -1208,15 +1241,15 @@ int DirEnt::entNext(DirEnt *ep, uint off, int *count) {
     }
     union Ent de;
     int cnt = 0;
-    memset(ep->filename, 0, FAT32_MAX_FILENAME + 1);
+    memset(a_entry->filename, 0, FAT32_MAX_FILENAME + 1);
     // 遍历dp的簇
-    for (int off2; (off2 = relocClus(this, off, 0)) != -1; off += 32) { // off2: 簇内偏移 off: 目录内偏移
-        // 没对齐或在非"."和"..."目录的情形下到达结尾
+    for (int off2; (off2 = relocClus(a_off, false)) != -1; a_off += 32) { // off2: 簇内偏移 off: 目录内偏移
+        // 没对齐或在非"."和".."目录的情形下到达结尾
         auto bytes = dev_fat[dev].rwClus(cur_clus, false, false, (uint64)&de, off2, 32);
         auto fchar = ((char*)&de)[0];
         auto leorder = de.lne.order;
         static bool first = true;
-        if ( bytes!= 32 || leorder==END_OF_ENTRY) { return -1; }
+        if (bytes!= 32 || leorder==END_OF_ENTRY) { return -1; }
         // 当前目录为空目录
         if (de.lne.order == EMPTY_ENTRY) {
             cnt++;
@@ -1224,39 +1257,175 @@ int DirEnt::entNext(DirEnt *ep, uint off, int *count) {
         }
         // 文件已删除
         else if (cnt) {
-            *count = cnt;
+            *a_count = cnt;
             return 0;
         }
         // 长目录项
         if (de.lne.attr == ATTR_LONG_NAME) {
             int lcnt = de.lne.order & ~LAST_LONG_ENTRY;
             if (de.lne.order & LAST_LONG_ENTRY) {
-                *count = lcnt + 1;                              // plus the s-n-e;
-                count = 0;
+                *a_count = lcnt + 1;                              // plus the s-n-e;
+                a_count = 0;
             }
-            readEntName(ep->filename + (lcnt - 1) * CHAR_LONG_NAME, &de);
+            de.readEntName(a_entry->filename + (lcnt-1) * CHAR_LONG_NAME);
         }
         // 短目录项
         else {
-            if (count) {
-                *count = 1;
-                readEntName(ep->filename, &de);
+            if (a_count) {
+                *a_count = 1;
+                de.readEntName(a_entry->filename);
             }
-            readEntInfo(ep, &de);
+            *a_entry = de;
             return 1;
         }
     }
     return -1;
 }
-const SuperBlock::BPB_t& SuperBlock::BPB_t::operator=(const BPB_t& a_bpb) {
-    memmove((void*)this, (void*)&a_bpb, sizeof(*this));
+int DirEnt::relocClus(uint a_off, bool a_alloc) {
+    int clus_num = a_off / dev_fat[dev].rBPC();
+    while (clus_num > clus_cnt) {
+        int clus = dev_fat[dev].fatRead(cur_clus);
+        if (clus >= FAT32_EOC) {
+            if (a_alloc) {
+                clus = allocClus();
+                fatWrite(cur_clus, clus);
+            }
+            else {
+                cur_clus = first_clus;
+                clus_cnt = 0;
+                return -1;
+            }
+        }
+        cur_clus = clus;
+        clus_cnt++;
+    }
+    if (clus_num < clus_cnt) {
+        cur_clus = first_clus;
+        clus_cnt = 0;
+        while (clus_cnt < clus_num) {
+            cur_clus = fatRead(cur_clus);
+            if (cur_clus >= FAT32_EOC) { panic("relocClus"); }
+            clus_cnt++;
+        }
+    }
+    return a_off % dev_fat[dev].rBPC();
+}
+const uint32 DirEnt::allocClus() const {  // @todo 应该写成FileSystem的成员？
+    // should we keep a free cluster list? instead of searching fat every time.
+    struct buf *b;
+    uint32 sec = dev_fat[dev].rRSC();
+    uint32 const ent_per_sec = dev_fat[dev].rBPS() / sizeof(uint32);
+    for (uint32 i = 0; i < dev_fat[dev].rFS(); i++, sec++) {
+        b = bread(dev, sec);
+        for (uint32 j = 0; j < ent_per_sec; j++) {
+            if (((uint32 *)(b->data))[j] == 0) {
+                ((uint32 *)(b->data))[j] = FAT32_EOC + 7;
+                bwrite(b);
+                brelse(b);
+                uint32 clus = i * ent_per_sec + j;
+                clearClus(clus);
+                return clus;
+            }
+        }
+        brelse(b);
+    }
+    panic("no clusters");
+}
+DirEnt *DirEnt::entDup() {
+    ++ref;
+    return this;
+}
+DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成ecache的成员
+    DirEnt *ep;
+    for (ep = root.next; ep != &root; ep = ep->next) {  // LRU algo
+        if (ep->valid == 1 && ep->parent == this && strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME) == 0) {  // @todo 不区分大小写？
+            if (ep->ref++ == 0) { ep->parent->ref++; }
+            return ep;
+        }
+    }
+    for (ep = root.prev; ep != &root; ep = ep->prev) {  // LRU algo
+        if (ep->ref == 0) {
+            ep->ref = 1;
+            ep->dev = parent->dev;  // @bug 空指针？
+            ep->off = 0;
+            ep->valid = 0;
+            ep->dirty = false;
+            return ep;
+        }
+    }
+    panic("entHit: insufficient ecache");
+    return nullptr;
+}
+void DirEnt::entRelse() {
+    // @todo 重构链表操作
+    if (this != &root && valid != 0 && ref == 1) {
+        // ref == 1 means no other process can have entry locked,
+        // so this acquiresleep() won't block (or deadlock).
+        next->prev = prev;
+        prev->next = next;
+        next = root.next;
+        prev = &root;
+        root.next->prev = this;
+        root.next = this;
+        if (valid == -1) { entTrunc(); }  // this means some one has called entRemove()
+        else { parentUpdate(); }
+        // Once entry->ref decreases down to 0, we can't guarantee the entry->parent field remains unchanged.
+        // Because entHit() may take the entry away and write it.
+        DirEnt *eparent = parent;
+        --ref;
+        if (ref == 0) { eparent->entRelse(); }
+        return;
+    }
+    --ref;
+    return;
+}
+void DirEnt::entTrunc() {
+    if(!(attribute & ATTR_LINK)){
+        for (uint32 clus = first_clus; clus >= 2 && clus < FAT32_EOC; ) {
+            uint32 next = dev_fat[dev].fatRead(clus);
+            freeClus(clus);
+            clus = next;
+        }
+    }
+    file_size = 0;
+    first_clus = 0;
+    dirty = true;
+}
+void DirEnt::parentUpdate() {
+    if (!dirty || valid != 1) { return; }
+    uint entcnt = 0;
+    uint32 poff = parent->relocClus(off, false);
+    dev_fat[dev].rwClus(parent->cur_clus, 0, 0, (uint64) &entcnt, poff, 1);
+    entcnt &= ~LAST_LONG_ENTRY;
+    poff = parent->relocClus(off + (entcnt<<5), 0);
+    union Ent de;
+    dev_fat[dev].rwClus(parent->cur_clus, 0, 0, (uint64)&de, poff, sizeof(de));
+    de.sne.fst_clus_hi = (uint16)(first_clus >> 16);
+    de.sne.fst_clus_lo = (uint16)(first_clus & 0xffff);
+    de.sne.file_size = file_size;
+    dev_fat[dev].rwClus(parent->cur_clus, 1, 0, (uint64)&de, poff, sizeof(de));
+    dirty = false;
+}
+SuperBlock::BPB& SuperBlock::BPB::operator=(const BPB& a_bpb) {
+    byts_per_sec = a_bpb.byts_per_sec;
+    sec_per_clus = a_bpb.sec_per_clus;
+    rsvd_sec_cnt = a_bpb.rsvd_sec_cnt;
+    fat_cnt = a_bpb.fat_cnt;
+    hidd_sec = a_bpb.hidd_sec;
+    tot_sec = a_bpb.tot_sec;
+    fat_sz = a_bpb.fat_sz;
+    root_clus = a_bpb.root_clus;
     return *this;
 }
-const SuperBlock& SuperBlock::operator=(const SuperBlock& a_spblk) {
-    memmove((void*)this, (void*)&a_spblk, sizeof(*this));
+SuperBlock& SuperBlock::operator=(const SuperBlock& a_spblk) {
+    first_data_sec = a_spblk.first_data_sec;
+    data_sec_cnt = a_spblk.data_sec_cnt;
+    data_clus_cnt = a_spblk.data_clus_cnt;
+    byts_per_clus = a_spblk.byts_per_clus;
+    bpb = a_spblk.bpb;
     return *this;
 }
-uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrdst, uint64 a_data, uint a_off, uint a_len) const {
+const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrdst, uint64 a_data, uint a_off, uint a_len) const {
     if (a_off + a_len > rBPC()) { panic("offset out of range"); }
     uint tot, m;
     struct buf *bp;
@@ -1277,8 +1446,42 @@ uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrdst, uint64 
     }
     return tot;
 }
-const FileSystem& FileSystem::operator=(const FileSystem& a_fs) {
-    memmove((void*)this, (void*)&a_fs, sizeof(*this));
+const uint32 SuperBlock::fatRead(uint32 a_cluster) const {
+    if (a_cluster >= FAT32_EOC) { return a_cluster; }
+    if (a_cluster > rDCC() + 1) { return 0; }  // because cluster number starts at 2, not 0
+    uint32 fat_sec = numthSec(a_cluster, 1);
+    // here should be a cache layer for FAT table, but not implemented yet.
+    struct buf *b = bread(0, fat_sec);
+    uint32 next_clus = *(uint32*)(b->data + secOffset(a_cluster));
+    brelse(b);
+    return next_clus;
+}
+void SuperBlock::clearClus(uint32 a_cluster) const {
+    uint32 sec = firstSec(a_cluster);
+    struct buf *b;
+    for (int i = 0; i < rSPC(); i++) {
+        b = bread(0, sec++);
+        memset(b->data, 0, BSIZE);
+        bwrite(b);
+        brelse(b);
+    }
+    return;
+}
+const int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
+    if (a_cluster > rDCC()+1) { return -1; }
+    uint32 fat_sec = numthSec(a_cluster, 1);
+    struct buf *b = bread(0, fat_sec);
+    uint off = secOffset(a_cluster);
+    *(uint32*)(b->data + off) = a_content;
+    bwrite(b);
+    brelse(b);
+    return 0;
+}
+FileSystem& FileSystem::operator=(const FileSystem& a_fs) {
+    SuperBlock::operator=(a_fs);
+    valid = a_fs.valid;
+    root = a_fs.root;
+    mount_mode = a_fs.mount_mode;
     return *this;
 }
 Path::Path(const string& a_str):pathname(a_str), dirname() {
@@ -1317,20 +1520,20 @@ DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  // @tod
     DirEnt *entry, *next;
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
-    else if(pathname[0] == '/') { entry = entDup(&root); }  // 绝对路径
-    else if(a_file != nullptr) { entry = entDup(a_file->obj.ep); }  // 相对路径（指定目录）
-    else { entry = entDup(kHartObjs.curtask->getProcess()->cwd); }  // 相对路径（工作目录）
+    else if(pathname[0] == '/') { entry = root.entDup(); }  // 绝对路径
+    else if(a_file != nullptr) { entry = a_file->obj.ep->entDup(); }  // 相对路径（指定目录）
+    else { entry = kHartObjs.curtask->getProcess()->cwd->entDup(); }  // 相对路径（工作目录）
     for(int i = 0; i < dirnum; ++i) {
         if (!(entry->attribute & ATTR_DIRECTORY)) {
-            entRelse(entry);
+            entry->entRelse();
             return nullptr;
         }
         if (a_parent && i == dirnum-1) { return entry; }
         if ((next = entry->entSearch(dirname[i])) == nullptr) {
-            entRelse(entry);
+           entry->entRelse();
             return nullptr;
         }
-        entRelse(entry);
+        entry->entRelse();
         entry = next;
     }
     return entry;
