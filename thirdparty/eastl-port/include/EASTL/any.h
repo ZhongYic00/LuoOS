@@ -31,7 +31,7 @@
 #include <EASTL/internal/config.h>
 #include <EASTL/internal/in_place_t.h>
 #if EASTL_RTTI_ENABLED
-	#include <typeinfo>
+	#include <typeinfo.hh>
 #endif
 #if EASTL_EXCEPTIONS_ENABLED
 	#include <exception>

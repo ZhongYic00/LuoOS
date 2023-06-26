@@ -50,7 +50,7 @@
 #include <EASTL/allocator.h>
 #include <EASTL/atomic.h>
 #if EASTL_RTTI_ENABLED
-	#include <typeinfo>
+	#include <typeinfo.hh>
 #endif
 #if EASTL_EXCEPTIONS_ENABLED
 	#include <exception>
