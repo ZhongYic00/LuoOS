@@ -11,7 +11,7 @@
 #include <EASTL/type_traits.h>
 #include <EASTL/string.h>
 #include <stdlib.h>
-#include <typeinfo>
+#include <typeinfo.hh>
 
 
 ///////////////////////////////////////////////////////////////////////////////
