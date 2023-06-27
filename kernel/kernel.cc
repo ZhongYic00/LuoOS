@@ -144,26 +144,23 @@ void idle(){
     }
 }
 std::atomic<uint32_t> started;
+mutex::spinlock spin;
 extern void schedule();
 extern void program0();
 extern "C" void strapwrapper();
 extern void _strapexit();
 
+FORCEDINLINE
 xlen_t irqStackOf(int hart){return kInfo.segments.kstack.first+hart*0x1000+0x1000;}
-extern "C" //__attribute__((section("init")))
-void start_kernel(int hartid){
-    register int tp asm("tp")=hartid;
-    register xlen_t sp asm("sp");
-    sp=irqStackOf(hartid);
-    // auto &ctx=kHartObjs.curtask->ctx; //TODO fixbug
-    // ctx.kstack=sp;
+
+void init(int hartid){
     puts=IO::_sbiputs;
     puts("\n\n>>>Hello LuoOS<<<\n\n");
     sbi_init();
-    int prevStarted=std::atomic_fetch_add(&started,1);
+    int prevStarted=started.fetch_add(1);
     Log(info,"Hart %d online!",hartid);
     
-    if(!prevStarted){
+    if(!prevStarted){   // is first hart
         // @todo needs plic and uart init?
         puts=IO::_blockingputs;
 
@@ -185,23 +182,48 @@ void start_kernel(int hartid){
         auto uproc=proc::createProcess();
         uproc->name="uprog00";
         uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
-        plicInit();
-        timerInit();
+        // plicInit();
         // csrClear(sstatus,1l<<csr::mstatus::spp);
         // csrSet(sstatus,BIT(csr::mstatus::spie));
         virtio_disk_init();
         Log(info,"virtio disk init over");
         binit();
         Log(info,"binit over");
-        sbi_hsm_hart_start(1,(xlen_t)0x80200000,0);
+        std::atomic_thread_fence(std::memory_order_release);
+        sbi_hsm_hart_start(hartid^1,(xlen_t)0x80200000,0);
         while(started<2){
             auto rt=sbi_hsm_hart_get_status(1);
         }
+        xlen_t mask=0x1;
+        sbi_remote_sfence_vma((cpumask*)&mask,0x0,0x84000000);
+        // for(volatile int i=10000000;i;i--);
+    } else {
+        csrWrite(stvec,strapwrapper);
+        csrSet(sstatus,BIT(csr::mstatus::sum));
+        // csrSet(sstatus,BIT(csr::mstatus::sie));
+        csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));
+    }
+    {// test lock
+        using namespace mutex;
+        lock_guard<spinlock<>> guard(spin);
+        printf("lock acquired! %d\n",hartid);
+    }
+    assert(hartid==1||hartid==0);
+    if(hartid==0){
+        timerInit();
+        plicInit();
+        std::atomic_thread_fence(std::memory_order_acquire);
         schedule();
         Log(info,"first schedule");
-        volatile register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
         _strapexit();
     }
-    while(true)ExecInst(wfi);
-    // halt();
+    halt();
+}
+
+extern "C" __attribute__((naked))
+void start_kernel(int hartid){
+    register int tp asm("tp")=hartid;
+    register xlen_t sp asm("sp");
+    sp=irqStackOf(hartid);
+    init(hartid);
 }
