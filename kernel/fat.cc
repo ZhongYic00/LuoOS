@@ -497,7 +497,7 @@ int fs::entWrite(DirEnt *entry, int user_src, uint64 src, uint off, uint n) {
 }
 // trim ' ' in the head and tail, '.' in head, and test legality
 // 去除开头和结尾的' '以及开头的'.'  对于非法名字，返回0
-char *fs::flName(char *name) {
+char *fs::flNameOld(char *name) {
     static char illegal[] = { '\"', '*', '/', ':', '<', '>', '?', '\\', '|', 0 };
     char *p;
     while (*name == ' ' || *name == '.') { name++; }
@@ -581,7 +581,7 @@ void fs::entSynAt(DirEnt *dp, DirEnt *ep, uint off) {
 // 在dp目录下创建一个文件/目录，返回创建的文件/目录
 DirEnt *fs::entCreateAt(DirEnt *dp, char *name, int attr) {
     if (!(dp->attribute & ATTR_DIRECTORY)) { panic("entCreateAt not dir"); }
-    if (dp->valid != 1 || !(name = flName(name))) { return nullptr; } // detect illegal character
+    if (dp->valid != 1 || !(name = flNameOld(name))) { return nullptr; } // detect illegal character
     DirEnt *ep;
     uint off = 0;
     if ((ep = dirLookUp(dp, name, &off)) != 0) { return ep; } // entry exists
@@ -1136,6 +1136,66 @@ void fs::getKStat(DirEnt *de, struct KStat *kst) {
     kst->_unused[0] = 0;
     kst->_unused[1] = 0;
 }
+static string flName(string a_name) {  // @todo 也许是fs的一部分？跟fs关联的非法字符表
+    static char illegal[] = { '\"', '*', '/', ':', '<', '>', '?', '\\', '|', 0 };
+    size_t beg = 0, i = 0;
+    char c;
+    for(c = a_name[beg]; c == ' ' || c == '.'; c = a_name[beg]) { ++beg; }
+    for (i = beg; c != '\0'; c = a_name[i]) {
+        if (c < ' ' || strchr(illegal, c)) { return ""; }
+        ++i;
+    }
+    while (i > beg) {
+        --i;
+        if (a_name[i] != ' ') { break; }
+    }
+    return a_name.substr(beg, i+1 - beg);
+}
+static string getShortName(string a_name) {
+    static char illegal[] = { '+', ',', ';', '=', '[', ']', 0 };   // these are legal in l-n-e but not s-n-e
+    const char *name = a_name.c_str();
+    char shortname[CHAR_SHORT_NAME + 1];
+    int i = 0;
+    char c;
+    const char *p = name;
+    for (int j = strlen(name) - 1; j >= 0; j--) {
+        if (name[j] == '.') {
+            p = name + j; // 最后一个'.'
+            break;
+        }
+    }
+    while (i < CHAR_SHORT_NAME && (c = *name++)) {
+        if (i == 8 && p) {  
+            if (p + 1 < name) { break; }  // no '.'
+            else {
+                name = p + 1, p = 0;
+                continue;
+            }
+        }
+        if (c == ' ') { continue; }
+        if (c == '.') {
+            if (name > p) {  // last '.'
+                memset(shortname + i, ' ', 8 - i);
+                i = 8, p = 0;
+            }
+            continue;
+        }
+        if (c >= 'a' && c <= 'z') {
+            c += 'A' - 'a';
+        } else {
+            if (strchr(illegal, c) != nullptr) { c = '_'; }
+        }
+        shortname[i++] = c;
+    }
+    while (i < CHAR_SHORT_NAME) { shortname[i++] = ' '; }
+    return shortname;
+}
+// 根据shortname计算校验和
+static uint8 getCheckSum(string shortname) {
+    uint8 sum = 0;
+    for (int i = CHAR_SHORT_NAME, j = 0; i != 0; --i, ++j) { sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + shortname[j]; }
+    return sum;
+}
 void LNE::readEntName(char *a_buf) const {
     wchar temp[NELEM(name1)];
     memmove(temp, name1, sizeof(temp));
@@ -1231,7 +1291,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
 }
 int DirEnt::entNext(DirEnt *a_entry, uint a_off, int *a_count) {
     if (!(attribute & ATTR_DIRECTORY)) { panic("entFindNext not dir"); } // 不是目录
-    if (a_entry->valid) { panic("entFindNext ep valid"); } // 存放结果的结构无效
+    if (a_entry->valid) { panic("entFindNext ep valid"); } // 存放结果的结构已被占用
     if (a_off % 32) { panic("entFindNext not align"); } // 未对齐
     if (valid != 1) { return -1; } // 搜索目录无效
     if (attribute & ATTR_LINK){
@@ -1347,7 +1407,7 @@ DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成
     for (ep = root.prev; ep != &root; ep = ep->prev) {  // LRU algo
         if (ep->ref == 0) {
             ep->ref = 1;
-            ep->dev = dev;  // @bug 空指针？
+            ep->dev = dev;
             ep->off = 0;
             ep->valid = 0;
             ep->dirty = false;
@@ -1406,6 +1466,88 @@ void DirEnt::parentUpdate() {
     de.sne.file_size = file_size;
     dev_fat[dev].rwClus(parent->cur_clus, 1, 0, (uint64)&de, poff, sizeof(de));
     dirty = false;
+}
+DirEnt *DirEnt::entCreate(string a_name, int a_attr) {
+    if (!(attribute & ATTR_DIRECTORY)) { panic("entCreateAt not dir"); }
+    a_name = flName(a_name);
+    if (valid != 1 || a_name == "") { return nullptr; }  // detect illegal character
+    DirEnt *ep;
+    uint off = 0;
+    if ((ep = entSearch(a_name, &off)) != 0) { return ep; }  // entry exists
+    ep = eCacheHit(a_name);
+    ep->attribute = a_attr;
+    ep->file_size = 0;
+    ep->first_clus = 0;
+    ep->parent = entDup();
+    ep->off = off;
+    ep->clus_cnt = 0;
+    ep->cur_clus = 0;
+    ep->dirty = false;
+    strncpy(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME);
+    ep->filename[FAT32_MAX_FILENAME] = '\0';
+    if (a_attr == ATTR_DIRECTORY) {    // generate "." and ".." for ep
+        ep->attribute |= ATTR_DIRECTORY;
+        ep->cur_clus = ep->first_clus = allocClus();
+        ep->entCreateOnDisk(ep, 0);
+        ep->entCreateOnDisk(this, 32);
+    }
+    else { ep->attribute |= ATTR_ARCHIVE; }
+    entCreateOnDisk(ep, off);
+    ep->valid = 1;
+    return ep;
+}
+void DirEnt::entCreateOnDisk(const DirEnt *a_entry, uint a_off) {
+    if (!(attribute & ATTR_DIRECTORY)) { panic("entSynAt: not dir"); }
+    if (a_off % sizeof(union Ent)) { panic("entSynAt: not aligned"); }
+    union Ent de;
+    memset(&de, 0, sizeof(de));
+    if (a_off <= 32) {  // 短名
+        if (a_off == 0) { strncpy(de.sne.name, ".          ", sizeof(de.sne.name)); }
+        else { strncpy(de.sne.name, "..         ", sizeof(de.sne.name)); }
+        de.sne.attr = ATTR_DIRECTORY;
+        de.sne.fst_clus_hi = (uint16)(a_entry->first_clus >> 16);  // first clus high 16 bits
+        de.sne.fst_clus_lo = (uint16)(a_entry->first_clus & 0xffff);  // low 16 bits
+        de.sne.file_size = 0;  // filesize is updated in dirUpdate()
+        a_off = relocClus(a_off, true);
+        dev_fat[dev].rwClus(cur_clus, true, false, (uint64)&de, a_off, sizeof(de));
+    }
+    else {  // 长名
+        int entcnt = (strlen(a_entry->filename) + CHAR_LONG_NAME - 1) / CHAR_LONG_NAME;   // count of l-n-entries, rounds up
+        string shortname = getShortName(a_entry->filename);
+        de.lne.checksum = getCheckSum(shortname);
+        de.lne.attr = ATTR_LONG_NAME;
+        for (int i = entcnt; i > 0; i--) {
+            if ((de.lne.order = i) == entcnt) { de.lne.order |= LAST_LONG_ENTRY; }
+            const char *p = a_entry->filename + (i-1) * CHAR_LONG_NAME;
+            uint8 *w = (uint8*)de.lne.name1;
+            int end = 0;
+            for (int j = 1; j <= CHAR_LONG_NAME; j++) {
+                if (end) {
+                    *w++ = 0xff;            // on k210, unaligned reading is illegal
+                    *w++ = 0xff;
+                }
+                else { 
+                    if ((*w++ = *p++) == 0) { end = 1; }
+                    *w++ = 0;
+                }
+                switch (j) {
+                    case 5: w = (uint8*)de.lne.name2; break;
+                    case 11: w = (uint8*)de.lne.name3; break;
+                }
+            }
+            uint off2 = relocClus(a_off, true);
+            dev_fat[dev].rwClus(cur_clus, true, false, (uint64)&de, off2, sizeof(de));
+            a_off += sizeof(de);
+        }
+        memset(&de, 0, sizeof(de));
+        strncpy(de.sne.name, shortname.c_str(), sizeof(de.sne.name));
+        de.sne.attr = a_entry->attribute;
+        de.sne.fst_clus_hi = (uint16)(a_entry->first_clus >> 16);  // first clus high 16 bits
+        de.sne.fst_clus_lo = (uint16)(a_entry->first_clus & 0xffff);  // low 16 bits
+        de.sne.file_size = a_entry->file_size;  // filesize is updated in dirUpdate()
+        a_off = relocClus(a_off, true);
+        dev_fat[dev].rwClus(cur_clus, true, false, (uint64)&de, a_off, sizeof(de));
+    }
 }
 SuperBlock::BPB& SuperBlock::BPB::operator=(const BPB& a_bpb) {
     byts_per_sec = a_bpb.byts_per_sec;
@@ -1538,4 +1680,25 @@ DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  // @tod
         entry = next;
     }
     return entry;
+}
+DirEnt *Path::pathCreate(short a_type, int a_mode, SharedPtr<File> a_file) const {  // @todo 改成返回File
+    DirEnt *ep, *dp;
+    if((dp = pathSearch(a_file, true)) == nullptr){
+        printf("can't find dir\n");
+        return nullptr;
+    }
+    if (a_type == T_DIR) { a_mode = ATTR_DIRECTORY; }
+    else if (a_mode & O_RDONLY) { a_mode = ATTR_READ_ONLY; }
+    else { a_mode = 0; }
+    if ((ep = dp->entCreate(dirname.back(), a_mode)) == nullptr) {
+        dp->entRelse();
+        return nullptr;
+    }
+    if ((a_type==T_DIR && !(ep->attribute&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->attribute&ATTR_DIRECTORY))) {
+        ep->entRelse();
+        dp->entRelse();
+        return nullptr;
+    }
+    dp->entRelse();
+    return ep;
 }

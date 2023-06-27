@@ -308,7 +308,8 @@ namespace syscall {
         int fd;
 
         if(a_flags & O_CREATE) {
-            ep = fs::pathCreateAt(path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
+            // ep = fs::pathCreateAt(path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
+            ep = fs::Path(path).pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
             if(ep == nullptr) { return statcode::err; }
         }
         else {

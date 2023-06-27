@@ -67,6 +67,8 @@ namespace fs {
             void entRelse();
             void entTrunc();
             void parentUpdate();
+            DirEnt *entCreate(string a_name, int a_attr);
+            void entCreateOnDisk(const DirEnt *a_entry, uint a_off);
     };
     struct Link{
         union Ent de;
@@ -161,6 +163,7 @@ namespace fs {
             inline DirEnt *pathSearch(SharedPtr<File> a_file) const { return pathSearch(a_file, false); }
             inline DirEnt *pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
             inline DirEnt *pathSearch() const { return pathSearch(nullptr, false); }
+            DirEnt *pathCreate(short a_type, int a_mode, SharedPtr<File> a_file = nullptr) const;
     };
 	struct DStat {
 	  uint64 d_ino;	// 索引结点号
@@ -201,7 +204,7 @@ namespace fs {
 
     int fat32Init(void);
     DirEnt *dirLookUp(DirEnt *entry, const char *filename, uint *poff);
-    char* flName(char *name);
+    char* flNameOld(char *name);
     void entSynAt(DirEnt *dp, DirEnt *ep, uint off);
     DirEnt *entCreateAt(DirEnt *dp, char *name, int attr);
     DirEnt *entDup(DirEnt *entry);
