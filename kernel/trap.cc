@@ -11,6 +11,9 @@ static hook_t hooks[]={schedule};
 
 extern void nextTimeout();
 void timerInterruptHandler(){
+    xlen_t time;
+    csrRead(time,time);
+    Log(info,"timerInterrupt @ %ld",time);
     auto cur = kHartObjs.curtask;
     if(cur != nullptr) {
         auto curproc = cur->getProcess();

@@ -6,12 +6,13 @@
  */
 #include "sbi.hh"
 #include "klib.h"
+#include "kernel.hh"
 
 #define __ro_after_init
 #define EXPORT_SYMBOL(x)
 #define pr_info printf
 #define pr_warn printf
-#define pr_err printf
+#define pr_err(...) Log(error,__VA_ARGS__)
 
 unsigned long sbi_spec_version __ro_after_init = SBI_SPEC_VERSION_DEFAULT;
 EXPORT_SYMBOL(sbi_spec_version);

@@ -421,10 +421,10 @@ class Logger{
     int id;
     char buf[300];
   };
-  klib::ringbuf<LogItem> ring;
+  klib::ringbuf<LogItem> ring[5];
   int lid=0;
 public:
-    void log(const char *fmt,...);
+    void log(int level,const char *fmt,...);
 };
 extern Logger kLogger;
 
