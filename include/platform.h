@@ -71,23 +71,22 @@ namespace platform{
     namespace plic
     {
         constexpr auto base=0x0c000000l;
+        constexpr auto enable=base+0x2000,
+        threshold=base+0x200000,
+        claim=base+0x200004;
         namespace s{
-            constexpr auto enable=base+0x2080,
-                threshold=base+0x201000,
-                claim=base+0x201004;
+            constexpr int contextOf(int hart) {return hart*2+1;}
         }
         namespace m{
-            constexpr auto enable=base+0x2000,
-            threshold=base+0x200000,
-            claim=base+0x200004;
+            constexpr int contextOf(int hart) {return hart*2;}
         }
         using namespace s;
         constexpr auto priority=base,
             pending=base+0x1000;
         constexpr xlen_t priorityOf(int id) {return priority+id*4;}
-        constexpr xlen_t enableOf(int hart) { return enable+hart*0x80; }
-        constexpr xlen_t thresholdOf(int hart) { return threshold+hart*0x1000; }
-        constexpr xlen_t claimOf(int hart) { return claim+hart*0x1000; }
+        constexpr xlen_t enableOf(int hart) { return enable+contextOf(hart)*0x80; }
+        constexpr xlen_t thresholdOf(int hart) { return threshold+contextOf(hart)*0x1000; }
+        constexpr xlen_t claimOf(int hart) { return claim+contextOf(hart)*0x1000; }
     } // namespace plic
     namespace clint
     {
