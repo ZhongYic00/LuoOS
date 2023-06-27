@@ -1195,6 +1195,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         printf("valid is not 1\n");
         return nullptr;
     }
+    // DirEnt *ep = entHit(this, a_dirname.c_str());  // 从缓冲区中找
     DirEnt *ep = eCacheHit(a_dirname);  // 从缓冲区中找
     if (ep->valid == 1) { return ep; }  // ecache hits
     // 缓冲区找不到则往下执行
@@ -1346,7 +1347,7 @@ DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成
     for (ep = root.prev; ep != &root; ep = ep->prev) {  // LRU algo
         if (ep->ref == 0) {
             ep->ref = 1;
-            ep->dev = parent->dev;  // @bug 空指针？
+            ep->dev = dev;  // @bug 空指针？
             ep->off = 0;
             ep->valid = 0;
             ep->dirty = false;

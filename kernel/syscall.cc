@@ -56,7 +56,7 @@ namespace syscall {
         assert(rt == content.size());
         fs::entRelse(testfile);
         Log(info, "entWrite success\n---------------------------------------------------------");
-        testfile = fs::entEnterFrom("/testfile", f);
+        testfile = fs::Path("/testfile").pathSearch(f);
         char buf[2 * content.size()];
         rt = fs::entRead(testfile, 0, (xlen_t)buf, 0, content.size());
         assert(rt == content.size());
@@ -75,7 +75,7 @@ namespace syscall {
         if(ep == nullptr) { panic("create /dev failed\n"); }
         ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
-        auto tmp = fs::Path("/dev/vda2").pathSearch();  // new fs test
+        // auto tmp = fs::Path("/dev/vda2").pathSearch();  // new fs test
         Log(info,"fat initialize ok");
         return statcode::ok;
     }
@@ -274,7 +274,7 @@ namespace syscall {
         auto curproc = kHartObjs.curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
-        DirEnt *ep = fs::entEnter(path);
+        DirEnt *ep = fs::Path(path).pathSearch();
         if(ep == nullptr) { return statcode::err; }
         fs::entLock(ep);
         if(!(ep->attribute & ATTR_DIRECTORY)){
@@ -312,7 +312,7 @@ namespace syscall {
             if(ep == nullptr) { return statcode::err; }
         }
         else {
-            if((ep = fs::entEnterFrom(path, f2)) == nullptr) { return statcode::err; }
+            if((ep = fs::Path(path).pathSearch(f2)) == nullptr) { return statcode::err; }
             fs::entLock(ep);
             if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
                 printf("dir can't write\n");
@@ -657,7 +657,7 @@ namespace syscall {
         char *path=(char*)pathbuf.buff;
 
         Log(debug,"execve(path=%s,)",path);
-        auto Ent=fs::entEnter(path);
+        auto Ent=fs::Path(path).pathSearch();
         klib::SharedPtr<File> file=new File(Ent,File::FileOp::read);
         auto buf=file->read(Ent->file_size);
         // auto buf=klib::ByteArray{0};
