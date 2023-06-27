@@ -188,7 +188,7 @@ virtio_disk_rw(struct buf *b, int write)
   // IntGuard guard;
   uint64 sector = b->sectorno;
   Log(debug,"diskrw sector=%ld",sector);
-
+  for(bool success=false;!success;){
   // acquire(&disk.vdisk_lock);
 
   // the spec says that legacy block operations use three
@@ -260,20 +260,28 @@ virtio_disk_rw(struct buf *b, int write)
 
   // Wait for virtio_disk_intr() to say request has finished.
   // disk.info[idx[0]].waiting=kHartObjs.curtask;
+  /// @todo remove unused debug info
+  xlen_t sip,sip1;
+  csrRead(sip,sip);
   csrClear(sie,BIT(csr::mie::stie));
   csrSet(sstatus,BIT(csr::mstatus::sie));
-  while(b->disk == 1) {
+  for(int retry=std::numeric_limits<int>::max();b->disk == 1 && retry;retry--) {
     // syscall::sleep();
   }
+  if(!b->disk)success=1;
+  else Log(error,"virtio_rw sector=%ld faild, retrying...",sector);
   csrClear(sstatus,BIT(csr::mstatus::sie));
   csrSet(sie,BIT(csr::mie::stie));
+  csrRead(sip,sip1);
+  assert(((sip^sip1)&sip&0xff)==0);
 
   disk.info[idx[0]].b = 0;
   free_chain(idx[0]);
+  }
 
   // release(&disk.vdisk_lock);
 }
-
+//0x8020f8a8
 void
 virtio_disk_intr()
 {
