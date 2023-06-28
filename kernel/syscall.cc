@@ -69,13 +69,13 @@ namespace syscall {
         Log(info, "initializing fat\n");
         if(fs::fat32Init() != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObjs.curtask->getProcess();
-        curproc->cwd = fs::Path("/").pathSearch();
+        curproc->cwd = fs::entEnter("/");
+        // curproc->cwd = fs::Path("/").pathSearch();
         curproc->files[3] = new File(curproc->cwd,0);
         DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
         ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
         if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
-        // auto tmp = fs::Path("/dev/vda2").pathSearch();  // new fs test
         Log(info,"fat initialize ok");
         return statcode::ok;
     }
@@ -216,7 +216,8 @@ namespace syscall {
             printf("path error\n");
             return statcode::err;
         }
-        DirEnt *ep = fs::Path(devpath).pathSearch();
+        DirEnt *ep = fs::entEnter(devpath);
+        // DirEnt *ep = fs::Path(devpath).pathSearch();
         if(ep == nullptr) {
             printf("not found file\n");
             return statcode::err;
@@ -249,8 +250,10 @@ namespace syscall {
             return statcode::err;
         }
 
-        DirEnt *dev_ep = fs::Path(devpath).pathSearch();
-        DirEnt *ep = fs::Path(mountpath).pathSearch();
+        DirEnt *dev_ep = fs::entEnter(devpath);
+        DirEnt *ep = fs::entEnter(mountpath);
+        // DirEnt *dev_ep = fs::Path(devpath).pathSearch();
+        // DirEnt *ep = fs::Path(mountpath).pathSearch();
         if(dev_ep == nullptr) {
             printf("dev not found file\n");
             return statcode::err;
@@ -274,7 +277,8 @@ namespace syscall {
         auto curproc = kHartObjs.curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
-        DirEnt *ep = fs::Path(path).pathSearch();
+        DirEnt *ep = fs::entEnter(path);
+        // DirEnt *ep = fs::Path(path).pathSearch();
         if(ep == nullptr) { return statcode::err; }
         fs::entLock(ep);
         if(!(ep->attribute & ATTR_DIRECTORY)){
@@ -313,7 +317,8 @@ namespace syscall {
             if(ep == nullptr) { return statcode::err; }
         }
         else {
-            if((ep = fs::Path(path).pathSearch(f2)) == nullptr) { return statcode::err; }
+            if((ep = fs::entEnterFrom(path, f2)) == nullptr) { return statcode::err; }
+            // if((ep = fs::Path(path).pathSearch(f2)) == nullptr) { return statcode::err; }
             fs::entLock(ep);
             if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
                 printf("dir can't write\n");
@@ -658,7 +663,8 @@ namespace syscall {
         char *path=(char*)pathbuf.buff;
 
         Log(debug,"execve(path=%s,)",path);
-        auto Ent=fs::Path(path).pathSearch();
+        auto Ent=fs::entEnter(path);
+        // auto Ent=fs::Path(path).pathSearch();
         klib::SharedPtr<File> file=new File(Ent,File::FileOp::read);
         auto buf=file->read(Ent->file_size);
         // auto buf=klib::ByteArray{0};
