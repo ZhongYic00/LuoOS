@@ -108,14 +108,14 @@ Process* proc::createProcess(){
     proc->newTask();
     static bool inited = false;
     if(inited) {
-        if(proc->cwd == nullptr) { proc->cwd = fs::Path("/").pathSearch(); };
-        proc->files[3]=new fs::File(proc->cwd,0);
+        if(proc->cwd == nullptr) { proc->cwd = fs::entEnter("/"); };
+        proc->files[3]=eastl::make_shared<fs::File>(proc->cwd,0);
     }
     else { inited = true; }
-    using op=fs::File::FileOp;
-    proc->files[0]=new fs::File(fs::File::stdin,op::read);
-    proc->files[1]=new fs::File(fs::File::stdout,op::write);
-    proc->files[2]=new fs::File(fs::File::stderr,op::write);
+    using op=fs::FileOp;
+    proc->files[0]=eastl::make_shared<fs::File>(fs::File::stdin,op::read);
+    proc->files[1]=eastl::make_shared<fs::File>(fs::File::stdout,op::write);
+    proc->files[2]=eastl::make_shared<fs::File>(fs::File::stderr,op::write);
     DBG(proc->print();)
     Log(info,"proc created. pid=%d\n",proc->id);
     return proc;

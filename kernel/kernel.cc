@@ -10,6 +10,7 @@
 #include "buf.h"
 #include "virtio.h"
 #include "fat.hh"
+#include "fs/ramfs.hh"
 
 #define moduleLevel LogLevel::info
 
@@ -135,6 +136,10 @@ static void infoInit(){
         Log(info,"{0x%lx 0x%lx}",*(((vm::segment_t*)&kInfo.segments)+i));
     }
 }
+static void rootfsInit(){
+    auto rootfs=new ramfs::FileSystem();
+    auto root=rootfs->getRoot();
+}
 void idle(){
     while(true){
         Log(debug,"kidle...");
@@ -185,6 +190,7 @@ void start_kernel(int hartid){
     Log(info,"virtio disk init over");
     binit();
     Log(info,"binit over");
+    rootfsInit();
     schedule();
     Log(info,"first schedule");
     volatile register ptr_t t6 asm("t6")=kHartObjs.curtask->ctx.gpr;
