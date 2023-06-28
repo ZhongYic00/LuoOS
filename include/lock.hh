@@ -24,6 +24,7 @@ namespace mutex
     class spinlock{
         std::atomic<atomic_base_t> spin;
     public:
+        spinlock():spin(0){}
         bool lock(){
             /// @todo optimize, use normal read to reduce buslock overhead
 again:      atomic_base_t expected=0;
