@@ -11,7 +11,7 @@ namespace fs{
     using klib::SharedPtr;
     using pipe::Pipe;
 
-    class SuperBlock{};
+    class SuperBlock;
     enum class FileOp:uint16_t { none=0,read=0x1,write=0x2,append=0x4, };
     union FileOps {
         struct{

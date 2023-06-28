@@ -1,6 +1,6 @@
 # CROSS_COMPILE = riscv64-linux-gnu-
-# CROSS_COMPILE = riscv64-unknown-elf-
-CROSS_COMPILE = riscv-nuclei-elf-
+CROSS_COMPILE = riscv64-unknown-elf-
+# CROSS_COMPILE = riscv-nuclei-elf-
 CFLAGS = -nostdlib -fno-exceptions -fno-builtin -march=rv64g -mabi=lp64 -mcmodel=medany -Wall -std=c++17
 
 QEMU = qemu-system-riscv64
