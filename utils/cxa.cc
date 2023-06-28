@@ -1,4 +1,5 @@
 #include "klib.hh"
+#include <cxxabi.h>
 
 extern "C" void __cxa_pure_virtual(void)
 {
