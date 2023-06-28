@@ -113,6 +113,8 @@ static void memInit(){
     { auto &seg=kInfo.segments.frames; kGlobObjs.vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
     { auto seg=(vm::segment_t){0x84000000,0x84200000}; kGlobObjs.vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
 
+    kernel::KernelGlobalObjsRef ref(kGlobObjs);
+    ref->ksatp=1;
     kGlobObjs.vmar->print();
     Log(info,"is about to enable kernel vm");
     csrWrite(satp,kGlobObjs.ksatp=satp.value());

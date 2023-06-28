@@ -57,6 +57,28 @@ again:      atomic_base_t expected=0;
         lock_guard(const lock_guard&) = delete;
         lock_guard& operator=(const lock_guard&) = delete;
     };
+    template <typename T,typename L>
+    class LockedPtr: lock_guard<L>
+    {
+    public:
+        LockedPtr(T& initRef,L& lock)
+            : ref(initRef), lock_guard<L>(lock){}
+        T* operator->(){return &ref;}
+        T& operator*() {return ref;}
+
+    // .. operator overloads for -> and *
+    private:
+        T& ref;
+    };
+
+    template<typename T,typename L=spinlock<>>
+    class ObjectLockGuard{
+        T& obj;
+        L lock;
+    public:
+        ObjectLockGuard(T& obj):obj(obj){}
+        LockedPtr<T,L> operator->(){return LockedPtr(obj,lock);}
+    };
 } // namespace mutex
 
 
