@@ -52,7 +52,7 @@ HeapMgrGrowable::~HeapMgrGrowable(){
     }
 }
 
-ptr_t HeapMgrGrowable::alloc(xlen_t size){
+ptr_t HeapMgr::alloc(xlen_t size){
     if(size==0)return nullptr;
     for(int retry=0;retry<retryLimit;retry++){
         ptr_t rt=(tlsf_malloc(size));
@@ -63,16 +63,6 @@ ptr_t HeapMgrGrowable::alloc(xlen_t size){
     Log(warning,"alloc failed");
     return nullptr;
 }
-
-ptr_t HeapMgr::alloc(xlen_t size){
-    for(int retry=0;retry<retryLimit;retry++){
-        ptr_t rt=(tlsf_malloc(size));
-        if(rt!=nullptr)return rt;
-        growHeap();
-    }
-    return nullptr;
-}
-
 ptr_t HeapMgr::alligned_alloc(xlen_t size,xlen_t alignment){
     for(int retry=0;retry<retryLimit;retry++){
         ptr_t rt=(tlsf_memalign(alignment,size));

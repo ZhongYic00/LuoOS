@@ -52,7 +52,7 @@ namespace alloc
     protected:
         ptr_t pool;
         constexpr static int retryLimit=2;
-        inline void growHeap(){}
+        virtual void growHeap(){}
     public:
         HeapMgr(ptr_t addr,xlen_t len);
         ~HeapMgr();
@@ -66,9 +66,8 @@ namespace alloc
         klib::list<Span> dynPages;
         klib::ListNode<Span> *reservedNode;
         int growsize;
-        void growHeap();
+        void growHeap() override;
     public:
-        ptr_t alloc(xlen_t size);
         HeapMgrGrowable(HeapMgr &other,PageMgr &pmgr);
         HeapMgrGrowable(ptr_t addr,xlen_t len,PageMgr &pmgr);
         ~HeapMgrGrowable();
