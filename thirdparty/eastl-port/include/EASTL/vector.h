@@ -43,7 +43,7 @@
 #include <EASTL/bonus/compressed_pair.h>
 
 EA_DISABLE_ALL_VC_WARNINGS()
-#include <new>
+#include <new.hh>
 #include <stddef.h>
 #if EASTL_EXCEPTIONS_ENABLED
 	#include <stdexcept> // std::out_of_range, std::length_error.

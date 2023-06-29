@@ -165,7 +165,7 @@ namespace eastl
 #ifndef EASTL_USER_DEFINED_ALLOCATOR // If the user hasn't declared that he has defined a different allocator implementation elsewhere...
 
 	EA_DISABLE_ALL_VC_WARNINGS()
-	#include <new>
+	#include <new.hh>
 	EA_RESTORE_ALL_VC_WARNINGS()
 
 	#if !EASTL_DLL // If building a regular library and not building EASTL as a DLL...

@@ -50,14 +50,14 @@
 #include <EASTL/allocator.h>
 #include <EASTL/atomic.h>
 #if EASTL_RTTI_ENABLED
-	#include <typeinfo>
+	#include <typeinfo.hh>
 #endif
 #if EASTL_EXCEPTIONS_ENABLED
 	#include <exception>
 #endif
 
 EA_DISABLE_ALL_VC_WARNINGS()
-#include <new>
+#include <new.hh>
 #include <stddef.h>
 EA_RESTORE_ALL_VC_WARNINGS()
 

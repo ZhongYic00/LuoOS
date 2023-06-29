@@ -36,7 +36,7 @@
 
 EA_DISABLE_ALL_VC_WARNINGS();
 
-	#include <new>
+	#include <new.hh>
 
 EA_RESTORE_ALL_VC_WARNINGS();
 

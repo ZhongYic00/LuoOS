@@ -122,9 +122,9 @@
 	#if defined(_MSC_VER)
 		#pragma warning(push, 0)
 	#endif
-	#include <stdint.h>   // int32_t, INT64_C, UINT8_MAX, etc.
-	#include <math.h>     // float_t, double_t, etc.
-	#include <float.h>    // FLT_EVAL_METHOD.
+	// #include <stdint.h>   // int32_t, INT64_C, UINT8_MAX, etc.
+	// #include <math.h>     // float_t, double_t, etc.
+	// #include <float.h>    // FLT_EVAL_METHOD.
 	#if defined(_MSC_VER)
 		#pragma warning(pop)
 	#endif

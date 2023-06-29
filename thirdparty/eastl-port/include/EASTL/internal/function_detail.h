@@ -23,12 +23,12 @@
 #include <EASTL/allocator.h>
 
 #if EASTL_RTTI_ENABLED
-	#include <typeinfo>
+	#include <typeinfo.hh>
 #endif
 
 #if EASTL_EXCEPTIONS_ENABLED
 	EA_DISABLE_ALL_VC_WARNINGS()
-	#include <new>
+	#include <new.hh>
 	#include <exception>
 	EA_RESTORE_ALL_VC_WARNINGS()
 #endif
