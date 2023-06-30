@@ -514,7 +514,7 @@ namespace syscall {
         xlen_t func=ctx.x(10),childStack=ctx.x(11);
         int flags=ctx.x(12);
         auto pid=proc::clone(kHartObjs.curtask);
-        auto thrd=kGlobObjs.procMgr[pid]->defaultTask();
+        auto thrd=(**kGlobObjs->procMgr)[pid]->defaultTask();
         if(childStack)thrd->ctx.sp()=childStack;
         // if(func)thrd->ctx.pc=func;
         Log(debug,"clone curproc=%d, new proc=%d",kHartObjs.curtask->getProcess()->pid(),pid);
@@ -527,7 +527,7 @@ namespace syscall {
         if(pid==-1){
             // get child procs
             // every child wakes up parent at exit?
-            auto childs=kGlobObjs.procMgr.getChilds(curproc->pid());
+            auto childs=kGlobObjs->procMgr->getChilds(curproc->pid());
             while(!childs.empty()){
                 for(auto child:childs){
                     if(child->state==sched::Zombie){
@@ -537,11 +537,11 @@ namespace syscall {
                 }
                 if(target)break;
                 sleep();
-                childs=kGlobObjs.procMgr.getChilds(curproc->pid());
+                childs=kGlobObjs->procMgr->getChilds(curproc->pid());
             }
         }
         else if(pid>0){
-            auto proc=kGlobObjs.procMgr[pid];
+            auto proc=(**kGlobObjs->procMgr)[pid];
             while(proc->state!=sched::Zombie){
                 // proc add hook
                 sleep();

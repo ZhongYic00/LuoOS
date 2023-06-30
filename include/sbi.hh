@@ -339,22 +339,8 @@ struct sbiret sbi_debug_console_write(unsigned long num_bytes,
                                       unsigned long base_addr_hi);
 
 void sbi_ipi_init(void);
+int sbi_hsm_hart_start(unsigned long hartid, unsigned long saddr,
+			      unsigned long a1);
 
+int sbi_hsm_hart_get_status(unsigned long hartid);
 #endif /* _ASM_RISCV_SBI_H */
-namespace sbi
-{
-    enum ecalls{
-        none,
-        hart,
-        xtie,
-        xsie,
-    };
-    inline int ecall(int ecallId){
-        register int a7 asm("a7")=ecallId;
-        ExecInst(ecall);
-        register int a0 asm("a0");
-        return a0;
-    }
-    inline int resetXTIE(){return ecall(ecalls::xtie);}
-    inline int resetXSIE(){return ecall(ecalls::xsie);}
-} // namespace sbi

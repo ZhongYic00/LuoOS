@@ -6,12 +6,13 @@
  */
 #include "sbi.hh"
 #include "klib.h"
+#include "kernel.hh"
 
 #define __ro_after_init
 #define EXPORT_SYMBOL(x)
 #define pr_info printf
 #define pr_warn printf
-#define pr_err printf
+#define pr_err(...) Log(error,__VA_ARGS__)
 
 unsigned long sbi_spec_version __ro_after_init = SBI_SPEC_VERSION_DEFAULT;
 EXPORT_SYMBOL(sbi_spec_version);
@@ -445,4 +446,28 @@ struct sbiret sbi_debug_console_write(unsigned long num_bytes,
 void sbi_shutdown(void)
 {
 	sbi_ecall(SBI_EXT_0_1_SHUTDOWN, 0, 0, 0, 0, 0, 0, 0);
+}
+int sbi_hsm_hart_start(unsigned long hartid, unsigned long saddr,
+			      unsigned long a1)
+{
+	struct sbiret ret;
+
+	ret = sbi_ecall(SBI_EXT_HSM, SBI_EXT_HSM_HART_START,
+			hartid, saddr, a1, 0, 0, 0);
+	if (ret.error)
+		return sbi_err_map_linux_errno(ret.error);
+	else
+		return 0;
+}
+
+int sbi_hsm_hart_get_status(unsigned long hartid)
+{
+	struct sbiret ret;
+
+	ret = sbi_ecall(SBI_EXT_HSM, SBI_EXT_HSM_HART_STATUS,
+			hartid, 0, 0, 0, 0, 0);
+	if (ret.error)
+		return sbi_err_map_linux_errno(ret.error);
+	else
+		return ret.value;
 }

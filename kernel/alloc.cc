@@ -19,7 +19,7 @@ HeapMgr::~HeapMgr(){}
 
 void HeapMgrGrowable::growHeap(){
     Log(warning,"growHeap(growsize=%d)\n",growsize);
-    Span newSpan={pmgr.alloc(growsize),growsize};
+    Span newSpan={pmgr->alloc(growsize),growsize};
     reservedNode->data=newSpan;
     ptr_t newPool=(ptr_t)vm::pn2addr(newSpan.first);
     tlsf_add_pool(newPool,growsize*vm::pageSize);
@@ -30,10 +30,10 @@ void HeapMgrGrowable::growHeap(){
         tlsf_walk_pool(newPool);
     )
 }
-HeapMgrGrowable::HeapMgrGrowable(ptr_t addr,xlen_t len,PageMgr &pmgr):HeapMgr(addr,len),pmgr(pmgr),growsize(32){
+HeapMgrGrowable::HeapMgrGrowable(ptr_t addr,xlen_t len,LockedObject<PageMgr> &pmgr):HeapMgr(addr,len),pmgr(pmgr),growsize(32){
     reservedNode=(klib::ListNode<Span>*)(alloc(sizeof(klib::ListNode<Span>)));
 }
-HeapMgrGrowable::HeapMgrGrowable(HeapMgr &other,PageMgr &pmgr):pmgr(pmgr),HeapMgr(other),growsize(32){
+HeapMgrGrowable::HeapMgrGrowable(HeapMgr &other,LockedObject<PageMgr> &pmgr):pmgr(pmgr),HeapMgr(other),growsize(32){
     reservedNode=(klib::ListNode<Span>*)(alloc(sizeof(klib::ListNode<Span>)));
 }
 HeapMgrGrowable::~HeapMgrGrowable(){
@@ -52,7 +52,7 @@ HeapMgrGrowable::~HeapMgrGrowable(){
     }
 }
 
-ptr_t HeapMgrGrowable::alloc(xlen_t size){
+ptr_t HeapMgr::alloc(xlen_t size){
     if(size==0)return nullptr;
     for(int retry=0;retry<retryLimit;retry++){
         ptr_t rt=(tlsf_malloc(size));
@@ -63,16 +63,6 @@ ptr_t HeapMgrGrowable::alloc(xlen_t size){
     Log(warning,"alloc failed");
     return nullptr;
 }
-
-ptr_t HeapMgr::alloc(xlen_t size){
-    for(int retry=0;retry<retryLimit;retry++){
-        ptr_t rt=(tlsf_malloc(size));
-        if(rt!=nullptr)return rt;
-        growHeap();
-    }
-    return nullptr;
-}
-
 ptr_t HeapMgr::alligned_alloc(xlen_t size,xlen_t alignment){
     for(int retry=0;retry<retryLimit;retry++){
         ptr_t rt=(tlsf_memalign(alignment,size));
@@ -172,20 +162,20 @@ void* operator new(size_t size,ptr_t ptr){ // placement new
 }
 void* operator new(size_t size){
     if(size<vm::pageSize*32)
-        return reinterpret_cast<HeapMgrGrowable*>(kGlobObjs.heapMgr)->alloc(size);
-    else return (ptr_t)vm::pn2addr(kGlobObjs.pageMgr->alloc(vm::bytes2pages(size)));
+        return kGlobObjs->heapMgr->alloc(size);
+    else return (ptr_t)vm::pn2addr(kGlobObjs->pageMgr->alloc(vm::bytes2pages(size)));
 }
 void* operator new[](size_t size){
     if(size<vm::pageSize*32)
-        return reinterpret_cast<HeapMgrGrowable*>(kGlobObjs.heapMgr)->alloc(size);
-    else return (ptr_t)vm::pn2addr(kGlobObjs.pageMgr->alloc(vm::bytes2pages(size)));
+        return kGlobObjs->heapMgr->alloc(size);
+    else return (ptr_t)vm::pn2addr(kGlobObjs->pageMgr->alloc(vm::bytes2pages(size)));
 }
 void operator delete(void* ptr){
-    kGlobObjs.heapMgr->free(ptr);
+    kGlobObjs->heapMgr->free(ptr);
 }
 void operator delete(void* ptr,xlen_t unknown){
-    kGlobObjs.heapMgr->free(ptr);
+    kGlobObjs->heapMgr->free(ptr);
 }
 void operator delete[](void* ptr){
-    kGlobObjs.heapMgr->free(ptr);
+    kGlobObjs->heapMgr->free(ptr);
 }

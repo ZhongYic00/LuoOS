@@ -141,7 +141,7 @@ free_desc(int i)
     panic("virtio_disk_intr 2");
   disk.desc[i].addr = 0;
   disk.free[i] = 1;
-  while(!waiting.empty())kGlobObjs.scheduler.wakeup(waiting.pop_front());
+  while(!waiting.empty())kGlobObjs->scheduler->wakeup(waiting.pop_front());
 }
 
 // free a chain of descriptors.
@@ -188,7 +188,7 @@ virtio_disk_rw(struct buf *b, int write)
   // IntGuard guard;
   uint64 sector = b->sectorno;
   Log(debug,"diskrw sector=%ld",sector);
-
+  for(bool success=false;!success;){
   // acquire(&disk.vdisk_lock);
 
   // the spec says that legacy block operations use three
@@ -260,20 +260,28 @@ virtio_disk_rw(struct buf *b, int write)
 
   // Wait for virtio_disk_intr() to say request has finished.
   // disk.info[idx[0]].waiting=kHartObjs.curtask;
+  /// @todo remove unused debug info
+  xlen_t sip,sip1;
+  csrRead(sip,sip);
   csrClear(sie,BIT(csr::mie::stie));
   csrSet(sstatus,BIT(csr::mstatus::sie));
-  while(b->disk == 1) {
+  for(int retry=std::numeric_limits<int>::max();b->disk == 1 && retry;retry--) {
     // syscall::sleep();
   }
+  if(!b->disk)success=1;
+  else Log(error,"virtio_rw sector=%ld faild, retrying...",sector);
   csrClear(sstatus,BIT(csr::mstatus::sie));
   csrSet(sie,BIT(csr::mie::stie));
+  csrRead(sip,sip1);
+  assert(((sip^sip1)&sip&0xff)==0);
 
   disk.info[idx[0]].b = 0;
   free_chain(idx[0]);
+  }
 
   // release(&disk.vdisk_lock);
 }
-
+//0x8020f8a8
 void
 virtio_disk_intr()
 {
@@ -288,7 +296,7 @@ virtio_disk_intr()
     //   panic("virtio_disk_intr status");
     
     info.b->disk = 0;   // disk is done with buf
-    // kGlobObjs.scheduler.wakeup(info.waiting);
+    // kGlobObjs->scheduler->wakeup(info.waiting);
 
     disk.used_idx = (disk.used_idx + 1) % NUM;
   }
