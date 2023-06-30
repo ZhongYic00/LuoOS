@@ -381,15 +381,16 @@ namespace syscall {
     xlen_t getDents64(void) {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
-        struct DStat *a_buf = (struct DStat*)ctx.x(11);
+        DStat *a_buf = (DStat*)ctx.x(11);
         size_t a_len = ctx.x(12);
         if(fdOutRange(a_fd) || a_buf==nullptr || a_len<sizeof(DStat)) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
         SharedPtr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
-        struct DStat ds;
-        getDStat(f->obj.ep, &ds);
+        // DStat ds;
+        // getDStat(f->obj.ep, &ds);
+        DStat ds = *(f->obj.ep);
         curproc->vmar.copyout((xlen_t)a_buf, klib::ByteArray((uint8_t*)&ds,sizeof(ds)));
 
         return sizeof(ds);
@@ -417,14 +418,15 @@ namespace syscall {
     xlen_t fStat() {
         auto &ctx = kHartObjs.curtask->ctx;
         int a_fd = ctx.x(10);
-        struct KStat *a_kst = (struct KStat*)ctx.x(11);
+        KStat *a_kst = (KStat*)ctx.x(11);
         if(fdOutRange(a_fd) || a_kst==nullptr) { return statcode::err; }
 
         auto curproc = kHartObjs.curtask->getProcess();
         SharedPtr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
-        struct KStat kst;
-        fs::getKStat(f->obj.ep, &kst);
+        // KStat kst;
+        // fs::getKStat(f->obj.ep, &kst);
+        KStat kst = *(f->obj.ep);
         curproc->vmar.copyout((xlen_t)a_kst, klib::ByteArray((uint8_t*)&kst,sizeof(kst)));
         // @bug 用户态读到的数据混乱
         return statcode::ok;

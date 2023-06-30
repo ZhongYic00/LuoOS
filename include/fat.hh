@@ -57,7 +57,7 @@ namespace fs {
             // struct sleeplock lock;
         // public:
             DirEnt& operator=(const union Ent& a_ent);
-
+            
             DirEnt *entSearch(string a_dirname, uint *a_off = nullptr);
             int entNext(DirEnt *const a_entry, uint a_off, int *const a_count);
             inline int entNext(DirEnt *const a_entry, uint a_off) { return entNext(a_entry, a_off, nullptr); }
@@ -156,6 +156,7 @@ namespace fs {
             inline const DirEnt *const findRoot() const { return &root; }
             inline const uint8 rMM() const { return mount_mode; }
     };
+    extern FileSystem dev_fat[8];  // @todo 移到内核对象中
     class Path {
         private:
             string pathname;
@@ -173,40 +174,54 @@ namespace fs {
             DirEnt *pathCreate(short a_type, int a_mode, SharedPtr<File> a_file = nullptr) const;
             int pathRemove(SharedPtr<File> a_file = nullptr) const;
     };
-	struct DStat {
-	  uint64 d_ino;	// 索引结点号
-	  int64 d_off;	// 到下一个dirent的偏移
-	  uint16 d_reclen;	// 当前dirent的长度
-	  uint8 d_type;	// 文件类型
-	  char d_name[STAT_MAX_NAME + 1];	//文件名
+	class DStat {
+        public:
+            uint64 d_ino;	// 索引结点号
+            int64 d_off;	// 到下一个dirent的偏移
+            uint16 d_reclen;	// 当前dirent的长度
+            uint8 d_type;	// 文件类型
+            char d_name[STAT_MAX_NAME + 1];	//文件名
+            DStat() {}
+            DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, STAT_MAX_NAME); }
+            DStat(const DirEnt& a_entry):d_ino(a_entry.first_clus), d_off(0), d_reclen(a_entry.file_size), d_type((a_entry.attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry.filename, STAT_MAX_NAME); }
+            ~DStat() {}
 	};
 	struct Stat {
-	  char name[STAT_MAX_NAME + 1]; // 文件名
-	  int dev;     // File system's disk device // 文件系统的磁盘设备
-	  short type;  // Type of file // 文件类型
-	  uint64 size; // Size of file in bytes // 文件大小(字节)
+        char name[STAT_MAX_NAME + 1]; // 文件名
+        int dev;     // File system's disk device // 文件系统的磁盘设备
+        short type;  // Type of file // 文件类型
+        uint64 size; // Size of file in bytes // 文件大小(字节)
+        Stat() {}
+        Stat(const struct Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
+        Stat(const DirEnt& a_entry):name(), dev(a_entry.dev), type((a_entry.attribute&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry.file_size) { strncpy(name, a_entry.filename, STAT_MAX_NAME); }
+        ~Stat() {}
 	};
-	struct KStat {
-		dev_t st_dev;  			/* ID of device containing file */
-		ino_t st_ino;  			/* Inode number */
-		mode_t st_mode;  		/* File type and mode */
-		nlink_t st_nlink;  		/* Number of hard links */
-		uid_t st_uid;			/* User ID of owner */
-		gid_t st_gid;			/* Group ID of owner */
-		dev_t st_rdev;			/* Device ID (if special file) */
-		unsigned long __pad;	
-		size_t st_size;			/* Total size, in bytes */
-		blksize_t st_blksize;	/* Block size for filesystem I/O */
-		int __pad2; 			
-		blkcnt_t st_blocks;		/* Number of 512B blocks allocated */
-		long st_atime_sec;		/* Time of last access */
-		long st_atime_nsec;		
-		long st_mtime_sec;		/* Time of last modification */
-		long st_mtime_nsec;
-		long st_ctime_sec;		/* Time of last status change */
-		long st_ctime_nsec;
-		// unsigned __unused[2];
-		unsigned _unused[2]; // @todo 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
+	class KStat {
+        public:
+            dev_t st_dev;  			/* ID of device containing file */
+            ino_t st_ino;  			/* Inode number */
+            mode_t st_mode;  		/* File type and mode */
+            nlink_t st_nlink;  		/* Number of hard links */
+            uid_t st_uid;			/* User ID of owner */
+            gid_t st_gid;			/* Group ID of owner */
+            dev_t st_rdev;			/* Device ID (if special file) */
+            unsigned long __pad;	
+            size_t st_size;			/* Total size, in bytes */
+            blksize_t st_blksize;	/* Block size for filesystem I/O */
+            int __pad2; 			
+            blkcnt_t st_blocks;		/* Number of 512B blocks allocated */
+            long st_atime_sec;		/* Time of last access */
+            long st_atime_nsec;		
+            long st_mtime_sec;		/* Time of last modification */
+            long st_mtime_nsec;
+            long st_ctime_sec;		/* Time of last status change */
+            long st_ctime_nsec;
+            // unsigned __unused[2];
+            unsigned _unused[2]; // @todo 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
+            KStat() {}
+            KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
+            KStat(const DirEnt& a_entry):st_dev(a_entry.dev), st_ino(a_entry.first_clus), st_mode((a_entry.attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry.file_size), st_blksize(dev_fat[a_entry.dev].rBPC()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
+            ~KStat() {}
 	};
 
 
@@ -220,7 +235,7 @@ namespace fs {
     void entTrunc(DirEnt *entry);//
     void entRemove(DirEnt *entry);//
     void entRelse(DirEnt *entry);//
-    void entStat(DirEnt *ep, struct Stat *st);
+    void entStat(DirEnt *ep, struct Stat *st);//
     void entLock(DirEnt *entry);//
     void entUnlock(DirEnt *entry);//
     int entFindNext(DirEnt *dp, DirEnt *ep, uint off, int *count);//
@@ -230,7 +245,7 @@ namespace fs {
     int entWrite(DirEnt *entry, int user_src, uint64 src, uint off, uint n);//
     DirEnt *entEnterParentAt(char *path, char *name, SharedPtr<File> f);//
     DirEnt *entEnterFrom(char *path, SharedPtr<File> f);//
-    uint32 getBytesPerClus();
+    uint32 getBytesPerClus();//
     int entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2);
     int entUnlink(char *path, SharedPtr<File> f);
     int pathRemove(char *path);//
@@ -240,8 +255,8 @@ namespace fs {
     int devUnmount(DirEnt *mountpoint);
     DirEnt *pathCreate(char *path, short type, int mode);//
     DirEnt *pathCreateAt(char *path, short type, int mode, SharedPtr<File> f);//
-    void getDStat(DirEnt *de, struct DStat *st);
-    void getKStat(DirEnt *de, struct KStat *kst);
+    void getDStat(DirEnt *de, DStat *st);//
+    void getKStat(DirEnt *de, KStat *kst);//
 
 }
 

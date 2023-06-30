@@ -2,6 +2,7 @@
 #include "buf.h"
 #include "kernel.hh"
 
+namespace fs { FileSystem dev_fat[8]; }  //挂载设备集合
 using namespace fs;
 // #define moduleLevel LogLevel::trace
 
@@ -12,7 +13,6 @@ static struct entry_cache {
     DirEnt entries[ENTRY_CACHE_NUM];
 } ecache; // 目录缓冲区
 static DirEnt root; // 根目录
-FileSystem dev_fat[8]; //挂载设备集合
 int mount_num=0; //表示寻找在挂载集合的下标
 
 int bufCopyOut(int user_dst, uint64 dst, void *src, uint64 len) {
@@ -1106,14 +1106,14 @@ DirEnt *fs::pathCreateAt(char *path, short type, int mode, SharedPtr<File> f) {
     entLock(ep);
     return ep;
 }
-void fs::getDStat(DirEnt *de, struct DStat *st) {
+void fs::getDStat(DirEnt *de, DStat *st) {
     strncpy(st->d_name, de->filename, STAT_MAX_NAME);
     st->d_type = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
     st->d_ino = de->first_clus;
     st->d_off = 0;
     st->d_reclen = de->file_size;
 }
-void fs::getKStat(DirEnt *de, struct KStat *kst) {
+void fs::getKStat(DirEnt *de, KStat *kst) {
     kst->st_dev = de->dev;
     kst->st_ino = de->first_clus;
     kst->st_mode = (de->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
@@ -1228,6 +1228,7 @@ DirEnt& DirEnt::operator=(const union Ent& a_ent) {
     cur_clus = first_clus = ((uint32)a_ent.sne.fst_clus_hi<<16) | a_ent.sne.fst_clus_lo;
     file_size = a_ent.sne.file_size;
     clus_cnt = 0;
+    return *this;
 }
 DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     if(mount_flag == 1) {
