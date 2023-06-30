@@ -9,7 +9,7 @@ using namespace sched;
 
 void schedule(){
     Log(info,"scheduling");
-    auto curtask=static_cast<proc::Task*>(kGlobObjs.scheduler.next());
+    auto curtask=static_cast<proc::Task*>(kGlobObjs->scheduler->next());
     Log(info,"current task=%d proc=[%d]%s",curtask->id,curtask->getProcess()->pid(),curtask->getProcess()->name.c_str());
     curtask->switchTo();
 }

@@ -141,7 +141,7 @@ free_desc(int i)
     panic("virtio_disk_intr 2");
   disk.desc[i].addr = 0;
   disk.free[i] = 1;
-  while(!waiting.empty())kGlobObjs.scheduler.wakeup(waiting.pop_front());
+  while(!waiting.empty())kGlobObjs->scheduler->wakeup(waiting.pop_front());
 }
 
 // free a chain of descriptors.
@@ -296,7 +296,7 @@ virtio_disk_intr()
     //   panic("virtio_disk_intr status");
     
     info.b->disk = 0;   // disk is done with buf
-    // kGlobObjs.scheduler.wakeup(info.waiting);
+    // kGlobObjs->scheduler->wakeup(info.waiting);
 
     disk.used_idx = (disk.used_idx + 1) % NUM;
   }

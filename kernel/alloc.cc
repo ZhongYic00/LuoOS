@@ -19,7 +19,7 @@ HeapMgr::~HeapMgr(){}
 
 void HeapMgrGrowable::growHeap(){
     Log(warning,"growHeap(growsize=%d)\n",growsize);
-    Span newSpan={pmgr.alloc(growsize),growsize};
+    Span newSpan={pmgr->alloc(growsize),growsize};
     reservedNode->data=newSpan;
     ptr_t newPool=(ptr_t)vm::pn2addr(newSpan.first);
     tlsf_add_pool(newPool,growsize*vm::pageSize);
@@ -30,10 +30,10 @@ void HeapMgrGrowable::growHeap(){
         tlsf_walk_pool(newPool);
     )
 }
-HeapMgrGrowable::HeapMgrGrowable(ptr_t addr,xlen_t len,PageMgr &pmgr):HeapMgr(addr,len),pmgr(pmgr),growsize(32){
+HeapMgrGrowable::HeapMgrGrowable(ptr_t addr,xlen_t len,LockedObject<PageMgr> &pmgr):HeapMgr(addr,len),pmgr(pmgr),growsize(32){
     reservedNode=(klib::ListNode<Span>*)(alloc(sizeof(klib::ListNode<Span>)));
 }
-HeapMgrGrowable::HeapMgrGrowable(HeapMgr &other,PageMgr &pmgr):pmgr(pmgr),HeapMgr(other),growsize(32){
+HeapMgrGrowable::HeapMgrGrowable(HeapMgr &other,LockedObject<PageMgr> &pmgr):pmgr(pmgr),HeapMgr(other),growsize(32){
     reservedNode=(klib::ListNode<Span>*)(alloc(sizeof(klib::ListNode<Span>)));
 }
 HeapMgrGrowable::~HeapMgrGrowable(){
@@ -162,20 +162,20 @@ void* operator new(size_t size,ptr_t ptr){ // placement new
 }
 void* operator new(size_t size){
     if(size<vm::pageSize*32)
-        return reinterpret_cast<HeapMgrGrowable*>(kGlobObjs.heapMgr)->alloc(size);
-    else return (ptr_t)vm::pn2addr(kGlobObjs.pageMgr->alloc(vm::bytes2pages(size)));
+        return kGlobObjs->heapMgr->alloc(size);
+    else return (ptr_t)vm::pn2addr(kGlobObjs->pageMgr->alloc(vm::bytes2pages(size)));
 }
 void* operator new[](size_t size){
     if(size<vm::pageSize*32)
-        return reinterpret_cast<HeapMgrGrowable*>(kGlobObjs.heapMgr)->alloc(size);
-    else return (ptr_t)vm::pn2addr(kGlobObjs.pageMgr->alloc(vm::bytes2pages(size)));
+        return kGlobObjs->heapMgr->alloc(size);
+    else return (ptr_t)vm::pn2addr(kGlobObjs->pageMgr->alloc(vm::bytes2pages(size)));
 }
 void operator delete(void* ptr){
-    kGlobObjs.heapMgr->free(ptr);
+    kGlobObjs->heapMgr->free(ptr);
 }
 void operator delete(void* ptr,xlen_t unknown){
-    kGlobObjs.heapMgr->free(ptr);
+    kGlobObjs->heapMgr->free(ptr);
 }
 void operator delete[](void* ptr){
-    kGlobObjs.heapMgr->free(ptr);
+    kGlobObjs->heapMgr->free(ptr);
 }

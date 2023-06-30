@@ -15,7 +15,6 @@
 
 extern char _kstack_end;
 xlen_t kstack_end=(xlen_t)&_kstack_end;
-kernel::KernelGlobalObjs kGlobObjs;
 kernel::KernelHartObjs kHartObjs;
 kernel::KernelInfo kInfo={
     .segments={
@@ -27,6 +26,7 @@ using vm::pgtbl_t,vm::PageTable;
 __attribute__((section("pagetable")))
 vm::PageTableEntry kernelPageTableRoot[vm::pageEntriesPerPage];
 kernel::KernelObjectsBuf kObjsBuf;
+kernel::KernelGlobalObjs *kGlobObjs=reinterpret_cast<kernel::KernelGlobalObjs*>(&kObjsBuf.kGlobObjsBuf);
 uint8_t pool[32*vm::pageSize];
 
 void nextTimeout(){
@@ -93,31 +93,38 @@ void kernel::createKernelMapping( vm::VMAR &vmar){
     { auto &seg=kInfo.segments.data;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w,vm::VMO::CloneType::shared);}
     { auto &seg=kInfo.segments.bss;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w,vm::VMO::CloneType::shared);}
 }
+kernel::KernelGlobalObjs::KernelGlobalObjs():
+    heapMgr(pool,sizeof(pool),pageMgr),
+    pageMgr(vm::addr2pn(kInfo.segments.frames.first),vm::addr2pn(kInfo.segments.frames.second)),
+    vmar((std::initializer_list<vm::PageMapping>){},kernelPageTableRoot)
+    {}
 static void memInit(){
     Log(info,"initializing mem...");
     csr::satp satp;
     satp.mode=8;
     satp.asid=0;
     satp.ppn=vm::addr2pn((xlen_t)kernelPageTableRoot);
-    kGlobObjs.pageMgr=(alloc::PageMgr*)kObjsBuf.kPageMgrBuf;
-    kGlobObjs.heapMgr=(alloc::HeapMgr*)kObjsBuf.kHeapMgrBuf;
-    kGlobObjs.vmar=(vm::VMAR*)kObjsBuf.kVMARBuf;
-    new ((void*)&kObjsBuf.kHeapMgrBuf) alloc::HeapMgr(pool,sizeof(pool));
-    new ((void*)&kObjsBuf.kPageMgrBuf) alloc::PageMgr(vm::addr2pn(kInfo.segments.frames.first),vm::addr2pn(kInfo.segments.frames.second));
-    kGlobObjs.heapMgr=new alloc::HeapMgrGrowable(*kGlobObjs.heapMgr,*kGlobObjs.pageMgr);
-    new ((void*)&kObjsBuf.kVMARBuf) vm::VMAR({},kernelPageTableRoot);
+    auto kGlobObjsInternal=new ((void*)kObjsBuf.kGlobObjsBuf) kernel::KernelGlobalObjs();
+    // new ((void*)&kGlobObjs) kernel::KernelGlobalObjsRef(*kGlobObjsInternal);
+    // kGlobObjs.pageMgr=(alloc::PageMgr*)kObjsBuf.kPageMgrBuf;
+    // kGlobObjs.heapMgr=(alloc::HeapMgr*)kObjsBuf.kHeapMgrBuf;
+    // kGlobObjs.vmar=(vm::VMAR*)kObjsBuf.kVMARBuf;
+    // new ((void*)&kObjsBuf.kHeapMgrBuf) alloc::HeapMgr(pool,sizeof(pool));
+    // new ((void*)&kObjsBuf.kPageMgrBuf) alloc::PageMgr(vm::addr2pn(kInfo.segments.frames.first),vm::addr2pn(kInfo.segments.frames.second));
+    // kGlobObjs.heapMgr=new alloc::HeapMgrGrowable(*kGlobObjs.heapMgr,*kGlobObjs.pageMgr);
+    // new ((void*)&kObjsBuf.kVMARBuf) vm::VMAR({},kernelPageTableRoot);
     // kGlobObjs.vmar->map(0,vm::addr2pn(0x00000000),3*0x40000,0xcf); // naive direct mapping
     using perm=vm::PageTableEntry::fieldMasks;
-    kernel::createKernelMapping(*kGlobObjs.vmar);
-    { auto &seg=kInfo.segments.dev; kGlobObjs.vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
-    { auto &seg=kInfo.segments.frames; kGlobObjs.vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
-    { auto seg=(vm::segment_t){0x84000000,0x84200000}; kGlobObjs.vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
+    kernel::createKernelMapping(*(kGlobObjs->vmar.get()));
+    { auto &seg=kInfo.segments.dev; kGlobObjs->vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
+    { auto &seg=kInfo.segments.frames; kGlobObjs->vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
+    { auto seg=(vm::segment_t){0x84000000,0x84200000}; kGlobObjs->vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
 
-    kernel::KernelGlobalObjsRef ref(kGlobObjs);
-    ref->ksatp=1;
-    kGlobObjs.vmar->print();
+    // kernel::KernelGlobalObjsRef ref(kGlobObjs);
+    // ref->ksatp=1;
+    kGlobObjs->vmar->print();
     Log(info,"is about to enable kernel vm");
-    csrWrite(satp,kGlobObjs.ksatp=satp.value());
+    csrWrite(satp,kGlobObjs->ksatp=satp.value());
     ExecInst(sfence.vma);
     Log(info,"kernel vm enabled, memInit success");
 }
@@ -164,13 +171,13 @@ void init(int hartid){
     
     if(!prevStarted){   // is first hart
         // @todo needs plic and uart init?
+        csrWrite(stvec,strapwrapper);
         puts=IO::_blockingputs;
 
         infoInit();
         memInit();
         syscall::init();
         // csrWrite(sscratch,ctx.gpr);
-        csrWrite(stvec,strapwrapper);
         csrSet(sstatus,BIT(csr::mstatus::sum));
         // csrSet(sstatus,BIT(csr::mstatus::sie));
         csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));

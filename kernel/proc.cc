@@ -11,7 +11,7 @@ Process::Process(prior_t prior,tid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
     auto ustack=UserStackDefault;
     using perm=vm::PageTableEntry::fieldMasks;
-    vmar.map(vm::addr2pn(ustack),kGlobObjs.pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
+    vmar.map(vm::addr2pn(ustack),kGlobObjs->pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
     return ustack;
 }
 xlen_t Process::newTrapframe(){
@@ -19,35 +19,35 @@ xlen_t Process::newTrapframe(){
     auto kstackv=kInfo.segments.kstack.second;
     xlen_t kstackppn;
     using perm=vm::PageTableEntry::fieldMasks;
-    vmar.map(vm::addr2pn(kstackv),kstackppn=kGlobObjs.pageMgr->alloc(TrapframePages),1,perm::r|perm::w|perm::u|perm::v,vm::VMO::CloneType::alloc);
+    vmar.map(vm::addr2pn(kstackv),kstackppn=kGlobObjs->pageMgr->alloc(TrapframePages),1,perm::r|perm::w|perm::u|perm::v,vm::VMO::CloneType::alloc);
     return vm::pn2addr(kstackppn);
 }
 
 Task* Process::newKTask(prior_t prior){
-    auto thrd=Task::createTask(kGlobObjs.taskMgr,newTrapframe(),prior,this->pid());
+    auto thrd=Task::createTask(**kGlobObjs->taskMgr,newTrapframe(),prior,this->pid());
     thrd->lastpriv=Task::Priv::AlwaysKernel;
     thrd->kctx.sp()=(xlen_t)thrd->kctx.kstack;
     addTask(thrd);
-    kGlobObjs.scheduler.add(thrd);
+    kGlobObjs->scheduler->add(thrd);
     return thrd;
 }
 Task* Process::newTask(){
-    // auto thrd=kGlobObjs.taskMgr.alloc(0,this->pid(),proc::UserStackDefault);
-    auto thrd=Task::createTask(kGlobObjs.taskMgr,newTrapframe(),0,this->pid());
+    // auto thrd=kGlobObjs->taskMgr->alloc(0,this->pid(),proc::UserStackDefault);
+    auto thrd=Task::createTask(**kGlobObjs->taskMgr,newTrapframe(),0,this->pid());
     thrd->ctx.sp()=newUstack();
     thrd->ctx.a0()=0;
     addTask(thrd);
-    kGlobObjs.scheduler.add(thrd);
+    kGlobObjs->scheduler->add(thrd);
     return thrd;
 }
 
 Task* Process::newTask(const Task &other,bool allocStack){
-    auto thrd=Task::createTask(kGlobObjs.taskMgr,newTrapframe(),other,this->pid());
+    auto thrd=Task::createTask(**kGlobObjs->taskMgr,newTrapframe(),other,this->pid());
     if(allocStack){
         thrd->ctx.sp()=newUstack();
     }
     addTask(thrd);
-    kGlobObjs.scheduler.add(thrd);
+    kGlobObjs->scheduler->add(thrd);
     return thrd;
 }
 
@@ -88,7 +88,7 @@ void Task::switchTo(){
 }
 void Task::sleep(){
     Log(info,"sleep(this=Task<%d>)",this->id);
-    kGlobObjs.scheduler.sleep(this);
+    kGlobObjs->scheduler->sleep(this);
     // register xlen_t sp asm("sp");
     // saveContextTo(kctx.gpr);
 }
@@ -98,13 +98,13 @@ void Process::print(){
     Log(info,"===========");
 }
 Process* proc::createKProcess(prior_t prior){
-    auto proc=new (kGlobObjs.procMgr) Process(0,0);
+    auto proc=new (**kGlobObjs->procMgr) Process(0,0);
     proc->newKTask(prior);
     return proc;
 }
 Process* proc::createProcess(){
-    // auto proc=kGlobObjs.procMgr.alloc(0,0);
-    auto proc=new (kGlobObjs.procMgr) Process(0,0);
+    // auto proc=kGlobObjs->progMgr->alloc(0,0);
+    auto proc=new (**kGlobObjs->procMgr) Process(0,0);
     proc->newTask();
     static bool inited = false;
     if(inited) {
@@ -120,12 +120,12 @@ Process* proc::createProcess(){
     Log(info,"proc created. pid=%d\n",proc->id);
     return proc;
 }
-Process* Task::getProcess(){ return kGlobObjs.procMgr[proc]; }
+Process* Task::getProcess(){ return (**kGlobObjs->procMgr)[proc]; }
 proc::pid_t proc::clone(Task *task){
     auto proc=task->getProcess();
     Log(info,"clone(src=%p:[%d])",proc,proc->pid());
     TRACE(Log(info,"src proc VMAR:\n");proc->vmar.print();)
-    auto newproc=new (kGlobObjs.procMgr) Process(*proc);
+    auto newproc=new (**kGlobObjs->procMgr) Process(*proc);
     newproc->newTask(*task,false);
     newproc->defaultTask()->ctx.a0()=sys::statcode::ok;
     TRACE(newproc->vmar.print();)
@@ -142,23 +142,23 @@ void Process::exit(int status){
     /// @todo resource recycle
 
     for(auto task:tasks){
-        kGlobObjs.scheduler.remove(task);
+        kGlobObjs->scheduler->remove(task);
     }
 
     state=sched::Zombie;
 
     auto task=parentProc()->defaultTask();
-    kGlobObjs.scheduler.wakeup(task);
+    kGlobObjs->scheduler->wakeup(task);
 }
 void Process::zombieExit(){
     Log(info,"Proc[%d] zombie exit",pid());
-    kGlobObjs.procMgr.del(this);
+    kGlobObjs->procMgr->del(this);
 }
 Process::~Process(){
-    for(auto task:tasks)kGlobObjs.taskMgr.del(task);
+    for(auto task:tasks)kGlobObjs->taskMgr->del(task);
     tasks.clear();
 }
-Process *Process::parentProc(){return kGlobObjs.procMgr[parent];}
+Process *Process::parentProc(){return (**kGlobObjs->procMgr)[parent];}
 
 int Process::fdAlloc(SharedPtr<File> a_file, int a_fd){ // fd缺省值为-1，在头文件中定义
     if(a_fd < 0) {

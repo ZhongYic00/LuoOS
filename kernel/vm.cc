@@ -148,7 +148,7 @@ klib::string PageTable::toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
 pgtbl_t PageTable::createPTNode(){
     // return reinterpret_cast<pgtbl_t>(aligned_alloc(pageSize,pageSize));
     // auto rt=reinterpret_cast<pgtbl_t>(new PageTableNode);
-    auto rt=reinterpret_cast<pgtbl_t>(vm::pn2addr(kGlobObjs.pageMgr->alloc(1)));
+    auto rt=reinterpret_cast<pgtbl_t>(vm::pn2addr(kGlobObjs->pageMgr->alloc(1)));
     Log(debug,"createPTNode=0x%lx",rt);
     return rt;
 }
@@ -157,7 +157,7 @@ bool PageTable::freePTNode(pgtbl_t table){
         auto &entry=table[i];
         if(entry.isValid())return false;
     }
-    kGlobObjs.pageMgr->free(addr2pn((xlen_t)table),0);
+    kGlobObjs->pageMgr->free(addr2pn((xlen_t)table),0);
     return true;
 }
 xlen_t PageTable::toSATP(PageTable &table){
@@ -174,11 +174,11 @@ VMO vm::VMO::clone() const{
         case CloneType::shared:
             break;
         case CloneType::clone:
-            ppn=kGlobObjs.pageMgr->alloc(pages);
+            ppn=kGlobObjs->pageMgr->alloc(pages);
             copyframes(this->ppn(),ppn,pages);
             break;
         case CloneType::alloc:
-            ppn=kGlobObjs.pageMgr->alloc(pages);
+            ppn=kGlobObjs->pageMgr->alloc(pages);
             break;
         default:
             panic("unknown cloneType!");
@@ -186,6 +186,6 @@ VMO vm::VMO::clone() const{
     return VMO{ppn,pages,cloneType};
 }
 VMO vm::VMO::alloc(PageNum pages,CloneType type){
-    PageNum ppn=kGlobObjs.pageMgr->alloc(pages);
+    PageNum ppn=kGlobObjs->pageMgr->alloc(pages);
     return VMO{ppn,pages};
 }

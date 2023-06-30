@@ -24,7 +24,7 @@ void timerInterruptHandler(){
     for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
         auto towake = kHartObjs.sleep_tasks[i];
         if(towake.m_task!=nullptr && towake.m_wakeup_tick<kHartObjs.g_ticks) {
-            kGlobObjs.scheduler.wakeup(towake.m_task);
+            kGlobObjs->scheduler->wakeup(towake.m_task);
             kHartObjs.sleep_tasks[i].m_task = nullptr;
         }
     }
@@ -151,8 +151,7 @@ void _strapenter(){
     csrSwap(sscratch,t6);
     saveContext();
     extern xlen_t kstack_end;
-    csrRead(satp,kGlobObjs.prevsatp);
-    csrWrite(satp,kGlobObjs.ksatp);
+    csrWrite(satp,kGlobObjs->ksatp);
     ExecInst(sfence.vma);
     volatile register ptr_t sp asm("sp");
     // sp=(ptr_t)kstack_end;

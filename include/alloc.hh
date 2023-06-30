@@ -4,6 +4,7 @@
 #include "common.h"
 #include "klib.h"
 #include "vm.hh"
+#include "lock.hh"
 // #define DEBUG 1
 namespace alloc
 {
@@ -62,14 +63,14 @@ namespace alloc
         ptr_t realloc();
     };
     class HeapMgrGrowable:public HeapMgr{
-        PageMgr& pmgr;
+        LockedObject<PageMgr>& pmgr;
         klib::list<Span> dynPages;
         klib::ListNode<Span> *reservedNode;
         int growsize;
         void growHeap() override;
     public:
-        HeapMgrGrowable(HeapMgr &other,PageMgr &pmgr);
-        HeapMgrGrowable(ptr_t addr,xlen_t len,PageMgr &pmgr);
+        HeapMgrGrowable(HeapMgr &other,LockedObject<PageMgr> &pmgr);
+        HeapMgrGrowable(ptr_t addr,xlen_t len,LockedObject<PageMgr> &pmgr);
         ~HeapMgrGrowable();
     };
 } // namespace alloc

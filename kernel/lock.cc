@@ -15,7 +15,7 @@ namespace semaphore
         if(!waiting.empty()){
             auto front=waiting.pop_front();
             Log(info,"wakeup%s",front->toString().c_str());
-            kGlobObjs.scheduler.wakeup(front);
+            kGlobObjs->scheduler->wakeup(front);
         }
     }
 } // namespace semaphore

@@ -13,7 +13,7 @@ xlen_t ld::loadElf(const uint8_t *buff,vm::VMAR &vmar){
         const Elf64_Phdr &entry=phdrTable[i];
         if(entry.p_type!=PT_LOAD)continue;
         int pages=vm::bytes2pages(entry.p_memsz);
-        vm::PageNum ppn=(kGlobObjs.pageMgr->alloc(pages));
+        vm::PageNum ppn=(kGlobObjs->pageMgr->alloc(pages));
         Log(debug,"%x<=%x[%d pages@%x]",vm::addr2pn(entry.p_vaddr),ppn,pages,ld::elf::flags2perm(entry.p_flags));
         vmar.map(vm::PageMapping{vm::addr2pn(entry.p_vaddr),vm::VMO{ppn,pages},ld::elf::flags2perm(entry.p_flags),vm::PageMapping::MappingType::file});
         memcpy((ptr_t)vm::pn2addr(ppn),buff+entry.p_offset,entry.p_filesz);

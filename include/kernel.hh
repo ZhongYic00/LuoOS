@@ -110,27 +110,27 @@ namespace kernel {
             segment_t frames;
         }segments;
     };
-    struct KernelObjectsBuf{
-        #define OBJBUF(type,name) uint8_t name##Buf[sizeof(type)]
-        OBJBUF(alloc::HeapMgr,kHeapMgr);
-        OBJBUF(alloc::PageMgr,kPageMgr);
-        OBJBUF(vm::VMAR,kVMAR);
-    };
     struct KernelGlobalObjs{
-        vm::VMAR *vmar;
-        alloc::PageMgr *pageMgr;
-        alloc::HeapMgr *heapMgr;
-        sched::Scheduler scheduler;
-        proc::TaskManager taskMgr;
-        proc::ProcManager procMgr;
+        mutex::LockedObject<alloc::HeapMgrGrowable,spinlock<false>> heapMgr;
+        mutex::LockedObject<alloc::PageMgr> pageMgr;
+        mutex::LockedObject<vm::VMAR> vmar;
+        mutex::LockedObject<sched::Scheduler,spinlock<false>> scheduler;
+        mutex::LockedObject<proc::TaskManager,spinlock<false>> taskMgr;
+        mutex::LockedObject<proc::ProcManager,spinlock<false>> procMgr;
         xlen_t ksatp;
         xlen_t prevsatp;
+        KernelGlobalObjs();
     };
     struct KernelHartObjs{
         KernelTaskObjs *curtask;
         ptr_t trapstack;
         uint g_ticks;
         proc::SleepingTask sleep_tasks[NMAXSLEEP];
+    };
+    typedef mutex::ObjectGuard<kernel::KernelGlobalObjs> KernelGlobalObjsRef;
+    struct KernelObjectsBuf{
+        #define OBJBUF(type,name) uint8_t name##Buf[sizeof(type)]
+        OBJBUF(KernelGlobalObjs,kGlobObjs);
     };
     struct UtSName {
         char sysname[65];
@@ -155,8 +155,7 @@ namespace kernel {
     inline int threadId(){return kthreadIdBase+readHartId();}
     void createKernelMapping(vm::VMAR &vmar);
 }
-
-extern kernel::KernelGlobalObjs kGlobObjs;
+extern kernel::KernelGlobalObjs *kGlobObjs;
 extern kernel::KernelHartObjs kHartObjs;
 extern kernel::KernelInfo kInfo;
 
