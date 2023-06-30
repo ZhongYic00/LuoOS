@@ -78,6 +78,11 @@ namespace syscall {
         if(ep == nullptr) { panic("create /dev failed\n"); }
         // ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
         ep = fs::Path("/dev/vda2").pathCreate(T_DIR, 0);
+        // auto isempty = ep->isEmpty();
+        // auto dp = fs::Path("/dev/vda2/test").pathCreate(T_DIR, 0);
+        // isempty = ep->isEmpty();
+        // fs::Path("/dev/vda2/test").pathRemove();
+        // isempty = ep->isEmpty();
         if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
         Log(info,"fat initialize ok");
         return statcode::ok;

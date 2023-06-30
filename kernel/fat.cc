@@ -1289,11 +1289,11 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     ep->entRelse();
     return nullptr;
 }
-int DirEnt::entNext(DirEnt *a_entry, uint a_off, int *a_count) {
-    if (!(attribute & ATTR_DIRECTORY)) { panic("entFindNext not dir"); } // 不是目录
-    if (a_entry->valid) { panic("entFindNext ep valid"); } // 存放结果的结构已被占用
+int DirEnt::entNext(DirEnt *const a_entry, uint a_off, int *const a_count) {
+    if (!(attribute & ATTR_DIRECTORY)) { panic("entFindNext not dir"); }  // 不是目录
+    if (a_entry != nullptr && a_entry->valid) { panic("entFindNext ep valid"); }  // 存放结果的结构已被占用
     if (a_off % 32) { panic("entFindNext not align"); } // 未对齐
-    if (valid != 1) { return -1; } // 搜索目录无效
+    if (valid != 1) { return -1; }  // 搜索目录无效
     if (attribute & ATTR_LINK){
         struct Link li;
         dev_fat[dev].rwClus(first_clus, false, false, (uint64)&li, 0, 36);
@@ -1302,14 +1302,14 @@ int DirEnt::entNext(DirEnt *a_entry, uint a_off, int *a_count) {
     }
     union Ent de;
     int cnt = 0;
-    memset(a_entry->filename, 0, FAT32_MAX_FILENAME + 1);
+    bool islne = false;
+    if(a_entry != nullptr) { memset(a_entry->filename, 0, FAT32_MAX_FILENAME + 1); }
     // 遍历dp的簇
-    for (int off2; (off2 = relocClus(a_off, false)) != -1; a_off += 32) { // off2: 簇内偏移 off: 目录内偏移
+    for (int off2; (off2 = relocClus(a_off, false)) != -1; a_off += 32) {  // off2: 簇内偏移 off: 目录内偏移
         // 没对齐或在非"."和".."目录的情形下到达结尾
         auto bytes = dev_fat[dev].rwClus(cur_clus, false, false, (uint64)&de, off2, 32);
         auto fchar = ((char*)&de)[0];
         auto leorder = de.lne.order;
-        static bool first = true;
         if (bytes!= 32 || leorder==END_OF_ENTRY) { return -1; }
         // 当前目录为空目录
         if (de.lne.order == EMPTY_ENTRY) {
@@ -1317,26 +1317,26 @@ int DirEnt::entNext(DirEnt *a_entry, uint a_off, int *a_count) {
             continue;
         }
         // 文件已删除
-        else if (cnt) {
-            *a_count = cnt;
+        else if (cnt != 0) {
+            if(a_count != nullptr) { *a_count = cnt; }
             return 0;
         }
         // 长目录项
         if (de.lne.attr == ATTR_LONG_NAME) {
             int lcnt = de.lne.order & ~LAST_LONG_ENTRY;
-            if (de.lne.order & LAST_LONG_ENTRY) {
-                *a_count = lcnt + 1;                              // plus the s-n-e;
-                a_count = 0;
+            if (de.lne.order&LAST_LONG_ENTRY) {
+                if(a_count != nullptr) { *a_count = lcnt + 1; }  // plus the s-n-e;
+                islne = true;
             }
-            de.readEntName(a_entry->filename + (lcnt-1) * CHAR_LONG_NAME);
+            if(a_entry != nullptr ) { de.readEntName(a_entry->filename + (lcnt-1) * CHAR_LONG_NAME); }
         }
         // 短目录项
         else {
-            if (a_count) {
-                *a_count = 1;
-                de.readEntName(a_entry->filename);
+            if (!islne) {
+                if(a_count != nullptr) { *a_count = 1; }
+                if(a_entry != nullptr ) { de.readEntName(a_entry->filename); }
             }
-            *a_entry = de;
+            if(a_entry != nullptr ) { *a_entry = de; }
             return 1;
         }
     }
@@ -1595,6 +1595,22 @@ int DirEnt::entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) {
     }
     return tot;
 }
+void DirEnt::entRemove() {
+    if (valid != 1) { return; }
+    uint entcnt = 0;
+    uint32 off1 = off;
+    uint32 off2 = parent->relocClus(off1, false);
+    dev_fat[parent->dev].rwClus(parent->cur_clus, false, false, (uint64)&entcnt, off2, 1);
+    entcnt &= ~LAST_LONG_ENTRY;
+    uint8 flag = EMPTY_ENTRY;
+    for (int i = 0; i <= entcnt; i++) {
+        dev_fat[parent->dev].rwClus(parent->cur_clus, true, false, (uint64)&flag, off2, 1);
+        off1 += 32;
+        off2 = parent->relocClus(off1, false);
+    }
+    valid = -1;
+    return;
+}
 SuperBlock::BPB& SuperBlock::BPB::operator=(const BPB& a_bpb) {
     byts_per_sec = a_bpb.byts_per_sec;
     sec_per_clus = a_bpb.sec_per_clus;
@@ -1747,4 +1763,15 @@ DirEnt *Path::pathCreate(short a_type, int a_mode, SharedPtr<File> a_file) const
     }
     dp->entRelse();
     return ep;
+}
+int Path::pathRemove(SharedPtr<File> a_file) const {
+    DirEnt *ep = pathSearch(a_file);
+    if(ep == nullptr) { return -1; }
+    if((ep->attribute & ATTR_DIRECTORY) && !ep->isEmpty()) {
+        entRelse(ep);
+        return -1;
+    }
+    ep->entRemove();
+    entRelse(ep);
+    return 0;
 }
