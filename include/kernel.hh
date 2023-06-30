@@ -151,6 +151,8 @@ namespace kernel {
             inline time_t tvNSec() { return m_tv_nsec; }
     };
     inline int readHartId(){register int hartid asm("tp"); return hartid;}
+    constexpr tid_t kthreadIdBase=0x80000000;
+    inline int threadId(){return kthreadIdBase+readHartId();}
     void createKernelMapping(vm::VMAR &vmar);
 }
 
