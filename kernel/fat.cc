@@ -1549,6 +1549,52 @@ void DirEnt::entCreateOnDisk(const DirEnt *a_entry, uint a_off) {
         dev_fat[dev].rwClus(cur_clus, true, false, (uint64)&de, a_off, sizeof(de));
     }
 }
+int DirEnt::entRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) {
+    if (a_off > file_size || a_off + a_len < a_off || (attribute & ATTR_DIRECTORY)) { return 0; }
+    if (attribute & ATTR_LINK){
+        struct Link li;
+        dev_fat[dev].rwClus(first_clus, false, false, (uint64)&li, 0, 36);
+        first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
+        attribute = li.de.sne.attr;
+    }
+    if (a_off + a_len > file_size) { a_len = file_size - a_off; }
+    uint tot, m;
+    for (tot = 0; cur_clus < FAT32_EOC && tot < a_len; tot += m, a_off += m, a_dst += m) {
+        relocClus(a_off, false);
+        m = dev_fat[dev].rBPC() - a_off % dev_fat[dev].rBPC();
+        if (a_len - tot < m) { m = a_len - tot; }
+        if (dev_fat[dev].rwClus(cur_clus, false, a_usrdst, a_dst, a_off % dev_fat[dev].rBPC(), m) != m) { break; }
+    }
+    return tot;
+}
+int DirEnt::entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) {
+    if (a_off > file_size || a_off + a_len < a_off || (uint64)a_off + a_len > 0xffffffff || (attribute & ATTR_READ_ONLY)) { return -1; }
+    if (attribute & ATTR_LINK){
+        struct Link li;
+        dev_fat[dev].rwClus(first_clus, false, false, (uint64)&li, 0, 36);
+        first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
+        attribute = li.de.sne.attr;
+    }
+    if (first_clus == 0) {   // so file_size if 0 too, which requests a_off == 0
+        cur_clus = first_clus = allocClus();
+        clus_cnt = 0;
+        dirty = true;
+    }
+    uint tot, m;
+    for (tot = 0; tot < a_len; tot += m, a_off += m, a_src += m) {
+        relocClus(a_off, true);
+        m = dev_fat[dev].rBPC() - a_off % dev_fat[dev].rBPC();
+        if (a_len - tot < m) { m = a_len - tot; }
+        if (dev_fat[dev].rwClus(cur_clus, true, a_usrsrc, a_src, a_off % dev_fat[dev].rBPC(), m) != m) { break; }
+    }
+    if(a_len > 0) {
+        if(a_off > file_size) {
+            file_size = a_off;
+            dirty = true;
+        }
+    }
+    return tot;
+}
 SuperBlock::BPB& SuperBlock::BPB::operator=(const BPB& a_bpb) {
     byts_per_sec = a_bpb.byts_per_sec;
     sec_per_clus = a_bpb.sec_per_clus;
@@ -1568,22 +1614,22 @@ SuperBlock& SuperBlock::operator=(const SuperBlock& a_spblk) {
     bpb = a_spblk.bpb;
     return *this;
 }
-const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrdst, uint64 a_data, uint a_off, uint a_len) const {
+const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, uint64 a_buf, uint a_off, uint a_len) const {
     if (a_off + a_len > rBPC()) { panic("offset out of range"); }
     uint tot, m;
     struct buf *bp;
     uint sec = firstSec(a_cluster) + a_off / rBPS();
     a_off = a_off % rBPS();
     int bad = 0;
-    for (tot = 0; tot < a_len; tot += m, a_off += m, a_data += m, sec++) {
+    for (tot = 0; tot < a_len; tot += m, a_off += m, a_buf += m, sec++) {
         bp = bread(0, sec);  // @todo 设备号？
         m = BSIZE - a_off % BSIZE;
         if (a_len - tot < m) { m = a_len - tot; }
         // @todo 弃用bufCopyIn/Out()
         if (a_iswrite) {
-            if ((bad = bufCopyIn(bp->data + (a_off % BSIZE), a_usrdst, a_data, m)) != -1) { bwrite(bp); }
+            if ((bad = bufCopyIn(bp->data + (a_off % BSIZE), a_usrbuf, a_buf, m)) != -1) { bwrite(bp); }
         }
-        else { bad = bufCopyOut(a_usrdst, a_data, bp->data + (a_off % BSIZE), m); }
+        else { bad = bufCopyOut(a_usrbuf, a_buf, bp->data + (a_off % BSIZE), m); }
         brelse(bp);
         if (bad == -1) { break; }
     }

@@ -28,7 +28,7 @@ xlen_t fs::File::write(xlen_t addr,size_t len){
             break;
         case FileType::entry:
             entLock(obj.ep);
-            if (entWrite(obj.ep, 1, addr, off, len) == len) {
+            if (obj.ep->entWrite(true, addr, off, len) == len) {
                 off += len;
                 rt = len;
             }
@@ -57,7 +57,7 @@ klib::ByteArray fs::File::read(size_t len, long a_off, bool a_update){
             int rdbytes = 0;
             klib::ByteArray buf(len);
             entLock(obj.ep);
-            if((rdbytes = entRead(obj.ep, 0, (uint64)buf.buff, a_off, len)) > 0) {
+            if((rdbytes = obj.ep->entRead(false, (uint64)buf.buff, a_off, len)) > 0) {
                 if(a_update) { off = a_off + rdbytes; }
             }
             entUnlock(obj.ep);

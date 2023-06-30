@@ -53,13 +53,13 @@ namespace syscall {
         assert(rt == 0);
         Log(info, "pathCreateAt success\n---------------------------------------------------------");
         klib::string content = "test write";
-        rt=fs::entWrite(testfile, 0, (xlen_t)content.c_str(), 0, content.size());
+        rt=testfile->entWrite(false, (xlen_t)content.c_str(), 0, content.size());
         assert(rt == content.size());
         fs::entRelse(testfile);
         Log(info, "entWrite success\n---------------------------------------------------------");
         testfile = fs::Path("/testfile").pathSearch(f);
         char buf[2 * content.size()];
-        rt = fs::entRead(testfile, 0, (xlen_t)buf, 0, content.size());
+        rt = testfile->entRead(false, (xlen_t)buf, 0, content.size());
         assert(rt == content.size());
         fs::entRelse(testfile);
         Log(info, "entRead success\n---------------------------------------------------------");

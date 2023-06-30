@@ -69,6 +69,8 @@ namespace fs {
             void parentUpdate();
             DirEnt *entCreate(string a_name, int a_attr);
             void entCreateOnDisk(const DirEnt *a_entry, uint a_off);
+            int entRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len);
+            int entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len);
     };
     struct Link{
         union Ent de;
@@ -119,7 +121,7 @@ namespace fs {
             inline const uint32 rTS() const { return bpb.tot_sec; }
             inline const uint32 rFS() const { return bpb.fat_sz; }
             inline const uint32 rRC() const { return bpb.root_clus; }
-            const uint rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrdst, uint64 a_data, uint a_off, uint a_len) const;
+            const uint rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, uint64 a_buf, uint a_off, uint a_len) const;
             inline const uint32 firstSec(uint32 a_cluster) const { return (a_cluster-2)*rSPC() + rFDS(); }
             const uint32 fatRead(uint32 a_cluster) const;
             inline const uint32 numthSec(uint32 a_cluster, uint8 a_fat_num) const { return rRSC() + (a_cluster<<2) / rBPS() + rFS() * (a_fat_num-1); }
@@ -203,25 +205,25 @@ namespace fs {
 
 
     int fat32Init(void);
-    DirEnt *dirLookUp(DirEnt *entry, const char *filename, uint *poff);
-    char* flNameOld(char *name);
-    void entSynAt(DirEnt *dp, DirEnt *ep, uint off);
-    DirEnt *entCreateAt(DirEnt *dp, char *name, int attr);
-    DirEnt *entDup(DirEnt *entry);
-    void dirUpdate(DirEnt *entry);
-    void entTrunc(DirEnt *entry);
+    DirEnt *dirLookUp(DirEnt *entry, const char *filename, uint *poff);//
+    char* flNameOld(char *name);//
+    void entSynAt(DirEnt *dp, DirEnt *ep, uint off);//
+    DirEnt *entCreateAt(DirEnt *dp, char *name, int attr);//
+    DirEnt *entDup(DirEnt *entry);//
+    void dirUpdate(DirEnt *entry);//
+    void entTrunc(DirEnt *entry);//
     void entRemove(DirEnt *entry);
-    void entRelse(DirEnt *entry);
+    void entRelse(DirEnt *entry);//
     void entStat(DirEnt *ep, struct Stat *st);
-    void entLock(DirEnt *entry);
-    void entUnlock(DirEnt *entry);
-    int entFindNext(DirEnt *dp, DirEnt *ep, uint off, int *count);
-    DirEnt *entEnter(char *path);
-    DirEnt *entEnterParent(char *path, char *name);
-    int entRead(DirEnt *entry, int user_dst, uint64 dst, uint off, uint n);
+    void entLock(DirEnt *entry);//
+    void entUnlock(DirEnt *entry);//
+    int entFindNext(DirEnt *dp, DirEnt *ep, uint off, int *count);//
+    DirEnt *entEnter(char *path);//
+    DirEnt *entEnterParent(char *path, char *name);//
+    int entRead(DirEnt *entry, int user_dst, uint64 dst, uint off, uint n);//
     int entWrite(DirEnt *entry, int user_src, uint64 src, uint off, uint n);
-    DirEnt *entEnterParentAt(char *path, char *name, SharedPtr<File> f);
-    DirEnt *entEnterFrom(char *path, SharedPtr<File> f);
+    DirEnt *entEnterParentAt(char *path, char *name, SharedPtr<File> f);//
+    DirEnt *entEnterFrom(char *path, SharedPtr<File> f);//
     uint32 getBytesPerClus();
     int entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2);
     int entUnlink(char *path, SharedPtr<File> f);
@@ -230,8 +232,8 @@ namespace fs {
     int pathRemoveAt(char *path, SharedPtr<File> f);
     int devMount(DirEnt *mountpoint,DirEnt *dev);
     int devUnmount(DirEnt *mountpoint);
-    DirEnt *pathCreate(char *path, short type, int mode);
-    DirEnt *pathCreateAt(char *path, short type, int mode, SharedPtr<File> f);
+    DirEnt *pathCreate(char *path, short type, int mode);//
+    DirEnt *pathCreateAt(char *path, short type, int mode, SharedPtr<File> f);//
     void getDStat(DirEnt *de, struct DStat *st);
     void getKStat(DirEnt *de, struct KStat *kst);
 
