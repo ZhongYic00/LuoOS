@@ -44,7 +44,7 @@ namespace syscall {
         return sleep();
     }
     xlen_t testMount() {
-        int rt = fs::fat32Init();
+        int rt = fs::rootFSInit();
         kHartObjs.curtask->getProcess()->cwd = fs::Path("/").pathSearch();
         printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
         SharedPtr<File> f;
@@ -55,20 +55,20 @@ namespace syscall {
         klib::string content = "test write";
         rt=testfile->entWrite(false, (xlen_t)content.c_str(), 0, content.size());
         assert(rt == content.size());
-        fs::entRelse(testfile);
+        testfile->entRelse();
         Log(info, "entWrite success\n---------------------------------------------------------");
         testfile = fs::Path("/testfile").pathSearch(f);
         char buf[2 * content.size()];
         rt = testfile->entRead(false, (xlen_t)buf, 0, content.size());
         assert(rt == content.size());
-        fs::entRelse(testfile);
+        testfile->entRelse();
         Log(info, "entRead success\n---------------------------------------------------------");
         printf("%s\n", buf);
         return rt;
     }
     xlen_t testFATInit() {
         Log(info, "initializing fat\n");
-        if(fs::fat32Init() != 0) { panic("fat init failed\n"); }
+        if(fs::rootFSInit() != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObjs.curtask->getProcess();
         // curproc->cwd = fs::entEnter("/");
         curproc->cwd = fs::Path("/").pathSearch();
@@ -170,8 +170,7 @@ namespace syscall {
             printf("can't create %s\n", path);
             return statcode::err;
         }
-        fs::entUnlock(ep);
-        fs::entRelse(ep);
+        ep->entRelse();
 
         return statcode::ok;
     }
@@ -234,7 +233,7 @@ namespace syscall {
             return statcode::err;
         }
 
-        return fs::devUnmount(ep);
+        return ep->entUnmount();
     }
     xlen_t mount() {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -278,7 +277,7 @@ namespace syscall {
             return statcode::err;
         }
 
-        return devMount(ep, dev_ep);
+        return ep->entMount(dev_ep);
     }
     xlen_t chDir(void) {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -291,15 +290,12 @@ namespace syscall {
         // DirEnt *ep = fs::entEnter(path);
         DirEnt *ep = fs::Path(path).pathSearch();
         if(ep == nullptr) { return statcode::err; }
-        fs::entLock(ep);
         if(!(ep->attribute & ATTR_DIRECTORY)){
-            fs::entUnlock(ep);
-            fs::entRelse(ep);
+            ep->entRelse();
             return statcode::err;
         }
-        fs::entUnlock(ep);
 
-        fs::entRelse(curproc->cwd);
+        curproc->cwd->entRelse();
         curproc->cwd = ep;
         curproc->files[3]=eastl::make_shared<File>(curproc->cwd, O_RDWR);
 
@@ -330,17 +326,14 @@ namespace syscall {
         else {
             // if((ep = fs::entEnterFrom(path, f2)) == nullptr) { return statcode::err; }
             if((ep = fs::Path(path).pathSearch(f2)) == nullptr) { return statcode::err; }
-            fs::entLock(ep);
             if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
                 printf("dir can't write\n");
-                fs::entUnlock(ep);
-                fs::entRelse(ep);
+                ep->entRelse();
                 return statcode::err;
             }
             if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
                 printf("it is not dir\n");
-                fs::entUnlock(ep);
-                fs::entRelse(ep);
+                ep->entRelse();
                 return statcode::err;
             }
         }
@@ -348,11 +341,11 @@ namespace syscall {
         f1->off = (a_flags&O_APPEND) ? ep->file_size : 0;
         fd = curproc->fdAlloc(f1);
         if(fdOutRange(fd)) {
-            fs::entRelse(ep);
+            ep->entRelse();
             return statcode::err;
             // 如果fd分配不成功，f过期后会自动delete        
         }
-        if(!(ep->attribute&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { fs::entTrunc(ep); }
+        if(!(ep->attribute&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { ep->entTrunc(); }
 
         return fd;
     }

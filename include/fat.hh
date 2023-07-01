@@ -2,6 +2,7 @@
 #define FAT_HH__
 
 #include "fs.hh"
+#include "buf.h"
 
 namespace fs {
     using eastl::string;
@@ -54,10 +55,12 @@ namespace fs {
             DirEnt *next; // 
             DirEnt *prev; // 
             uint8 mount_flag;
-            // struct sleeplock lock;
         // public:
+            // @todo 暂时不能写构造函数，会禁用初始化列表
+            // DirEnt() {}
+            // DirEnt(const DirEnt& a_entry):filename(), attribute(a_entry.attribute), first_clus(a_entry.first_clus), file_size(a_entry.file_size), cur_clus(a_entry.cur_clus), clus_cnt(a_entry.clus_cnt), dev(a_entry.dev), dirty(a_entry.dirty), valid(a_entry.valid), ref(a_entry.ref), off(a_entry.off), parent(a_entry.parent), next(a_entry.next), prev(a_entry.prev), mount_flag(a_entry.mount_flag) { strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME); }
+            // ~DirEnt() {}
             DirEnt& operator=(const union Ent& a_ent);
-            
             DirEnt *entSearch(string a_dirname, uint *a_off = nullptr);
             int entNext(DirEnt *const a_entry, uint a_off, int *const a_count);
             inline int entNext(DirEnt *const a_entry, uint a_off) { return entNext(a_entry, a_off, nullptr); }
@@ -76,6 +79,8 @@ namespace fs {
             int entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len);
             void entRemove();
             inline bool isEmpty() { return entNext(2 * 32) == -1; }  // skip the "." and ".."
+            int entMount(const DirEnt *a_dev);
+            int entUnmount();
     };
     struct Link{
         union Ent de;
@@ -99,6 +104,7 @@ namespace fs {
                 uint32 root_clus; // 根目录簇号
                 BPB_t() {}
                 BPB_t(const BPB_t& a_bpb):byts_per_sec(a_bpb.byts_per_sec), sec_per_clus(a_bpb.sec_per_clus), rsvd_sec_cnt(a_bpb.rsvd_sec_cnt), fat_cnt(a_bpb.fat_cnt), hidd_sec(a_bpb.hidd_sec), tot_sec(a_bpb.tot_sec), fat_sz(a_bpb.fat_sz), root_clus(a_bpb.root_clus) {}
+                BPB_t(const struct buf& a_buf):byts_per_sec(*(uint16*)(a_buf.data+11)), sec_per_clus(*(uint8*)(a_buf.data+13)), rsvd_sec_cnt(*(uint16*)(a_buf.data+14)), fat_cnt(*(uint8*)(a_buf.data+16)), hidd_sec(*(uint32*)(a_buf.data+28)), tot_sec(*(uint32*)(a_buf.data+32)), fat_sz(*(uint32*)(a_buf.data+36)), root_clus(*(uint32*)(a_buf.data+44)) {}
                 BPB_t(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):byts_per_sec(a_bps), sec_per_clus(a_spc), rsvd_sec_cnt(a_rsc), fat_cnt(a_fc), hidd_sec(a_hs), tot_sec(a_ts), fat_sz(a_fs), root_clus(a_rc) {}
                 ~BPB_t() {}
                 BPB_t& operator=(const BPB_t& a_bpb);
@@ -109,8 +115,9 @@ namespace fs {
             SuperBlock(const SuperBlock& a_spblk):first_data_sec(a_spblk.first_data_sec), data_sec_cnt(a_spblk.data_sec_cnt), data_clus_cnt(a_spblk.data_clus_cnt), byts_per_clus(a_spblk.byts_per_clus), bpb(a_spblk.bpb) {}
             SuperBlock(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, BPB a_bpb):first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bpb) {}
             SuperBlock(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc) {}
-            SuperBlock(BPB a_bpb):first_data_sec(a_bpb.rsvd_sec_cnt+a_bpb.fat_cnt*a_bpb.fat_sz), data_sec_cnt(a_bpb.tot_sec-first_data_sec), data_clus_cnt(data_sec_cnt/a_bpb.sec_per_clus), byts_per_clus(a_bpb.sec_per_clus*a_bpb.byts_per_sec), bpb(a_bpb) {}
-            SuperBlock(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):first_data_sec(a_rsc+a_fc*a_fs), data_sec_cnt(a_ts-first_data_sec), data_clus_cnt(data_sec_cnt/a_spc), byts_per_clus(a_spc*a_bps), bpb(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc) {}
+            SuperBlock(const BPB& a_bpb):first_data_sec(a_bpb.rsvd_sec_cnt+a_bpb.fat_cnt*a_bpb.fat_sz), data_sec_cnt(a_bpb.tot_sec-first_data_sec), data_clus_cnt(data_sec_cnt/a_bpb.sec_per_clus), byts_per_clus(a_bpb.sec_per_clus*a_bpb.byts_per_sec), bpb(a_bpb) {}
+            SuperBlock(const struct buf& a_buf):SuperBlock(BPB(a_buf)) {}
+            SuperBlock(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):SuperBlock(BPB(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc)) {}
             ~SuperBlock() {}
             SuperBlock& operator=(const SuperBlock& a_spblk);
             inline const uint32 rFDS() const { return first_data_sec; }
@@ -144,10 +151,11 @@ namespace fs {
         public:
             FileSystem() {}
             FileSystem(const FileSystem& a_fs):SuperBlock(a_fs), valid(a_fs.valid), root(a_fs.root), mount_mode(a_fs.mount_mode) {}
-            FileSystem(SuperBlock a_spblk, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_spblk), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(const SuperBlock& a_spblk, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_spblk), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, BPB a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_fds, a_dsc, a_dcc, a_bpc, a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_fds, a_dsc, a_dcc, a_bpc, a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(BPB a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(const BPB& a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(const struct buf& a_buf, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_buf), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             FileSystem(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             ~FileSystem() {}
             FileSystem& operator=(const FileSystem& a_fs);
@@ -176,7 +184,10 @@ namespace fs {
             DirEnt *pathCreate(short a_type, int a_mode, SharedPtr<File> a_file = nullptr) const;
             int pathRemove(SharedPtr<File> a_file = nullptr) const;
             int pathLink(SharedPtr<File> a_f1, const Path& a_newpath, SharedPtr<File> a_f2) const;
-            int pathUnlink(SharedPtr<File> a_file) const;
+            inline int pathLink(const Path& a_newpath, SharedPtr<File> a_f2) const { return pathLink(nullptr, a_newpath, a_f2); }
+            inline int pathLink(SharedPtr<File> a_f1, const Path& a_newpath) const { return pathLink(a_f1, a_newpath, nullptr); }
+            inline int pathLink(const Path& a_newpath) const { return pathLink(nullptr, a_newpath, nullptr); }
+            int pathUnlink(SharedPtr<File> a_file = nullptr) const;
     };
 	class DStat {
         public:
@@ -185,20 +196,23 @@ namespace fs {
             uint16 d_reclen;	// 当前dirent的长度
             uint8 d_type;	// 文件类型
             char d_name[STAT_MAX_NAME + 1];	//文件名
+        // public:
             DStat() {}
             DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, STAT_MAX_NAME); }
             DStat(const DirEnt& a_entry):d_ino(a_entry.first_clus), d_off(0), d_reclen(a_entry.file_size), d_type((a_entry.attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry.filename, STAT_MAX_NAME); }
             ~DStat() {}
 	};
-	struct Stat {
-        char name[STAT_MAX_NAME + 1]; // 文件名
-        int dev;     // File system's disk device // 文件系统的磁盘设备
-        short type;  // Type of file // 文件类型
-        uint64 size; // Size of file in bytes // 文件大小(字节)
-        Stat() {}
-        Stat(const struct Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
-        Stat(const DirEnt& a_entry):name(), dev(a_entry.dev), type((a_entry.attribute&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry.file_size) { strncpy(name, a_entry.filename, STAT_MAX_NAME); }
-        ~Stat() {}
+	class Stat {
+        public:
+            char name[STAT_MAX_NAME + 1]; // 文件名
+            int dev;     // File system's disk device // 文件系统的磁盘设备
+            short type;  // Type of file // 文件类型
+            uint64 size; // Size of file in bytes // 文件大小(字节)
+        // public:
+            Stat() {}
+            Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
+            Stat(const DirEnt& a_entry):name(), dev(a_entry.dev), type((a_entry.attribute&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry.file_size) { strncpy(name, a_entry.filename, STAT_MAX_NAME); }
+            ~Stat() {}
 	};
 	class KStat {
         public:
@@ -222,46 +236,13 @@ namespace fs {
             long st_ctime_nsec;
             // unsigned __unused[2];
             unsigned _unused[2]; // @todo 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
+        // public:
             KStat() {}
             KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
             KStat(const DirEnt& a_entry):st_dev(a_entry.dev), st_ino(a_entry.first_clus), st_mode((a_entry.attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry.file_size), st_blksize(dev_fat[a_entry.dev].rBPC()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
             ~KStat() {}
 	};
-
-
-    int fat32Init(void);
-    DirEnt *dirLookUp(DirEnt *entry, const char *filename, uint *poff);//
-    char* flNameOld(char *name);//
-    void entSynAt(DirEnt *dp, DirEnt *ep, uint off);//
-    DirEnt *entCreateAt(DirEnt *dp, char *name, int attr);//
-    DirEnt *entDup(DirEnt *entry);//
-    void dirUpdate(DirEnt *entry);//
-    void entTrunc(DirEnt *entry);//
-    void entRemove(DirEnt *entry);//
-    void entRelse(DirEnt *entry);//
-    void entStat(DirEnt *ep, struct Stat *st);//
-    void entLock(DirEnt *entry);//
-    void entUnlock(DirEnt *entry);//
-    int entFindNext(DirEnt *dp, DirEnt *ep, uint off, int *count);//
-    DirEnt *entEnter(char *path);//
-    DirEnt *entEnterParent(char *path, char *name);//
-    int entRead(DirEnt *entry, int user_dst, uint64 dst, uint off, uint n);//
-    int entWrite(DirEnt *entry, int user_src, uint64 src, uint off, uint n);//
-    DirEnt *entEnterParentAt(char *path, char *name, SharedPtr<File> f);//
-    DirEnt *entEnterFrom(char *path, SharedPtr<File> f);//
-    uint32 getBytesPerClus();//
-    int entLink(char* oldpath, SharedPtr<File> f1, char* newpath, SharedPtr<File> f2);
-    int entUnlink(char *path, SharedPtr<File> f);
-    int pathRemove(char *path);//
-    int dirIsEmpty(DirEnt *dp);//
-    int pathRemoveAt(char *path, SharedPtr<File> f);//
-    int devMount(DirEnt *mountpoint,DirEnt *dev);
-    int devUnmount(DirEnt *mountpoint);
-    DirEnt *pathCreate(char *path, short type, int mode);//
-    DirEnt *pathCreateAt(char *path, short type, int mode, SharedPtr<File> f);//
-    void getDStat(DirEnt *de, DStat *st);//
-    void getKStat(DirEnt *de, KStat *kst);//
-
+    int rootFSInit();
 }
 
 #endif
