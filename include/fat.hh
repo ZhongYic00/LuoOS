@@ -164,15 +164,19 @@ namespace fs {
         public:
             Path() {}
             Path(const Path& a_path):pathname(a_path.pathname), dirname(a_path.dirname) {}
-            Path(const string& a_str);
+            Path(const string& a_str):pathname(a_str), dirname() { pathBuild(); }
+            Path(const char *a_str):pathname(a_str), dirname() { pathBuild(); }
             const Path& operator=(const Path& a_path);
             ~Path() {}
+            void pathBuild();
             DirEnt *pathSearch(SharedPtr<File> a_file, bool a_parent) const;  // @todo 返回值改为File类型
             inline DirEnt *pathSearch(SharedPtr<File> a_file) const { return pathSearch(a_file, false); }
             inline DirEnt *pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
             inline DirEnt *pathSearch() const { return pathSearch(nullptr, false); }
             DirEnt *pathCreate(short a_type, int a_mode, SharedPtr<File> a_file = nullptr) const;
             int pathRemove(SharedPtr<File> a_file = nullptr) const;
+            int pathLink(SharedPtr<File> a_f1, const Path& a_newpath, SharedPtr<File> a_f2) const;
+            int pathUnlink(SharedPtr<File> a_file) const;
     };
 	class DStat {
         public:

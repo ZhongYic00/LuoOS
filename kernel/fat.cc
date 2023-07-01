@@ -1690,7 +1690,12 @@ FileSystem& FileSystem::operator=(const FileSystem& a_fs) {
     mount_mode = a_fs.mount_mode;
     return *this;
 }
-Path::Path(const string& a_str):pathname(a_str), dirname() {
+const Path& Path::operator=(const Path& a_path) {
+    pathname = a_path.pathname;
+    dirname = a_path.dirname;
+    return *this;
+}
+void Path::pathBuild() {
     size_t len = pathname.length();
     if(len > 0) {  // 保证数组长度不为0
         auto ind = new size_t[len][2] { { 0, 0 } };
@@ -1716,11 +1721,7 @@ Path::Path(const string& a_str):pathname(a_str), dirname() {
         for(size_t i = 0; i < dirnum; ++i) { dirname[i] = pathname.substr(ind[i][0], ind[i][1]); }
         delete[] ind;
     }
-}
-const Path& Path::operator=(const Path& a_path) {
-    pathname = a_path.pathname;
-    dirname = a_path.dirname;
-    return *this;
+    return;
 }
 DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  // @todo 改成返回File
     DirEnt *entry, *next;
@@ -1775,4 +1776,92 @@ int Path::pathRemove(SharedPtr<File> a_file) const {
     ep->entRemove();
     entRelse(ep);
     return 0;
+}
+int Path::pathLink(SharedPtr<File> a_f1, const Path& a_newpath, SharedPtr<File> a_f2) const {
+    DirEnt *dp1 = pathSearch(a_f1);
+    if(dp1 == nullptr) {
+        printf("can't find dir\n");
+        return -1;
+    }
+    DirEnt *parent1 = dp1->parent;
+    int off2 = parent1->relocClus(dp1->off, false);
+    union Ent de;
+    if (dev_fat[parent1->dev].rwClus(parent1->cur_clus, false, false, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
+        printf("can't read Ent\n");
+        return -1;
+    }
+    struct Link li;
+    int clus;
+    if(!(de.sne.attr & ATTR_LINK)){
+        clus = dp1->allocClus();
+        li.de = de;
+        li.link_count = 2;
+        if(dev_fat[dp1->dev].rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
+            printf("write li wrong\n");
+            return -1;
+        }
+        de.sne.attr = ATTR_DIRECTORY | ATTR_LINK;
+        de.sne.fst_clus_hi = (uint16)(clus >> 16);       
+        de.sne.fst_clus_lo = (uint16)(clus & 0xffff);
+        de.sne.file_size = 36;
+        if(dev_fat[parent1->dev].rwClus(parent1->cur_clus, true, false, (uint64)&de, off2, 32) != 32){
+            printf("write parent1 wrong\n");
+            return -1;
+        }
+    }
+    else {
+        clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
+        dev_fat[dp1->dev].rwClus(clus, false, false, (uint64)&li, 0, 36);
+        li.link_count++;
+        if(dev_fat[dp1->dev].rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
+            printf("write li wrong\n");
+            return -1;
+        }
+    }
+    DirEnt *dp2 = a_newpath.pathSearch(a_f2);
+    if(dp2 == nullptr) {
+        printf("can't find dir\n");
+        return NULL;
+    }
+    uint off = 0;
+    DirEnt *ep = dp2->entSearch(a_newpath.dirname.back(), &off);
+    if(ep != nullptr) {
+        printf("%s exits", a_newpath.dirname.back().c_str());
+        return -1;
+    }
+    off = dp2->relocClus(off, true);
+    if(dev_fat[dp2->dev].rwClus(dp2->cur_clus, true, false, (uint64)&de, off, 32) != 32){
+        printf("write de into %s wrong",dp2->filename);
+        return -1;
+    }
+    return 0;
+}
+int Path::pathUnlink(SharedPtr<File> a_file) const {
+    DirEnt *dp = pathSearch(a_file);
+    if(dp == nullptr) { return -1; }
+    DirEnt *parent = dp->parent;
+    int off = parent->relocClus(dp->off, false);
+    union Ent de;
+    if (dev_fat[parent->dev].rwClus(parent->cur_clus, false, false, (uint64)&de, off, 32) != 32 || de.lne.order == END_OF_ENTRY) {
+        printf("can't read Ent\n");
+        return -1;
+    }
+    if(de.sne.attr & ATTR_LINK) {
+        int clus;
+        struct Link li;
+        clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
+        if(dev_fat[dp->dev].rwClus(clus, false, false, (uint64)&li, 0, 36) != 36) {
+            printf("read li wrong\n");
+            return -1;
+        }
+        if(--li.link_count == 0){
+            freeClus(clus);
+            de = li.de;
+            if(dev_fat[parent->dev].rwClus(parent->cur_clus, true, false, (uint64)&de, off, 32) != 32){
+                printf("write de into %s wrong\n",parent->filename);
+                return -1;
+            }
+        }
+    }
+    return pathRemove(a_file);
 }

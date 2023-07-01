@@ -189,7 +189,7 @@ namespace syscall {
         SharedPtr<File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; } // 非绝对路径
 
-        return fs::entUnlink(path, f);
+        return fs::Path(path).pathUnlink(f);
     }
     xlen_t linkAt(void) {
         auto &ctx = kHartObjs.curtask->ctx;
@@ -211,7 +211,8 @@ namespace syscall {
         if(*oldpath != '/') { f1 = curproc->files[a_olddirfd]; }
         if(*newpath != '/') { f2 = curproc->files[a_newdirfd]; }
 
-        return fs::entLink(oldpath, f1, newpath, f2);
+        // return fs::entLink(oldpath, f1, newpath, f2);
+        return fs::Path(oldpath).pathLink(f1, newpath, f2);
     }
     xlen_t umount2(void) {
         auto &ctx = kHartObjs.curtask->ctx;
