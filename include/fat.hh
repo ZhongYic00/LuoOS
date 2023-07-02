@@ -5,8 +5,6 @@
 #include "buf.h"
 
 namespace fs {
-    using eastl::string;
-    using eastl::vector;
     typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）
         uint8 attr; // 属性
@@ -144,7 +142,6 @@ namespace fs {
     };
     class FileSystem:public SuperBlock {
         private:
-            // SuperBlock spblk;
             bool valid;
             DirEnt root; //这个文件系统的根目录文件
             uint8 mount_mode; //是否被挂载的标志
@@ -177,17 +174,21 @@ namespace fs {
             const Path& operator=(const Path& a_path);
             ~Path() {}
             void pathBuild();
-            DirEnt *pathSearch(SharedPtr<File> a_file, bool a_parent) const;  // @todo 返回值改为File类型
-            inline DirEnt *pathSearch(SharedPtr<File> a_file) const { return pathSearch(a_file, false); }
+            DirEnt *pathSearch(shared_ptr<File> a_file, bool a_parent) const;  // @todo 返回值改为File类型
+            inline DirEnt *pathSearch(shared_ptr<File> a_file) const { return pathSearch(a_file, false); }
             inline DirEnt *pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
             inline DirEnt *pathSearch() const { return pathSearch(nullptr, false); }
-            DirEnt *pathCreate(short a_type, int a_mode, SharedPtr<File> a_file = nullptr) const;
-            int pathRemove(SharedPtr<File> a_file = nullptr) const;
-            int pathLink(SharedPtr<File> a_f1, const Path& a_newpath, SharedPtr<File> a_f2) const;
-            inline int pathLink(const Path& a_newpath, SharedPtr<File> a_f2) const { return pathLink(nullptr, a_newpath, a_f2); }
-            inline int pathLink(SharedPtr<File> a_f1, const Path& a_newpath) const { return pathLink(a_f1, a_newpath, nullptr); }
+            DirEnt *pathCreate(short a_type, int a_mode, shared_ptr<File> a_file = nullptr) const;
+            int pathRemove(shared_ptr<File> a_file = nullptr) const;
+            int pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const;
+            inline int pathLink(const Path& a_newpath, shared_ptr<File> a_f2) const { return pathLink(nullptr, a_newpath, a_f2); }
+            inline int pathLink(shared_ptr<File> a_f1, const Path& a_newpath) const { return pathLink(a_f1, a_newpath, nullptr); }
             inline int pathLink(const Path& a_newpath) const { return pathLink(nullptr, a_newpath, nullptr); }
-            int pathUnlink(SharedPtr<File> a_file = nullptr) const;
+            int pathUnlink(shared_ptr<File> a_file = nullptr) const;
+            shared_ptr<File> pathOpen(int a_flags, shared_ptr<File> a_file) const;
+            inline shared_ptr<File> pathOpen(shared_ptr<File> a_file) const { return pathOpen(0, a_file); }
+            inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
+            inline shared_ptr<File> pathOpen() const { return pathOpen(0, nullptr); }
     };
 	class DStat {
         public:

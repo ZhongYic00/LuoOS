@@ -652,7 +652,7 @@ void Path::pathBuild() {
     }
     return;
 }
-DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  // @todo 改成返回File
+DirEnt *Path::pathSearch(shared_ptr<File> a_file, bool a_parent) const {  // @todo 改成返回File
     DirEnt *entry, *next;
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
@@ -674,7 +674,7 @@ DirEnt *Path::pathSearch(SharedPtr<File> a_file, bool a_parent) const {  // @tod
     }
     return entry;
 }
-DirEnt *Path::pathCreate(short a_type, int a_mode, SharedPtr<File> a_file) const {  // @todo 改成返回File
+DirEnt *Path::pathCreate(short a_type, int a_mode, shared_ptr<File> a_file) const {  // @todo 改成返回File
     DirEnt *ep, *dp;
     if((dp = pathSearch(a_file, true)) == nullptr){
         printf("can't find dir\n");
@@ -695,7 +695,7 @@ DirEnt *Path::pathCreate(short a_type, int a_mode, SharedPtr<File> a_file) const
     dp->entRelse();
     return ep;
 }
-int Path::pathRemove(SharedPtr<File> a_file) const {
+int Path::pathRemove(shared_ptr<File> a_file) const {
     DirEnt *ep = pathSearch(a_file);
     if(ep == nullptr) { return -1; }
     if((ep->attribute & ATTR_DIRECTORY) && !ep->isEmpty()) {
@@ -706,7 +706,7 @@ int Path::pathRemove(SharedPtr<File> a_file) const {
     ep->entRelse();
     return 0;
 }
-int Path::pathLink(SharedPtr<File> a_f1, const Path& a_newpath, SharedPtr<File> a_f2) const {
+int Path::pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const {
     DirEnt *dp1 = pathSearch(a_f1);
     if(dp1 == nullptr) {
         printf("can't find dir\n");
@@ -765,7 +765,7 @@ int Path::pathLink(SharedPtr<File> a_f1, const Path& a_newpath, SharedPtr<File> 
     }
     return 0;
 }
-int Path::pathUnlink(SharedPtr<File> a_file) const {
+int Path::pathUnlink(shared_ptr<File> a_file) const {
     DirEnt *dp = pathSearch(a_file);
     if(dp == nullptr) { return -1; }
     DirEnt *parent = dp->parent;
@@ -793,4 +793,19 @@ int Path::pathUnlink(SharedPtr<File> a_file) const {
         }
     }
     return pathRemove(a_file);
+}
+shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
+    DirEnt *ep = pathSearch(a_file);
+    if(ep == nullptr) { return nullptr; }
+    if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
+        printf("dir can't write\n");
+        ep->entRelse();
+        return nullptr;
+    }
+    if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
+        printf("it is not dir\n");
+        ep->entRelse();
+        return nullptr;
+    }
+    return make_shared<File>(ep, a_flags);
 }

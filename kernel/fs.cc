@@ -11,7 +11,7 @@
 // @todo error handling
 using namespace fs;
 
-xlen_t fs::File::write(xlen_t addr,size_t len){
+xlen_t File::write(xlen_t addr,size_t len){
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.w)return rt;
     auto bytes=kHartObjs.curtask->getProcess()->vmar.copyin(addr,len);
@@ -37,7 +37,7 @@ xlen_t fs::File::write(xlen_t addr,size_t len){
     }
     return rt;
 }
-klib::ByteArray fs::File::read(size_t len, long a_off, bool a_update){
+klib::ByteArray File::read(size_t len, long a_off, bool a_update){
     if(a_off < 0) { a_off = off; }
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.r) { return rt; }
@@ -66,7 +66,7 @@ klib::ByteArray fs::File::read(size_t len, long a_off, bool a_update){
     }
     return klib::ByteArray{0};
 }
-klib::ByteArray fs::File::readAll(){
+klib::ByteArray File::readAll(){
     switch(type){
         case FileType::entry:{
             size_t size=obj.ep->file_size;
@@ -77,7 +77,7 @@ klib::ByteArray fs::File::readAll(){
     }
 }
 
-fs::File::~File() {
+File::~File() {
     switch(type){
         case FileType::pipe: {
             if(ops.fields.r)obj.pipe->decReader();
