@@ -23,6 +23,14 @@
 #include "alloc.hh"
 // #include "include/proc.h"
 #include "klib.h"
+#include <EASTL/bonus/lru_cache.h>
+#include "bio.hh"
+bio::BCacheMgr bcache;
+
+void test(){
+    auto ref=bcache[{1,1}];
+    ref[10]=100;
+}
 
 struct buf blockBufs[NBUF];
 
@@ -44,6 +52,8 @@ struct {
 void
 binit(void)
 {
+  new ((void*)&bcache) bio::BCacheMgr();
+  test();
   struct buf *b;
   new ((ptr_t)&freecache.sema) semaphore::Semaphore(0);
   // initlock(&freecache.lock, "freecache");
