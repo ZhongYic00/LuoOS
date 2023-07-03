@@ -6,54 +6,47 @@
 #include <EASTL/bonus/lru_cache.h>
 
 namespace eastl{
-    namespace v2{
+    namespace v3{
         template<typename K,typename V>
         class shared_lru{
-            unordered_map<K,weak_ptr<V>> active;
-            lru_cache<K,shared_ptr<V>> inactive;
+            using list_type=list< pair<K,shared_ptr<V>> >;
+            using list_iterator=typename list_type::iterator;
+            using map_type=unordered_map<K,pair<weak_ptr<V>,list_iterator>>;
+            map_type active;
+            list_type lru;
+            size_t capacity;
+            void reserve(){
+                if(lru.size()>capacity){
+                    active.find(lru.back().first)->second.second=lru.end();
+                    lru.pop_back();
+                }
+            }
         public:
-            shared_lru(size_t size):inactive(size){}
+            shared_lru(size_t size):capacity(size){}
             template<typename Lambda>
             shared_ptr<V> getOrSet(const K &key,Lambda refill){
-                if(active.find(key)!=active.end()) return active[key].lock();
-                V* valptr=nullptr;
-                if(inactive.contains(key)){
-                    auto ptr=inactive[key];
-                    valptr=ptr.get();
-                    inactive.erase(key);
-                } else valptr=refill();
-                auto rt=shared_ptr<V>(valptr,[this,key](V* ptr)->void{
-                    active.erase(key);
-                    inactive[key]=shared_ptr<V>(ptr);
-                });
-                active.insert(pair{key,weak_ptr<V>(rt)});
+                if(active.find(key)!=active.end()){
+                    Log(trace,"bcache hit(%d)",key);
+                    auto mit=active.find(key);
+                    auto rt=mit->second.first.lock();
+                    lru.erase(mit->second.second);
+                    lru.push_front(pair{key,rt});
+                    mit->second.second=lru.begin();
+                    return rt;
+                }
+                Log(trace,"bcache miss(%d)",key);
+                reserve();
+                auto rt=shared_ptr<V>(refill(),[this,key](V* val)->void{active.erase(key);});
+                lru.push_front(pair{key,rt});
+                active[key]=pair{weak_ptr<V>(rt),lru.begin()};
                 return rt;
             }
             inline bool contains(const K &key){
-                return active.find(key)!=active.end()||inactive.contains(key);
+                return active.find(key)!=active.end();
             }
         };
     }
-#ifdef EASTL_LRU_MODIFIED
-    namespace v1{
-        template<typename K,typename V>
-        class shared_lru:public lru_cache<K,shared_ptr<V>>{
-            void erase_oldest() override{
-                ///@bug temporal complexity incorrect
-                auto iter = --(this->m_list.end());
-                for(;this->m_map[*iter].first.use_count()>1;iter--);
-                auto key=*iter;
-                this->m_list.erase(iter);
-
-                // Delete the actual entry
-                this->map_erase(this->m_map.find(key));
-            }
-        public:
-          shared_lru(size_t size):lru_cache<K,shared_ptr<V>>(size){}
-        };
-    }
-#endif
-    using namespace v2;
+    using namespace v3;
 }
 
 
