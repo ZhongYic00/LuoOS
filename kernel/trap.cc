@@ -3,7 +3,7 @@
 #include "rvcsr.hh"
 #include "sbi.hh"
 #include "kernel.hh"
-#include "virtio.h"
+#include "virtio.hh"
 
 #define moduleLevel LogLevel::debug
 

@@ -7,8 +7,7 @@
 #include "ld.hh"
 #include "sched.hh"
 #include "proc.hh"
-#include "buf.h"
-#include "virtio.h"
+#include "virtio.hh"
 #include "fat.hh"
 #include "fs/ramfs.hh"
 
@@ -201,7 +200,7 @@ void init(int hartid){
         // csrSet(sstatus,BIT(csr::mstatus::spie));
         virtio_disk_init();
         Log(info,"virtio disk init over");
-        binit();
+        bio::init();
         Log(info,"binit over");
         std::atomic_thread_fence(std::memory_order_release);
         sbi_hsm_hart_start(hartid^1,(xlen_t)0x80200000,0);
@@ -229,6 +228,7 @@ void init(int hartid){
         std::atomic_thread_fence(std::memory_order_acquire);
         schedule();
         Log(info,"first schedule");
+        kLogger.outputLevel=warning;
         _strapexit();
     }
     halt();

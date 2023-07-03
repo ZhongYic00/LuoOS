@@ -2,9 +2,10 @@
 #define FAT_HH__
 
 #include "fs.hh"
-#include "buf.h"
+#include "bio.hh"
 
 namespace fs {
+    using namespace bio;
     using eastl::string;
     using eastl::vector;
     typedef struct ShortNameEntry_t {
@@ -102,23 +103,40 @@ namespace fs {
                 uint32 tot_sec;  // 总扇区数
                 uint32 fat_sz;   // 一个fat所占扇区数
                 uint32 root_clus; // 根目录簇号
-                BPB_t() {}
-                BPB_t(const BPB_t& a_bpb):byts_per_sec(a_bpb.byts_per_sec), sec_per_clus(a_bpb.sec_per_clus), rsvd_sec_cnt(a_bpb.rsvd_sec_cnt), fat_cnt(a_bpb.fat_cnt), hidd_sec(a_bpb.hidd_sec), tot_sec(a_bpb.tot_sec), fat_sz(a_bpb.fat_sz), root_clus(a_bpb.root_clus) {}
-                BPB_t(const struct buf& a_buf):byts_per_sec(*(uint16*)(a_buf.data+11)), sec_per_clus(*(uint8*)(a_buf.data+13)), rsvd_sec_cnt(*(uint16*)(a_buf.data+14)), fat_cnt(*(uint8*)(a_buf.data+16)), hidd_sec(*(uint32*)(a_buf.data+28)), tot_sec(*(uint32*)(a_buf.data+32)), fat_sz(*(uint32*)(a_buf.data+36)), root_clus(*(uint32*)(a_buf.data+44)) {}
+                BPB_t()=default;
+                BPB_t(const BPB_t& a_bpb)=default;
                 BPB_t(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):byts_per_sec(a_bps), sec_per_clus(a_spc), rsvd_sec_cnt(a_rsc), fat_cnt(a_fc), hidd_sec(a_hs), tot_sec(a_ts), fat_sz(a_fs), root_clus(a_rc) {}
                 ~BPB_t() {}
                 BPB_t& operator=(const BPB_t& a_bpb);
             } bpb;
             typedef BPB_t BPB;
         public:
-            SuperBlock() {}
+            SuperBlock()=default;
             SuperBlock(const SuperBlock& a_spblk):first_data_sec(a_spblk.first_data_sec), data_sec_cnt(a_spblk.data_sec_cnt), data_clus_cnt(a_spblk.data_clus_cnt), byts_per_clus(a_spblk.byts_per_clus), bpb(a_spblk.bpb) {}
             SuperBlock(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, BPB a_bpb):first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bpb) {}
             SuperBlock(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc) {}
             SuperBlock(const BPB& a_bpb):first_data_sec(a_bpb.rsvd_sec_cnt+a_bpb.fat_cnt*a_bpb.fat_sz), data_sec_cnt(a_bpb.tot_sec-first_data_sec), data_clus_cnt(data_sec_cnt/a_bpb.sec_per_clus), byts_per_clus(a_bpb.sec_per_clus*a_bpb.byts_per_sec), bpb(a_bpb) {}
-            SuperBlock(const struct buf& a_buf):SuperBlock(BPB(a_buf)) {}
             SuperBlock(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):SuperBlock(BPB(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc)) {}
             ~SuperBlock() {}
+            SuperBlock(const BlockBuf &buf){
+                auto &self=*this;
+                if (strncmp(&buf.at<char const>(82), "FAT32", 5)) { panic("not FAT32 volume"); }
+                // memmove(&fat.bpb.byts_per_sec, other.d + 11, 2); // avoid misaligned load on k210
+                self.bpb={
+                    buf.at<uint16_t>(11),//byts_per_sec
+                    buf.at<uint8>(13),//sec_per_clus
+                    buf.at<uint16>(14),//rsvd_sec_cnt
+                    buf.at<uint8>(16),//fat_cnt
+                    buf[28],//hidd_sec
+                    buf[32],//tot_sec
+                    buf[36],//fat_sz
+                    buf[44],//root_clus
+                };
+                self.first_data_sec = self.bpb.rsvd_sec_cnt + self.bpb.fat_cnt * self.bpb.fat_sz;
+                self.data_sec_cnt = self.bpb.tot_sec - self.first_data_sec;
+                self.data_clus_cnt = self.data_sec_cnt / self.bpb.sec_per_clus;
+                self.byts_per_clus = self.bpb.sec_per_clus * self.bpb.byts_per_sec;
+            }
             SuperBlock& operator=(const SuperBlock& a_spblk);
             inline const uint32 rFDS() const { return first_data_sec; }
             inline const uint32 rDSC() const { return data_sec_cnt; }
@@ -155,7 +173,7 @@ namespace fs {
             FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, BPB a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_fds, a_dsc, a_dcc, a_bpc, a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_fds, a_dsc, a_dcc, a_bpc, a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             FileSystem(const BPB& a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(const struct buf& a_buf, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_buf), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(const BlockBuf& a_buf, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_buf), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             FileSystem(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             ~FileSystem() {}
             FileSystem& operator=(const FileSystem& a_fs);

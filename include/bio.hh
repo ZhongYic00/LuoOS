@@ -1,6 +1,7 @@
 #ifndef BIO_HH__
 #define BIO_HH__
 #include "common.h"
+#include "klib.hh"
 #include <EASTL/shared_ptr.h>
 #include <EASTL/weak_ptr.h>
 #include <EASTL/bonus/lru_cache.h>
@@ -111,6 +112,7 @@ namespace bio{
             return lru.getOrSet(key,[key]()->BlockBuf*{return new BlockBuf(key);});
         }
     };
+    void init();
 }
 extern bio::BCacheMgr bcache;
 #endif

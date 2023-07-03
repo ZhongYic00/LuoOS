@@ -15,7 +15,6 @@
 
 // #include "include/spinlock.h"
 // #include "include/sleeplock.h"
-#include "buf.h"
 // #include "include/sdcard.h"
 // #include "include/printf.h"
 // #include "disk.h"
@@ -40,11 +39,10 @@ struct {
     semaphore::Semaphore sema;
 } freecache;
 
-void
-binit(void)
+void bio::init(void)
 {
     new ((void*)&bcache) bio::BCacheMgr();
-    test();
+    /// @todo use sema to control concurrency
     new ((ptr_t)&freecache.sema) semaphore::Semaphore(bio::BCacheMgr::defaultSize);
 }
 
