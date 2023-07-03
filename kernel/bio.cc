@@ -19,77 +19,46 @@
 // #include "include/sdcard.h"
 // #include "include/printf.h"
 // #include "disk.h"
-#include "virtio.h"
+#include "virtio.hh"
 #include "alloc.hh"
 // #include "include/proc.h"
 #include "klib.h"
 #include <EASTL/bonus/lru_cache.h>
 #include "bio.hh"
+
+// #define moduleLevel debug
 bio::BCacheMgr bcache;
 
 void test(){
-    auto ref=bcache[{1,1}];
-    (*ref)[10]=100;
-    int read=(*ref)[10];
+    // auto ref=bcache[{1,1}];
+    // (*ref)[10]=100;
+    // int read=(*ref)[10];
 }
 
-struct buf blockBufs[NBUF];
-
 struct {
-  // struct spinlock lock;
-  semaphore::Semaphore sema;
+    // struct spinlock lock;
+    semaphore::Semaphore sema;
 } freecache;
 
 void
 binit(void)
 {
-  new ((void*)&bcache) bio::BCacheMgr();
-  test();
-  new ((ptr_t)&freecache.sema) semaphore::Semaphore(bio::BCacheMgr::defaultSize);
+    new ((void*)&bcache) bio::BCacheMgr();
+    test();
+    new ((ptr_t)&freecache.sema) semaphore::Semaphore(bio::BCacheMgr::defaultSize);
 }
 
 // Look through buffer cache for block on device dev.
 // If not found, allocate a buffer.
 // In either case, return locked buffer.
-static struct buf*
-bget(uint dev, uint sectorno) {
-  Log(debug,"bget dev=%d, secno=%d",dev,sectorno);
+namespace bio{
+    void BlockBuf::reload(){
+        /// @todo should use devmgr, <blockdev>(devmgr[dev]).read(sec)
+        virtio_disk_rw(*this,0);
+    }
+    void BlockBuf::flush(){
+        Log(debug,"blockbuf flush");
+        // virtio_disk_rw(*this,1);
+        dirty=false;
+    }
 }
-
-
-struct buf* 
-bread(uint dev, uint sectorno) {
-  struct buf *b;
-  b = bget(dev, sectorno);
-
-  if (!b->vaild) {
-    virtio_disk_rw(b, 0);
-    b->vaild = 1;
-  }
-
-  return b;
-}
-
-// Write b's contents to disk.  Must be locked.
-void 
-bwrite(struct buf *b) {
-  virtio_disk_rw(b, 1);;
-  b->vaild = 1;
-}
-
-
-void
-brelse(struct buf *b)
-{
-  // acquire(&freecache.lock);
-  b->busy = 0;
-
-  // @todo 进程相关
-  // wakeup sleeping processes because of b is busy
-  // wakeup(b);
-  b->sema.rel();
-  freecache.sema.rel();
-  // wakeup sleeping processes because of NOFREEBUF
-  // wakeup(&freecache);
-}
-

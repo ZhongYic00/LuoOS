@@ -61,22 +61,35 @@ namespace bio{
         bool operator==(const BlockKey other) const {return dev==other.dev&&secno==other.secno;}
     };
     struct BlockBuf{
+        /// @todo add lock for concurrency
+        constexpr static int blockSize=512;
         const BlockKey key;
         bool dirty;
         uint8_t *d;
-        BlockBuf(const BlockKey& key_):key(key_),d(reinterpret_cast<uint8_t*>(new AlignedBytes)){
-            /// @todo fill buffer from dev:secno
+        BlockBuf(const BlockKey& key_):key(key_),d(reinterpret_cast<uint8_t*>(new AlignedBytes<blockSize>)){
+            reload();
         }
         ~BlockBuf(){
-            /// @todo writeback
+            flush();
             delete reinterpret_cast<AlignedBytes<>*>(d);
         }
-        template<typename T=uint32_t>
-        inline const T& operator[](off_t off) const {return reinterpret_cast<T*>(d)[off];}
-        template<typename T=uint32_t>
-        inline T& operator[](off_t off){ dirty=true; return reinterpret_cast<T*>(d)[off]; }
-        template<typename T=uint32_t>
+        inline const uint32_t& operator[](off_t off) const {return at<uint32_t>(off);}
+        inline uint32_t& operator[](off_t off){return at<uint32_t>(off);}
+        template<typename T>
         inline const T& at(off_t off) const {return *reinterpret_cast<T*>(d+off);}
+        template<typename T>
+        inline T& at(off_t off){ dirty=true; return *reinterpret_cast<T*>(d+off); }
+        template<typename T=uint32_t>
+        inline const T& as(off_t off) const {return reinterpret_cast<T*>(d)[off];}
+        template<typename T=uint32_t>
+        inline T& as(off_t off) {return reinterpret_cast<T*>(d)[off];}
+        inline void clear(){dirty=true; memset(d,0,blockSize);}
+        /// @todo writeback
+        void flush();
+        /// @todo load from dev:secno
+        void reload();
+    private:
+        inline klib::ByteArray asArray(){return klib::ByteArray(d,blockSize);}
     };
     typedef eastl::weak_ptr<BlockBuf> BufWeakRef;
     typedef eastl::shared_ptr<BlockBuf> BufRef;
@@ -94,8 +107,10 @@ namespace bio{
         constexpr static size_t defaultSize=0x100;
         BCacheMgr():lru(defaultSize){}
         BufRef operator[](const BlockKey &key){
-            return lru.getOrSet(key,[key](){return new BlockBuf(key);});
+            Log(debug,"bcache[{%d:%x}]",key.dev,key.secno);
+            return lru.getOrSet(key,[key]()->BlockBuf*{return new BlockBuf(key);});
         }
     };
 }
+extern bio::BCacheMgr bcache;
 #endif
