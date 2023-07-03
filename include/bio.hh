@@ -59,25 +59,34 @@ namespace eastl{
 
 namespace bio{
     using ::eastl::shared_ptr;
+    /// @todo move to klib
+    template<int SIZE=512>
+    struct alignas(SIZE) AlignedBytes{uint8_t bytes[SIZE];};
     struct BlockKey{
         dev_t dev;
         uint32_t secno;
         bool operator==(const BlockKey other) const {return dev==other.dev&&secno==other.secno;}
     };
-    struct alignas(512) BlockBuf{
-        uint8_t d[512];
+    struct BlockBuf{
+        const BlockKey key;
+        bool dirty;
+        uint8_t *d;
+        BlockBuf(const BlockKey& key_):key(key_),d(reinterpret_cast<uint8_t*>(new AlignedBytes)){
+            /// @todo fill buffer from dev:secno
+        }
+        ~BlockBuf(){
+            /// @todo writeback
+            delete reinterpret_cast<AlignedBytes<>*>(d);
+        }
+        template<typename T=uint32_t>
+        inline const T& operator[](off_t off) const {return reinterpret_cast<T*>(d)[off];}
+        template<typename T=uint32_t>
+        inline T& operator[](off_t off){ dirty=true; return reinterpret_cast<T*>(d)[off]; }
+        template<typename T=uint32_t>
+        inline const T& at(off_t off) const {return *reinterpret_cast<T*>(d+off);}
     };
     typedef eastl::weak_ptr<BlockBuf> BufWeakRef;
-    struct BufRef{
-        BlockKey key;
-        eastl::shared_ptr<BlockBuf> buf;
-        BufRef(BlockBuf *buf_):buf(buf_){}
-        BufRef(const shared_ptr<BlockBuf> &ref,const BlockKey &key_):key(key_),buf(ref){}
-        template<typename T=uint32_t>
-        inline T& operator[](off_t off){return reinterpret_cast<T*>(buf->d)[off];}
-        template<typename T=uint32_t>
-        inline T& at(off_t off){return *reinterpret_cast<T*>(buf->d+off);}
-    };
+    typedef eastl::shared_ptr<BlockBuf> BufRef;
 }
 
 namespace eastl{
@@ -92,7 +101,7 @@ namespace bio{
         constexpr static size_t defaultSize=0x100;
         BCacheMgr():lru(defaultSize){}
         BufRef operator[](const BlockKey &key){
-            return BufRef{lru.getOrSet(key,[key](){return new BlockBuf();}),key};
+            return lru.getOrSet(key,[key](){return new BlockBuf(key);});
         }
     };
 }
