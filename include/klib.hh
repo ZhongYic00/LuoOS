@@ -350,6 +350,7 @@ class Logger{
   klib::ringbuf<LogItem> ring[5];
   int lid=0;
 public:
+  LogLevel outputLevel=LogLevel::info;
     void log(int level,const char *fmt,...);
 };
 extern Logger kLogger;

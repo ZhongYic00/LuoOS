@@ -16,11 +16,11 @@ enum LogLevel{
 #define TRACE(x) IFDEF(moduleLevel<=LogLevel::trace,x)
 #define IFTEST(x) IFDEF(GUEST,x)
 
-extern int outputLevel;
+extern int enableLevel;
 #ifndef moduleLevel
     #define moduleLevel LogLevel::error
 #endif
 #define Log(level,fmt,...) \
-    if(level>=outputLevel && level>=moduleLevel){kLogger.log(level,(__FILE__":%d:%s::\t" fmt "\n"),__LINE__,__PRETTY_FUNCTION__,##__VA_ARGS__);}
+    if(level>=enableLevel && level>=moduleLevel){kLogger.log(level,(__FILE__":%d:%s::\t" fmt "\n"),__LINE__,__FUNCTION__,##__VA_ARGS__);}
 
 #define DEBUG 0
