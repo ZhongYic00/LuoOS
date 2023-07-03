@@ -175,6 +175,11 @@ void* operator new(size_t size){
         return reinterpret_cast<HeapMgrGrowable*>(kGlobObjs.heapMgr)->alloc(size);
     else return (ptr_t)vm::pn2addr(kGlobObjs.pageMgr->alloc(vm::bytes2pages(size)));
 }
+void* operator new(size_t size,std::align_val_t alignment){
+    if(size<vm::pageSize*32)
+        return reinterpret_cast<HeapMgrGrowable*>(kGlobObjs.heapMgr)->alligned_alloc(size,size_t(alignment));
+    else panic("unimplemented!");
+}
 void* operator new[](size_t size){
     if(size<vm::pageSize*32)
         return reinterpret_cast<HeapMgrGrowable*>(kGlobObjs.heapMgr)->alloc(size);
@@ -184,6 +189,9 @@ void operator delete(void* ptr){
     kGlobObjs.heapMgr->free(ptr);
 }
 void operator delete(void* ptr,xlen_t unknown){
+    kGlobObjs.heapMgr->free(ptr);
+}
+void operator delete(void* ptr,xlen_t unknown,std::align_val_t){
     kGlobObjs.heapMgr->free(ptr);
 }
 void operator delete[](void* ptr){
