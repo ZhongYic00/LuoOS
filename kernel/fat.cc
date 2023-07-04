@@ -580,11 +580,6 @@ const int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
     (*buf)[off] = a_content;
     return 0;
 }
-const Path& Path::operator=(const Path& a_path) {
-    pathname = a_path.pathname;
-    dirname = a_path.dirname;
-    return *this;
-}
 void Path::pathBuild() {
     size_t len = pathname.length();
     if(len > 0) {  // 保证数组长度不为0

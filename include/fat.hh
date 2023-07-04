@@ -168,12 +168,12 @@ namespace fs {
             string pathname;
             vector<string> dirname;
         public:
-            Path() {}
-            Path(const Path& a_path):pathname(a_path.pathname), dirname(a_path.dirname) {}
+            Path() = default;
+            Path(const Path& a_path) = default;
             Path(const string& a_str):pathname(a_str), dirname() { pathBuild(); }
             Path(const char *a_str):pathname(a_str), dirname() { pathBuild(); }
-            const Path& operator=(const Path& a_path);
-            ~Path() {}
+            ~Path() = default;
+            Path& operator=(const Path& a_path) = default;
             void pathBuild();
             DirEnt *pathSearch(shared_ptr<File> a_file, bool a_parent) const;  // @todo 返回值改为File类型
             inline DirEnt *pathSearch(shared_ptr<File> a_file) const { return pathSearch(a_file, false); }
@@ -199,10 +199,10 @@ namespace fs {
             uint8 d_type;	// 文件类型
             char d_name[STAT_MAX_NAME + 1];	//文件名
         // public:
-            DStat() {}
+            DStat() = default;
             DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, STAT_MAX_NAME); }
             DStat(const DirEnt& a_entry):d_ino(a_entry.first_clus), d_off(0), d_reclen(a_entry.file_size), d_type((a_entry.attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry.filename, STAT_MAX_NAME); }
-            ~DStat() {}
+            ~DStat() = default;
 	};
 	class Stat {
         public:
@@ -211,10 +211,10 @@ namespace fs {
             short type;  // Type of file // 文件类型
             uint64 size; // Size of file in bytes // 文件大小(字节)
         // public:
-            Stat() {}
+            Stat() = default;
             Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
             Stat(const DirEnt& a_entry):name(), dev(a_entry.dev), type((a_entry.attribute&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry.file_size) { strncpy(name, a_entry.filename, STAT_MAX_NAME); }
-            ~Stat() {}
+            ~Stat() = default;
 	};
 	class KStat {
         public:
@@ -239,10 +239,11 @@ namespace fs {
             // unsigned __unused[2];
             unsigned _unused[2]; // @todo 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
         // public:
-            KStat() {}
+            KStat() = default;
             KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
             KStat(const DirEnt& a_entry):st_dev(a_entry.dev), st_ino(a_entry.first_clus), st_mode((a_entry.attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry.file_size), st_blksize(dev_fat[a_entry.dev].rBPC()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
-            ~KStat() {}
+            ~KStat() = default;
+
 	};
     int rootFSInit();
 }

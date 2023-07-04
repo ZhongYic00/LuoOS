@@ -94,7 +94,7 @@ namespace fs{
         FileSystem_():internal::FileSystem(){}
     };
 
-    struct DirEnt;
+    class DirEnt;
 
     struct File {
         enum FileType { none,pipe,entry,dev, stdin,stdout,stderr };
