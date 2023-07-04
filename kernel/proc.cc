@@ -26,7 +26,6 @@ xlen_t Process::newTrapframe(){
 Task* Process::newKTask(prior_t prior){
     auto thrd=Task::createTask(**kGlobObjs->taskMgr,newTrapframe(),prior,this->pid());
     thrd->lastpriv=Task::Priv::AlwaysKernel;
-    thrd->kctx.sp()=(xlen_t)thrd->kctx.kstack;
     addTask(thrd);
     kGlobObjs->scheduler->add(thrd);
     return thrd;
@@ -63,28 +62,8 @@ void validate(){
 
 extern void _strapexit();
 void Task::switchTo(){
-    // task->ctx.pc=0x80200000l;
-    kHartObjs.curtask=this;
+    kHartObj().curtask=this;
     kctx.tp()=kernel::readHartId();
-    // if(lastpriv==Priv::User){
-    //     csrWrite(sscratch,ctx.gpr);
-    //     csrWrite(sepc,ctx.pc);
-    //     auto proc=getProcess();
-    //     /// @todo chaos
-    //     csrClear(sstatus,1l<<csr::mstatus::spp);
-    //     csrSet(sstatus,BIT(csr::mstatus::spie));
-    // } else {
-    //     if(lastpriv!=Priv::AlwaysKernel)lastpriv=Priv::User;
-    //     // csrWrite(satp,kctx.satp);
-    //     // ExecInst(sfence.vma);
-    //     volatile register ptr_t t6 asm("t6")=kctx.gpr;
-    //     restoreContext();
-    //     /// @bug suppose this swap has problem when switching process
-    //     csrSwap(sscratch,t6);
-    //     csrSet(sstatus,BIT(csr::mstatus::sie));
-    //     ExecInst(ret);
-    // }
-    // task->getProcess()->vmar.print();
 }
 void Task::sleep(){
     Log(info,"sleep(this=Task<%d>)",this->id);

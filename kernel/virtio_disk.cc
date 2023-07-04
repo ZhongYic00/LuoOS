@@ -203,7 +203,7 @@ virtio_disk_rw(bio::BlockBuf &buf, int write)
     if(alloc3_desc(idx) == 0) {
       break;
     }
-    waiting.push_back(kHartObjs.curtask);
+    waiting.push_back(kHartObj().curtask);
     syscall::sleep();
   }
   
@@ -261,7 +261,7 @@ virtio_disk_rw(bio::BlockBuf &buf, int write)
     .queue.notify=0; // value is queue number
 
   // Wait for virtio_disk_intr() to say request has finished.
-  // disk.info[idx[0]].waiting=kHartObjs.curtask;
+  // disk.info[idx[0]].waiting=kHartObj().curtask;
   /// @todo remove unused debug info
   xlen_t sip,sip1;
   csrRead(sip,sip);

@@ -123,7 +123,6 @@ namespace kernel {
     };
     struct KernelHartObjs{
         KernelTaskObjs *curtask;
-        ptr_t trapstack;
         uint g_ticks;
         proc::SleepingTask sleep_tasks[NMAXSLEEP];
     };
@@ -150,13 +149,15 @@ namespace kernel {
             inline time_t tvSec() { return m_tv_sec; }
             inline time_t tvNSec() { return m_tv_nsec; }
     };
-    inline int readHartId(){register int hartid asm("tp"); return hartid;}
+    FORCEDINLINE inline int readHartId(){register int hartid asm("tp"); return hartid;}
     constexpr tid_t kthreadIdBase=0x80000000;
     inline int threadId(){return kthreadIdBase+readHartId();}
     void createKernelMapping(vm::VMAR &vmar);
 }
 extern kernel::KernelGlobalObjs *kGlobObjs;
-extern kernel::KernelHartObjs kHartObjs;
+extern kernel::KernelHartObjs kHartObjs[8];
+FORCEDINLINE
+inline kernel::KernelHartObjs& kHartObj(){return kHartObjs[kernel::readHartId()];}
 extern kernel::KernelInfo kInfo;
 
 #endif
