@@ -536,25 +536,6 @@ int DirEnt::entUnmount() {
     dev=0;
     return 0;
 }
-SuperBlock::BPB& SuperBlock::BPB::operator=(const BPB& a_bpb) {
-    byts_per_sec = a_bpb.byts_per_sec;
-    sec_per_clus = a_bpb.sec_per_clus;
-    rsvd_sec_cnt = a_bpb.rsvd_sec_cnt;
-    fat_cnt = a_bpb.fat_cnt;
-    hidd_sec = a_bpb.hidd_sec;
-    tot_sec = a_bpb.tot_sec;
-    fat_sz = a_bpb.fat_sz;
-    root_clus = a_bpb.root_clus;
-    return *this;
-}
-SuperBlock& SuperBlock::operator=(const SuperBlock& a_spblk) {
-    first_data_sec = a_spblk.first_data_sec;
-    data_sec_cnt = a_spblk.data_sec_cnt;
-    data_clus_cnt = a_spblk.data_clus_cnt;
-    byts_per_clus = a_spblk.byts_per_clus;
-    bpb = a_spblk.bpb;
-    return *this;
-}
 const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, uint64 a_buf, uint a_off, uint a_len) const {
     if (a_off + a_len > rBPC()) { panic("offset out of range"); }
     uint tot, m;
@@ -598,13 +579,6 @@ const int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
     uint off = secOffset(a_cluster);
     (*buf)[off] = a_content;
     return 0;
-}
-FileSystem& FileSystem::operator=(const FileSystem& a_fs) {
-    SuperBlock::operator=(a_fs);
-    valid = a_fs.valid;
-    root = a_fs.root;
-    mount_mode = a_fs.mount_mode;
-    return *this;
 }
 const Path& Path::operator=(const Path& a_path) {
     pathname = a_path.pathname;
