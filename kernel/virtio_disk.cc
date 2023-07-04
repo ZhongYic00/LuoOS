@@ -10,11 +10,12 @@
 // #include "include/types.h"
 // #include "include/riscv.h"
 #include "kernel.hh"
-#include "virtio.h"
+#include "virtio.hh"
 #include "proc.hh"
 #include "vm.hh"
 #include "klib.hh"
-#define moduleLevel debug
+#include "bio.hh"
+// #define moduleLevel debug
 namespace syscall
 {
   extern int sleep();
@@ -42,7 +43,8 @@ static struct disk {
   // for use when completion interrupt arrives.
   // indexed by first descriptor index of chain.
   struct {
-    struct buf *b;
+    /// @todo 可能需要考虑并发同步，使用lock统一实现
+    int *ready;
     char status;
     proc::Task *waiting;
   } info[NUM];
@@ -183,10 +185,10 @@ public:
 };
 
 void
-virtio_disk_rw(struct buf *b, int write)
+virtio_disk_rw(bio::BlockBuf &buf, int write)
 {
   // IntGuard guard;
-  uint64 sector = b->sectorno;
+  uint64 sector = buf.key.secno;
   Log(debug,"diskrw sector=%ld",sector);
   for(bool success=false;!success;){
   // acquire(&disk.vdisk_lock);
@@ -228,8 +230,8 @@ virtio_disk_rw(struct buf *b, int write)
   disk.desc[idx[0]].flags = VRING_DESC_F_NEXT;
   disk.desc[idx[0]].next = idx[1];
 
-  disk.desc[idx[1]].addr = (uint64) b->data;
-  disk.desc[idx[1]].len = BSIZE;
+  disk.desc[idx[1]].addr = reinterpret_cast<uint64_t>(buf.d);
+  disk.desc[idx[1]].len = bio::BlockBuf::blockSize;
   if(write)
     disk.desc[idx[1]].flags = 0; // device reads b->data
   else
@@ -244,8 +246,8 @@ virtio_disk_rw(struct buf *b, int write)
   disk.desc[idx[2]].next = 0;
 
   // record struct buf for virtio_disk_intr().
-  b->disk = 1;
-  disk.info[idx[0]].b = b;
+  int ready=0;
+  disk.info[idx[0]].ready = &ready;
 
   // avail[0] is flags
   // avail[1] tells the device how far to look in avail[2...].
@@ -265,17 +267,16 @@ virtio_disk_rw(struct buf *b, int write)
   csrRead(sip,sip);
   csrClear(sie,BIT(csr::mie::stie));
   csrSet(sstatus,BIT(csr::mstatus::sie));
-  for(int retry=std::numeric_limits<int>::max();b->disk == 1 && retry;retry--) {
+  for(int retry=std::numeric_limits<int>::max();ready == 0 && retry;retry--) {
     // syscall::sleep();
   }
-  if(!b->disk)success=1;
+  if(ready)success=1;
   else Log(error,"virtio_rw sector=%ld faild, retrying...",sector);
   csrClear(sstatus,BIT(csr::mstatus::sie));
   csrSet(sie,BIT(csr::mie::stie));
   csrRead(sip,sip1);
   assert(((sip^sip1)&sip&0xff)==0);
 
-  disk.info[idx[0]].b = 0;
   free_chain(idx[0]);
   }
 
@@ -295,7 +296,7 @@ virtio_disk_intr()
     // if(info.status != 0)
     //   panic("virtio_disk_intr status");
     
-    info.b->disk = 0;   // disk is done with buf
+    *info.ready = 1;   // disk is done with buf
     // kGlobObjs->scheduler->wakeup(info.waiting);
 
     disk.used_idx = (disk.used_idx + 1) % NUM;

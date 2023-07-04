@@ -81,12 +81,10 @@ static uint8 getCheckSum(string shortname) {
 }
 
 int fs::rootFSInit() {  // @todo 重构为entMount + eCacheInit
-    struct buf *b = bread(0, 0);
-    if (strncmp((char const*)(b->data + 82), "FAT32", 5)) { panic("not FAT32 volume"); }
-    dev_fat[0] = FileSystem(*b, true, { 0 }, 0);
-    brelse(b);
-    // make sure that byts_per_sec has the same value with BSIZE 
-    if (BSIZE != dev_fat[0].rBPS()) { panic("byts_per_sec != BSIZE"); }
+    auto buf=bcache[{0,0}];
+    dev_fat[0] = FileSystem(*buf, true, { 0 }, 0);
+    // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
+    if (BlockBuf::blockSize != dev_fat[0].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
     DirEnt *root = dev_fat[0].getRoot();
     *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[0].rRC(), 0, dev_fat[0].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
     for(DirEnt *de = ecache.entries; de < ecache.entries + ENTRY_CACHE_NUM; de++) {  // @todo 重构链表操作
@@ -281,18 +279,16 @@ const uint32 DirEnt::allocClus() const {  // @todo 应该写成FileSystem的成�
     uint32 sec = dev_fat[dev].rRSC();
     uint32 const ent_per_sec = dev_fat[dev].rBPS() / sizeof(uint32);
     for (uint32 i = 0; i < dev_fat[dev].rFS(); i++, sec++) {
-        b = bread(dev, sec);
+        auto ref = bcache[{dev, sec}];
+        auto buf = *ref;
         for (uint32 j = 0; j < ent_per_sec; j++) {
-            if (((uint32 *)(b->data))[j] == 0) {
-                ((uint32 *)(b->data))[j] = FAT32_EOC + 7;
-                bwrite(b);
-                brelse(b);
+            if (buf.as<uint32_t>(j) == 0) {
+                buf.as<uint32_t>(j) = FAT32_EOC + 7;
                 uint32 clus = i * ent_per_sec + j;
                 dev_fat[dev].clearClus(clus);
                 return clus;
             }
         }
-        brelse(b);
     }
     panic("no clusters");
 }
@@ -522,13 +518,12 @@ int DirEnt::entMount(const DirEnt *a_dev) {
         ++mount_num;
         mount_num = mount_num % 8;
     }
-    struct buf *b = bread(a_dev->dev, 0);
-    if (strncmp((char const*)(b->data+82), "FAT32", 5)) { panic("not FAT32 volume"); }
-    // dev_fat[mount_num] = FileSystem(*(uint16*)(b->data+11), *(uint8*)(b->data+13), *(uint16*)(b->data+14), *(uint8*)(b->data+16), *(uint32*)(b->data+28), *(uint32*)(b->data+32), *(uint32*)(b->data+36), *(uint32*)(b->data+44), true, {0}, 1);
-    dev_fat[mount_num] = FileSystem(*b, true, { 0 }, 1);
-    brelse(b);
-    // make sure that byts_per_sec has the same value with BSIZE 
-    if (BSIZE != dev_fat[mount_num].rBPS()) { panic("byts_per_sec != BSIZE"); }
+    {// eliminate lifecycle
+        auto buf=bcache[{a_dev->dev,0}];
+        dev_fat[mount_num] = FileSystem(*buf, true, { 0 }, 1);
+    }
+    // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
+    if (BlockBuf::blockSize != dev_fat[mount_num].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
     DirEnt *root = dev_fat[mount_num].getRoot();
     *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
     mount_flag = 1;
@@ -563,20 +558,18 @@ SuperBlock& SuperBlock::operator=(const SuperBlock& a_spblk) {
 const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, uint64 a_buf, uint a_off, uint a_len) const {
     if (a_off + a_len > rBPC()) { panic("offset out of range"); }
     uint tot, m;
-    struct buf *bp;
     uint sec = firstSec(a_cluster) + a_off / rBPS();
     a_off = a_off % rBPS();
     int bad = 0;
     for (tot = 0; tot < a_len; tot += m, a_off += m, a_buf += m, sec++) {
-        bp = bread(0, sec);  // @todo 设备号？
-        m = BSIZE - a_off % BSIZE;
+        auto bp = bcache[{0, sec}];  // @todo 设备号？
+        m = BlockBuf::blockSize - a_off % BlockBuf::blockSize;
         if (a_len - tot < m) { m = a_len - tot; }
         // @todo 弃用bufCopyIn/Out()
         if (a_iswrite) {
-            if ((bad = bufCopyIn(bp->data + (a_off % BSIZE), a_usrbuf, a_buf, m)) != -1) { bwrite(bp); }
+            if ((bad = bufCopyIn(bp->d + (a_off % BlockBuf::blockSize), a_usrbuf, a_buf, m)) != -1) {bp->dirty=1;}
         }
-        else { bad = bufCopyOut(a_usrbuf, a_buf, bp->data + (a_off % BSIZE), m); }
-        brelse(bp);
+        else { bad = bufCopyOut(a_usrbuf, a_buf, bp->d + (a_off % BlockBuf::blockSize), m); }
         if (bad == -1) { break; }
     }
     return tot;
@@ -586,30 +579,24 @@ const uint32 SuperBlock::fatRead(uint32 a_cluster) const {
     if (a_cluster > rDCC() + 1) { return 0; }  // because cluster number starts at 2, not 0
     uint32 fat_sec = numthSec(a_cluster, 1);
     // here should be a cache layer for FAT table, but not implemented yet.
-    struct buf *b = bread(0, fat_sec);
-    uint32 next_clus = *(uint32*)(b->data + secOffset(a_cluster));
-    brelse(b);
+    auto buf = bcache[{0,fat_sec}];
+    uint32 next_clus = (*buf)[secOffset(a_cluster)];
     return next_clus;
 }
 void SuperBlock::clearClus(uint32 a_cluster) const {
     uint32 sec = firstSec(a_cluster);
-    struct buf *b;
     for (int i = 0; i < rSPC(); i++) {
-        b = bread(0, sec++);
-        memset(b->data, 0, BSIZE);
-        bwrite(b);
-        brelse(b);
+        auto buf = bcache[{0, sec++}];
+        buf->clear();
     }
     return;
 }
 const int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
     if (a_cluster > rDCC()+1) { return -1; }
     uint32 fat_sec = numthSec(a_cluster, 1);
-    struct buf *b = bread(0, fat_sec);
+    auto buf = bcache[{0, fat_sec}];
     uint off = secOffset(a_cluster);
-    *(uint32*)(b->data + off) = a_content;
-    bwrite(b);
-    brelse(b);
+    (*buf)[off] = a_content;
     return 0;
 }
 FileSystem& FileSystem::operator=(const FileSystem& a_fs) {

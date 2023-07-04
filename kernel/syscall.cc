@@ -1,7 +1,6 @@
 #include "kernel.hh"
 #include "sched.hh"
 #include "fat.hh"
-#include "buf.h"
 #include "ld.hh"
 #include "sbi.hh"
 #include "TINYSTL/vector.h"
@@ -34,11 +33,9 @@ namespace syscall {
         return statcode::err;
     }
     xlen_t testBio() {
-        for(int i = 0; i < 35; i++){
-            auto buf = bread(0, i);
-            bwrite(buf);
-            brelse(buf);
-        }
+        // for(int i=0;i<300;i++){
+        //     auto buf=bcache[{0,i%260}];
+        // }
         return statcode::ok;
     }
     xlen_t testIdle() {
