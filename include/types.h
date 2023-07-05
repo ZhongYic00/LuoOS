@@ -19,6 +19,7 @@ typedef unsigned int  uint32;
 typedef unsigned long uint64;
 typedef long int64;
 typedef unsigned long uintptr_t;
+typedef long long loff_t;
 #define NULL 0
 #define typeof __typeof__
 

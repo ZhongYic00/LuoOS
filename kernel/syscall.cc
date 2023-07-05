@@ -15,7 +15,7 @@ extern void _strapexit();
 extern char _uimg_start;
 namespace syscall {
     using sys::statcode;
-    using kernel::TimeSpec;
+    // using kernel::TimeSpec;
     using kernel::UtSName;
     using fs::File;
     using fs::KStat;
@@ -432,12 +432,12 @@ namespace syscall {
     xlen_t nanoSleep() {
         auto cur = kHartObjs.curtask;
         auto ctx = cur->ctx;
-        TimeSpec *a_tv = (TimeSpec*)ctx.x(10);
+        struct timespec *a_tv = (struct timespec*)ctx.x(10);
 
         auto curproc = cur->getProcess();
-        klib::ByteArray tvarray = curproc->vmar.copyin((xlen_t)a_tv, sizeof(TimeSpec));
-        TimeSpec *tv = (TimeSpec*)tvarray.buff;
-        struct proc::SleepingTask tosleep(cur, kHartObjs.g_ticks + tv->tvSec()*kernel::CLK_FREQ/kernel::INTERVAL + tv->tvNSec()*kernel::CLK_FREQ/(1000000*kernel::INTERVAL));
+        klib::ByteArray tvarray = curproc->vmar.copyin((xlen_t)a_tv, sizeof(struct timespec));
+        struct timespec *tv = (struct timespec*)tvarray.buff;
+        struct proc::SleepingTask tosleep(cur, kHartObjs.g_ticks + tv->tv_sec*kernel::CLK_FREQ/kernel::INTERVAL + tv->tv_nsec*kernel::CLK_FREQ/(1000000*kernel::INTERVAL));
         for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
             if(kHartObjs.sleep_tasks[i].m_task == nullptr) {
                 kHartObjs.sleep_tasks[i] = tosleep;
@@ -476,24 +476,18 @@ namespace syscall {
         auto curproc = kHartObjs.curtask->getProcess();
         static struct UtSName uts = { "domainname", "machine", "nodename", "release", "sysname", "version" };
         curproc->vmar.copyout((xlen_t)a_uts, klib::ByteArray((uint8_t*)&uts, sizeof(uts)));
-        // todo@ 这里是干些啥？
-        // ExecInst(fence);
-        // ExecInst(fence.i);
-        // ExecInst(sfence.vma);
-        // ExecInst(fence);
-        // ExecInst(fence.i);
 
         return statcode::ok;
     }
     xlen_t getTimeOfDay() {
         auto &ctx = kHartObjs.curtask->ctx;
-        TimeSpec *a_ts = (TimeSpec*)ctx.x(10);
+        struct timespec *a_ts = (struct timespec*)ctx.x(10);
         if(a_ts == nullptr) { return statcode::err; }
     
         auto curproc = kHartObjs.curtask->getProcess();
         xlen_t ticks;
         asm volatile("rdtime %0" : "=r" (ticks) );
-        TimeSpec ts(ticks/kernel::CLK_FREQ, ((100000*ticks/kernel::CLK_FREQ)%100000)*10);
+        struct timespec ts = { ticks/kernel::CLK_FREQ, ((100000*ticks/kernel::CLK_FREQ)%100000)*10 };
         curproc->vmar.copyout((xlen_t)a_ts, klib::ByteArray((uint8_t*)&ts, sizeof(ts)));
 
         return statcode::ok;

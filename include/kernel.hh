@@ -140,16 +140,6 @@ namespace kernel {
         char machine[65];
         char domainname[65];
     };
-    class TimeSpec {
-        private:
-            time_t m_tv_sec;  /* 秒 */
-            long m_tv_nsec; /* 纳秒, 范围在0~999999999 */
-        public:
-            TimeSpec():m_tv_sec(0), m_tv_nsec(0) {}
-            TimeSpec(time_t a_tv_sec, long a_tv_nsec):m_tv_sec(a_tv_sec), m_tv_nsec(a_tv_nsec) {}
-            inline time_t tvSec() { return m_tv_sec; }
-            inline time_t tvNSec() { return m_tv_nsec; }
-    };
     inline int readHartId(){register int hartid asm("tp"); return hartid;}
     constexpr tid_t kthreadIdBase=0x80000000;
     inline int threadId(){return kthreadIdBase+readHartId();}

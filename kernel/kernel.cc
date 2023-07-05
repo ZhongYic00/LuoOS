@@ -146,8 +146,8 @@ static void infoInit(){
     }
 }
 static void rootfsInit(){
-    auto rootfs=new ramfs::FileSystem();
-    auto root=rootfs->getRoot();
+    // auto rootfs=new ramfs::FileSystem();
+    // auto root=rootfs->getRoot();
 }
 void idle(){
     while(true){

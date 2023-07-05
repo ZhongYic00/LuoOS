@@ -6,6 +6,7 @@
 
 namespace fs {
     using BlockBuf = struct bio::BlockBuf;
+    class SuperBlock;
     typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）
         uint8 attr; // 属性
@@ -37,6 +38,15 @@ namespace fs {
         LNE lne; // long name entry
         void readEntName(char *a_buf) const;
     };
+    class INode:public internal::INode {
+        private:
+            uint8 attribute;  // 属性
+            uint32 first_clus;  // 起始簇号
+            uint32 cur_clus;  // 当前簇号
+            uint clus_cnt;  // 当前簇是该文件的第几个簇
+        public:
+            INode(const union Ent& a_ent):internal::INode(), attribute(a_ent.sne.attr), first_clus(((uint32)a_ent.sne.fst_clus_hi<<16) | a_ent.sne.fst_clus_lo), cur_clus(first_clus), clus_cnt(0) {}
+    };
     class DirEnt {
         public:
             char  filename[FAT32_MAX_FILENAME + 1];  // 文件名
@@ -58,7 +68,7 @@ namespace fs {
             // @todo 暂时不能写构造函数，会禁用初始化列表
             // DirEnt() {}
             // DirEnt(const DirEnt& a_entry):filename(), attribute(a_entry.attribute), first_clus(a_entry.first_clus), file_size(a_entry.file_size), cur_clus(a_entry.cur_clus), clus_cnt(a_entry.clus_cnt), dev(a_entry.dev), dirty(a_entry.dirty), valid(a_entry.valid), ref(a_entry.ref), off(a_entry.off), parent(a_entry.parent), next(a_entry.next), prev(a_entry.prev), mount_flag(a_entry.mount_flag) { strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME); }
-            // ~DirEnt() {}
+            ~DirEnt() = default;
             DirEnt& operator=(const union Ent& a_ent);
             DirEnt *entSearch(string a_dirname, uint *a_off = nullptr);
             int entNext(DirEnt *const a_entry, uint a_off, int *const a_count);
