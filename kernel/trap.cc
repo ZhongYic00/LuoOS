@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.hh"
 
-#define moduleLevel LogLevel::debug
+// #define moduleLevel LogLevel::debug
 
 static hook_t hooks[]={schedule};
 
@@ -155,8 +155,8 @@ void _strapenter(){
     // after saveContext t6=sscratch
     ptr_t t6;
     regRead(t6,t6);
-    auto curtask=proc::Task::gprToTask(t6);
     if constexpr(fromUmode){
+        auto curtask=proc::Task::gprToTask(t6);
         csrWrite(stvec,ktrapwrapper);
         csrWrite(sscratch,curtask->kctx.gpr);
         regWrite(tp,curtask->kctx.tp());
@@ -177,7 +177,8 @@ void _strapexit(){
     static xlen_t prevs0=0;
     /// @todo chaos
     if(cur->lastpriv==proc::Task::Priv::User){
-        xlen_t gprvaddr=kInfo.segments.kstack.second+offsetof(proc::Task,ctx.gpr);
+        // xlen_t gprvaddr=kInfo.segments.kstack.first+kernel::readHartId()*0x1000+offsetof(proc::Task,ctx.gpr);
+        auto gprvaddr=cur->kctx.vaddr+offsetof(proc::Task,ctx.gpr);
         csrWrite(sscratch,gprvaddr);
         csrWrite(sepc,cur->ctx.pc);
         csrClear(sstatus,1l<<csr::mstatus::spp);
@@ -191,6 +192,7 @@ void _strapexit(){
         ExecInst(sret);
     } else {
         csrSet(sstatus,1l<<csr::mstatus::spp);
+        csrWrite(stvec,ktrapwrapper);
         csrWrite(sscratch,cur->kctx.gpr);
         if(cur->lastpriv==proc::Task::Priv::AlwaysKernel)csrSet(sstatus,BIT(csr::mstatus::spie))
         else csrClear(sstatus,BIT(csr::mstatus::spie))

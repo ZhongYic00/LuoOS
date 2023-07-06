@@ -35,6 +35,7 @@ namespace proc
     };
     struct KContext:public Context{
         xlen_t satp;
+        xlen_t vaddr;
     };
 
     struct Task; 
@@ -122,7 +123,7 @@ namespace proc
         void zombieExit();
     private:
         xlen_t newUstack();
-        xlen_t newTrapframe();
+        auto newTrapframe();
         inline void addTask(Task* task){ tasks.insert(task); }
     };
     struct Task:public IdManagable,public Scheduable{ // a.k.a. kthread
@@ -158,17 +159,7 @@ namespace proc
         }
 
         template<typename ...Ts>
-        static Task* createTask(ObjManager<Task> &mgr,xlen_t buff,Ts&& ...args){
-            /**
-             * @brief mem layout. low -> high
-             * | task struct | kstack |
-             */
-            Task* task=reinterpret_cast<Task*>(buff);
-            auto id=mgr.newId();
-            new (task) Task(id,args...);
-            mgr.addObj(id,task);
-            return task;
-        }
+        static Task* createTask(ObjManager<Task> &mgr,xlen_t buff,Ts&& ...args);
         void operator delete(ptr_t task){}
         FORCEDINLINE inline static Task* gprToTask(ptr_t gpr){return reinterpret_cast<Task*>(gpr-offsetof(Task,ctx.gpr));}
     };

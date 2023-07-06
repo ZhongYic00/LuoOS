@@ -402,8 +402,9 @@ namespace syscall {
         return file->write(uva,len);
     }
     xlen_t exit(){
-        auto status=kHartObj().curtask->ctx.a0();
-        kHartObj().curtask->getProcess()->exit(status);
+        auto cur=kHartObj().curtask;
+        auto status=cur->ctx.a0();
+        cur->getProcess()->exit(status);
         yield();
     }
     xlen_t fStat() {

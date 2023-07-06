@@ -1,6 +1,7 @@
 #ifndef SCHED_HH__
 #define SCHED_HH__
 #include "klib.hh"
+#include "EASTL/list.h"
 
 namespace sched
 {
@@ -14,13 +15,12 @@ namespace sched
         State state;
         Scheduable(prior_t prior):prior(prior),state(Init){}
     };
-    using klib::list;
+    using eastl::list;
     class Scheduler{
-        list<Scheduable*,true> ready[maxPrior+1];
+        list<Scheduable*> ready[maxPrior+1];
         list<Scheduable*> pending;
-        klib::list<Scheduable*,true>::iterator cur[maxPrior+1];
     public:
-        Scheduable *next();
+        Scheduable *next(Scheduable *prev);
         Scheduler();
         void add(Scheduable *elem);
         void remove(Scheduable *elem);

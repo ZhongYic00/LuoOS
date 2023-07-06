@@ -185,8 +185,6 @@ void init(int hartid){
         for(int i=0;i<10;i++)
             printf("%d:Hello LuoOS!\n",i);
         extern char _uimg_start;
-        auto kidle=proc::createKProcess(sched::maxPrior);
-        kidle->defaultTask()->kctx.ra()=(xlen_t)idle;
         auto uproc=proc::createProcess();
         uproc->name="uprog00";
         uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
@@ -217,10 +215,12 @@ void init(int hartid){
         printf("lock acquired! %d\n",hartid);
     }
     assert(hartid==1||hartid==0);
-    if(isinit){
+    if(true){
         timerInit();
         plicInit();
         std::atomic_thread_fence(std::memory_order_acquire);
+        auto kidle=proc::createKProcess(sched::maxPrior);
+        kidle->defaultTask()->kctx.ra()=(xlen_t)idle;
         schedule();
         Log(info,"first schedule on hart%d",kernel::readHartId());
         kLogger.outputLevel=warning;
