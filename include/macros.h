@@ -17,10 +17,11 @@ enum LogLevel{
 #define IFTEST(x) IFDEF(GUEST,x)
 
 extern int enableLevel;
+inline int readHartId(){register int rt asm("tp");return rt;}
 #ifndef moduleLevel
     #define moduleLevel LogLevel::error
 #endif
 #define Log(level,fmt,...) \
-    if(level>=enableLevel && level>=moduleLevel){kLogger.log(level,(__FILE__":%d:%s::\t" fmt "\n"),__LINE__,__FUNCTION__,##__VA_ARGS__);}
+    if(level>=enableLevel && level>=moduleLevel){kLogger.log(level,("[%d]"__FILE__":%d:%s::\t" fmt "\n"),readHartId(),__LINE__,__FUNCTION__,##__VA_ARGS__);}
 
 #define DEBUG 0
