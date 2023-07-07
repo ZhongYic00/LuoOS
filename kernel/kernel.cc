@@ -16,10 +16,11 @@
 extern char _kstack_end;
 xlen_t kstack_end=(xlen_t)&_kstack_end;
 kernel::KernelHartObjs kHartObjs[8];
+extern char _kstack_start,_kstack_end;
 kernel::KernelInfo kInfo={
     .segments={
         .dev=(vm::segment_t){0x0,0x40000000},
-        .kstack=vm::segment_t{0x81200000,0x81208000}
+        .kstack=vm::segment_t{(xlen_t)&_kstack_start,(xlen_t)&_kstack_end}
     }
 };
 using vm::pgtbl_t,vm::PageTable;
