@@ -23,11 +23,11 @@ namespace proc
     struct Context
     {
         xlen_t gpr[30];
-        constexpr inline xlen_t& x(int r){return gpr[r-1];}
-        inline xlen_t& ra(){return x(1);}
-        inline xlen_t& a0(){return x(10);}
-        inline xlen_t& sp(){return x(2);}
-        inline xlen_t& tp(){return x(4);}
+        FORCEDINLINE inline xlen_t& x(int r){return gpr[r-1];}
+        FORCEDINLINE inline xlen_t& ra(){return x(1);}
+        FORCEDINLINE inline xlen_t& a0(){return x(10);}
+        FORCEDINLINE inline xlen_t& sp(){return x(2);}
+        FORCEDINLINE inline xlen_t& tp(){return x(4);}
         xlen_t pc;
         inline klib::string toString() const{
             klib::string rt;
@@ -37,8 +37,8 @@ namespace proc
         }
     };
     struct KContext:public Context{
-        ptr_t kstack;
         xlen_t satp;
+        xlen_t vaddr;
     };
 
     struct Task; 
@@ -124,7 +124,7 @@ namespace proc
         void zombieExit();
     private:
         xlen_t newUstack();
-        xlen_t newTrapframe();
+        auto newTrapframe();
         inline void addTask(Task* task){ tasks.insert(task); }
     };
     struct Task:public IdManagable,public Scheduable{ // a.k.a. kthread
@@ -139,16 +139,17 @@ namespace proc
         inline Task(tid_t tid,prior_t pri,tid_t proc):IdManagable(tid),Scheduable(pri),proc(proc),lastpriv(Priv::User){
             ctx.x(2)=UserStackDefault; //x2, sp
             kctx.satp=getProcess()->satp();
-            kctx.kstack=reinterpret_cast<ptr_t>(this)+TrapframePages*vm::pageSize;
+            kctx.sp()=trapstack();
         }
         inline Task(prior_t pri,tid_t proc):Task(id,pri,proc){}
         inline Task(tid_t tid,const Task &other,pid_t proc):IdManagable(tid),Scheduable(other.prior),proc(proc),lastpriv(Priv::User){
             ctx=other.ctx;
             kctx=other.kctx;
             kctx.satp=getProcess()->satp();
-            kctx.kstack=reinterpret_cast<ptr_t>(this)+TrapframePages*vm::pageSize;
+            kctx.sp()=trapstack();
         }
         inline Task(const Task &other,pid_t proc):Task(id,other,proc){}
+        FORCEDINLINE inline xlen_t trapstack(){return reinterpret_cast<xlen_t>(this)+TrapframePages*vm::pageSize;}
 
         void switchTo();
         void sleep();
@@ -159,18 +160,9 @@ namespace proc
         }
 
         template<typename ...Ts>
-        static Task* createTask(ObjManager<Task> &mgr,xlen_t buff,Ts&& ...args){
-            /**
-             * @brief mem layout. low -> high
-             * | task struct | kstack |
-             */
-            Task* task=reinterpret_cast<Task*>(buff);
-            auto id=mgr.newId();
-            new (task) Task(id,args...);
-            mgr.addObj(id,task);
-            return task;
-        }
+        static Task* createTask(ObjManager<Task> &mgr,xlen_t buff,Ts&& ...args);
         void operator delete(ptr_t task){}
+        FORCEDINLINE inline static Task* gprToTask(ptr_t gpr){return reinterpret_cast<Task*>(gpr-offsetof(Task,ctx.gpr));}
     };
     struct SleepingTask {
         struct Task *m_task;

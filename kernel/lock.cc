@@ -5,7 +5,7 @@ namespace semaphore
 {
     void Semaphore::req(){
         while(count==0){
-            waiting.push_back(kHartObjs.curtask);
+            waiting.push_back(kHartObj().curtask);
             syscall::sleep();
         }
         count--;

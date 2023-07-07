@@ -33,30 +33,27 @@ namespace klib
   template<typename T,size_t buffsize=128>
   struct ringbuf
   {
+    std::atomic<int> head,tail;
     T buff[128];
-    size_t head,tail;
     ringbuf():head(0),tail(0){}
-    FORCEDINLINE size_t next(size_t cur){return (cur+1)%buffsize;}
     inline void put(T d){
-      buff[tail]=d;
-      tail=next(tail);
+      buff[tail++%buffsize]=d;
     }
     inline T& req(){
-      auto &rt=buff[tail];
-      tail=next(tail);
+      auto &rt=buff[tail++%buffsize];
       return rt;
     }
     inline void pop(){
-      head=next(head);
+      head++;
     }
     inline T get(){
-      return buff[head];
+      return buff[head%buffsize];
     }
     inline bool empty(){
       return head==tail;
     }
     inline bool full(){
-      return next(tail)==head;
+      return head-tail==1;
     }
   };
 
@@ -324,9 +321,7 @@ static klib::ringbuf<char> buf;
 class IO{
 public:
   static void _sbiputs(const char *s);
-  inline static void _blockingputs(const char *s){
-    while(*s)platform::uart0::blocking::putc(*s++);
-  }
+  static void _blockingputs(const char *s);
   inline static void _nonblockingputs(const char *s){
     _blockingputs("nblkpts");
     while(*s){
@@ -348,7 +343,7 @@ class Logger{
     char buf[300];
   };
   klib::ringbuf<LogItem> ring[5];
-  int lid=0;
+  std::atomic_uint32_t lid=0;
 public:
   LogLevel outputLevel=LogLevel::info;
     void log(int level,const char *fmt,...);

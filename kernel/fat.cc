@@ -10,12 +10,12 @@ static struct entry_cache { DirEnt entries[ENTRY_CACHE_NUM]; } ecache; // 目录
 static DirEnt root; // 根目录
 static int mount_num = 0; //表示寻找在挂载集合的下标
 static int bufCopyOut(int user_dst, uint64 dst, void *src, uint64 len) {
-    if(user_dst) { kHartObjs.curtask->getProcess()->vmar.copyout(dst, klib::ByteArray((uint8_t*)src, len)); }
+    if(user_dst) { kHartObj().curtask->getProcess()->vmar.copyout(dst, klib::ByteArray((uint8_t*)src, len)); }
     else { memmove((void*)dst, src, len); }
     return 0;
 }
 static int bufCopyIn(void *dst, int user_src, uint64 src, uint64 len) {
-    if(user_src) { memmove(dst, (const void*)(kHartObjs.curtask->getProcess()->vmar.copyin(src, len).buff), len); }
+    if(user_src) { memmove(dst, (const void*)(kHartObj().curtask->getProcess()->vmar.copyin(src, len).buff), len); }
     else { memmove(dst, (void*)src, len); }
     return 0;
 }
@@ -614,7 +614,7 @@ DirEnt *Path::pathSearch(shared_ptr<File> a_file, bool a_parent) const {  // @to
     if(pathname.length() < 1) { return nullptr; }  // 空路径
     else if(pathname[0] == '/') { entry = dev_fat[0].getRoot()->entDup(); }  // 绝对路径
     else if(a_file != nullptr) { entry = a_file->obj.ep->entDup(); }  // 相对路径（指定目录）
-    else { entry = kHartObjs.curtask->getProcess()->cwd->entDup(); }  // 相对路径（工作目录）
+    else { entry = kHartObj().curtask->getProcess()->cwd->entDup(); }  // 相对路径（工作目录）
     for(int i = 0; i < dirnum; ++i) {
         if (!(entry->attribute & ATTR_DIRECTORY)) {
             entry->entRelse();

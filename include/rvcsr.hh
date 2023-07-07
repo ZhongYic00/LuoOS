@@ -13,6 +13,8 @@
 #define csrRW(val0,reg,val1) {asm volatile ("csrrw %0, "#reg", %1" :"=r"(val0):"r"(val1));}
 #define csrSwap(csr,gpr) {__asm__("csrrw "#gpr","#csr","#gpr);}
 #define ExecInst(inst) {asm volatile (#inst ::);}
+#define regWrite(reg, val) {asm volatile ("mv "#reg", %0" :: "r"(val)); }
+#define regRead(reg, val) {asm volatile ("mv %0, " #reg :"=r"(val):); }
 
 namespace csr
 {

@@ -43,8 +43,8 @@ namespace syscall {
     }
     xlen_t testMount() {
         int rt = fs::rootFSInit();
-        kHartObjs.curtask->getProcess()->cwd = fs::Path("/").pathSearch();
-        printf("0x%lx\n", kHartObjs.curtask->getProcess()->cwd);
+        kHartObj().curtask->getProcess()->cwd = fs::Path("/").pathSearch();
+        printf("0x%lx\n", kHartObj().curtask->getProcess()->cwd);
         shared_ptr<File> f;
         // auto testfile = fs::pathCreateAt("/testfile", T_FILE, O_CREATE|O_RDWR, f);
         auto testfile = fs::Path("/testfile").pathCreate(T_FILE, O_CREATE|O_RDWR, f);
@@ -67,7 +67,7 @@ namespace syscall {
     xlen_t testFATInit() {
         Log(info, "initializing fat\n");
         if(fs::rootFSInit() != 0) { panic("fat init failed\n"); }
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         // curproc->cwd = fs::entEnter("/");
         curproc->cwd = fs::Path("/").pathSearch();
         curproc->files[3] = make_shared<File>(curproc->cwd,0);
@@ -86,7 +86,7 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t getCwd(void) {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         char *a_buf = (char*)ctx.x(10);
         size_t a_len = ctx.x(11);
         if(a_buf == nullptr) {
@@ -95,7 +95,7 @@ namespace syscall {
             return statcode::err;
         }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         DirEnt *de = curproc->cwd;
         char path[FAT32_MAX_PATH];
         char *s;  // s为path的元素指针
@@ -124,7 +124,7 @@ namespace syscall {
     xlen_t dupArgsIn(int a_fd, int a_newfd=-1) {
         if(fdOutRange(a_fd)) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
         // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
@@ -134,13 +134,13 @@ namespace syscall {
         return newfd;
     }
     xlen_t dup() {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
 
         return dupArgsIn(a_fd);
     }
     xlen_t dup3() {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
         int a_newfd = ctx.x(11);
         if(fdOutRange(a_newfd)) { return statcode::err; }
@@ -148,14 +148,14 @@ namespace syscall {
         return dupArgsIn(a_fd, a_newfd);
     }
     xlen_t mkDirAt(void) {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         mode_t a_mode = ctx.x(12); // @todo 还没用上
         if(a_dirfd == AT_FDCWD) { a_dirfd = 3; };
         if(fdOutRange(a_dirfd) || a_path == nullptr) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
         shared_ptr<File> f;
@@ -173,14 +173,14 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t unlinkAt(void) {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12); // 这玩意有什么用？
         if(a_dirfd == AT_FDCWD) { a_dirfd = 3; };
         if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
         shared_ptr<File> f;
@@ -189,7 +189,7 @@ namespace syscall {
         return fs::Path(path).pathUnlink(f);
     }
     xlen_t linkAt(void) {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         int a_olddirfd = ctx.x(10);
         const char *a_oldpath = (const char*)ctx.x(11);
         int a_newdirfd = ctx.x(12);
@@ -199,7 +199,7 @@ namespace syscall {
         if(a_newdirfd == AT_FDCWD) { a_newdirfd = 3; };
         if(fdOutRange(a_olddirfd) || fdOutRange(a_newdirfd) || a_oldpath==nullptr || a_newpath==nullptr) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray oldpatharr = curproc->vmar.copyinstr((xlen_t)a_oldpath, FAT32_MAX_PATH);
         klib::ByteArray newpatharr = curproc->vmar.copyinstr((xlen_t)a_newpath, FAT32_MAX_PATH);
         char *oldpath = (char*)oldpatharr.buff;
@@ -212,12 +212,12 @@ namespace syscall {
         return fs::Path(oldpath).pathLink(f1, newpath, f2);
     }
     xlen_t umount2(void) {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         const char *a_devpath = (const char*)ctx.x(10);
         int a_flags = ctx.x(11); // 没用上
         if(a_devpath == nullptr) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray devpatharr = curproc->vmar.copyinstr((xlen_t)a_devpath, FAT32_MAX_PATH);
         char *devpath = (char*)devpatharr.buff;
         if(strncmp("/",devpath,2) == 0) {
@@ -234,7 +234,7 @@ namespace syscall {
         return ep->entUnmount();
     }
     xlen_t mount() {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         const char *a_devpath = (const char*)ctx.x(10);
         const char *a_mountpath = (const char*)ctx.x(11);
         const char *a_fstype = (const char*)ctx.x(12);
@@ -242,7 +242,7 @@ namespace syscall {
         const void *a_data = (const void*)ctx.x(14); // 手册表示可为NULL
         if(a_devpath==nullptr || a_mountpath==nullptr || a_fstype==nullptr) { return statcode::err; }
         // 错误输出可以合并
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray devpatharr = curproc->vmar.copyinstr((xlen_t)a_devpath, FAT32_MAX_PATH);
         klib::ByteArray mountpatharr = curproc->vmar.copyinstr((xlen_t)a_mountpath, FAT32_MAX_PATH);
         klib::ByteArray fstypearr = curproc->vmar.copyinstr((xlen_t)a_fstype, FAT32_MAX_PATH);
@@ -278,11 +278,11 @@ namespace syscall {
         return ep->entMount(dev_ep);
     }
     xlen_t chDir(void) {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         const char *a_path = (const char*)ctx.x(10);
         if(a_path == nullptr) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
         // DirEnt *ep = fs::entEnter(path);
@@ -300,7 +300,7 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t openAt() {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12);
@@ -308,7 +308,7 @@ namespace syscall {
         if(a_dirfd == AT_FDCWD) { a_dirfd = 3; };
         if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
         shared_ptr<File> f1, f2;
@@ -348,11 +348,11 @@ namespace syscall {
         return fd;
     }
     xlen_t close() {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
         if(fdOutRange(a_fd)) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         if(curproc->files[a_fd] == nullptr) { return statcode::err; } // 不能关闭一个已关闭的文件
         // 不能用新的局部变量代替，局部变量和files[a_fd]是两个不同的SharedPtr
         curproc->files[a_fd].reset();
@@ -360,7 +360,7 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t pipe2(){
-        auto &cur=kHartObjs.curtask;
+        auto &cur=kHartObj().curtask;
         auto &ctx=cur->ctx;
         auto proc=cur->getProcess();
         xlen_t fd=ctx.x(10),flags=ctx.x(11);
@@ -371,13 +371,13 @@ namespace syscall {
         proc->vmar[fd]=fds;
     }
     xlen_t getDents64(void) {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
         DStat *a_buf = (DStat*)ctx.x(11);
         size_t a_len = ctx.x(12);
         if(fdOutRange(a_fd) || a_buf==nullptr || a_len<sizeof(DStat)) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
         // DStat ds;
@@ -388,32 +388,33 @@ namespace syscall {
         return sizeof(ds);
     }
     xlen_t read(){
-        auto &ctx=kHartObjs.curtask->ctx;
+        auto &ctx=kHartObj().curtask->ctx;
         int fd=ctx.x(10);
         xlen_t uva=ctx.x(11),len=ctx.x(12);
-        auto file=kHartObjs.curtask->getProcess()->ofile(fd);
+        auto file=kHartObj().curtask->getProcess()->ofile(fd);
         auto bytes=file->read(len);
-        kHartObjs.curtask->getProcess()->vmar[uva]=bytes;
+        kHartObj().curtask->getProcess()->vmar[uva]=bytes;
         return bytes.len;
     }
     xlen_t write(){
-        auto &ctx=kHartObjs.curtask->ctx;
+        auto &ctx=kHartObj().curtask->ctx;
         xlen_t fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
-        auto file=kHartObjs.curtask->getProcess()->ofile(fd);
+        auto file=kHartObj().curtask->getProcess()->ofile(fd);
         return file->write(uva,len);
     }
     xlen_t exit(){
-        auto status=kHartObjs.curtask->ctx.a0();
-        kHartObjs.curtask->getProcess()->exit(status);
+        auto cur=kHartObj().curtask;
+        auto status=cur->ctx.a0();
+        cur->getProcess()->exit(status);
         yield();
     }
     xlen_t fStat() {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
         KStat *a_kst = (KStat*)ctx.x(11);
         if(fdOutRange(a_fd) || a_kst==nullptr) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> f = curproc->files[a_fd];
         if(f == nullptr) { return statcode::err; }
         // KStat kst;
@@ -430,17 +431,17 @@ namespace syscall {
         _strapexit(); //TODO check
     }
     xlen_t nanoSleep() {
-        auto cur = kHartObjs.curtask;
+        auto cur = kHartObj().curtask;
         auto ctx = cur->ctx;
         struct timespec *a_tv = (struct timespec*)ctx.x(10);
 
         auto curproc = cur->getProcess();
         klib::ByteArray tvarray = curproc->vmar.copyin((xlen_t)a_tv, sizeof(struct timespec));
         struct timespec *tv = (struct timespec*)tvarray.buff;
-        struct proc::SleepingTask tosleep(cur, kHartObjs.g_ticks + tv->tv_sec*kernel::CLK_FREQ/kernel::INTERVAL + tv->tv_nsec*kernel::CLK_FREQ/(1000000*kernel::INTERVAL));
+        struct proc::SleepingTask tosleep(cur, kHartObj().g_ticks + tv->tv_sec*kernel::CLK_FREQ/kernel::INTERVAL + tv->tv_nsec*kernel::CLK_FREQ/(1000000*kernel::INTERVAL));
         for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
-            if(kHartObjs.sleep_tasks[i].m_task == nullptr) {
-                kHartObjs.sleep_tasks[i] = tosleep;
+            if(kHartObj().sleep_tasks[i].m_task == nullptr) {
+                kHartObj().sleep_tasks[i] = tosleep;
                 return sleep();
             }
         }
@@ -448,7 +449,7 @@ namespace syscall {
     }
     void yield(){
         Log(debug,"yield!");
-        auto &cur=kHartObjs.curtask;
+        auto &cur=kHartObj().curtask;
         sleepSave(cur->kctx.gpr);
     }
     xlen_t sysyield(){
@@ -456,35 +457,35 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t times(void) {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         proc::Tms *a_tms = (proc::Tms*)ctx.x(10);
         // if(a_tms == nullptr) { return statcode::err; } // a_tms留空时不管tms只返回ticks？
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         if(a_tms != nullptr) { curproc->vmar.copyout((xlen_t)a_tms, klib::ByteArray((uint8_t*)&curproc->ti, sizeof(proc::Tms))); }
         // acquire(&tickslock);
-        int ticks = (int)(kHartObjs.g_ticks/kernel::INTERVAL);
+        int ticks = (int)(kHartObj().g_ticks/kernel::INTERVAL);
         // release(&tickslock);
 
         return ticks;
     }
     xlen_t uName(void) {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         struct UtSName *a_uts = (struct UtSName*)ctx.x(10);
         if(a_uts == nullptr) { return statcode::err; }
 
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         static struct UtSName uts = { "domainname", "machine", "nodename", "release", "sysname", "version" };
         curproc->vmar.copyout((xlen_t)a_uts, klib::ByteArray((uint8_t*)&uts, sizeof(uts)));
 
         return statcode::ok;
     }
     xlen_t getTimeOfDay() {
-        auto &ctx = kHartObjs.curtask->ctx;
+        auto &ctx = kHartObj().curtask->ctx;
         struct timespec *a_ts = (struct timespec*)ctx.x(10);
         if(a_ts == nullptr) { return statcode::err; }
     
-        auto curproc = kHartObjs.curtask->getProcess();
+        auto curproc = kHartObj().curtask->getProcess();
         xlen_t ticks;
         asm volatile("rdtime %0" : "=r" (ticks) );
         struct timespec ts = { ticks/kernel::CLK_FREQ, ((100000*ticks/kernel::CLK_FREQ)%100000)*10 };
@@ -493,29 +494,29 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t getPid(){
-        return kHartObjs.curtask->getProcess()->pid();
+        return kHartObj().curtask->getProcess()->pid();
     }
-    xlen_t getPPid() { return kHartObjs.curtask->getProcess()->parentProc()->pid(); }
+    xlen_t getPPid() { return kHartObj().curtask->getProcess()->parentProc()->pid(); }
     int sleep(){
-        auto &cur=kHartObjs.curtask;
+        auto &cur=kHartObj().curtask;
         cur->sleep();
         yield();
         return statcode::ok;
     }
     xlen_t clone(){
-        auto &ctx=kHartObjs.curtask->ctx;
+        auto &ctx=kHartObj().curtask->ctx;
         xlen_t func=ctx.x(10),childStack=ctx.x(11);
         int flags=ctx.x(12);
-        auto pid=proc::clone(kHartObjs.curtask);
+        auto pid=proc::clone(kHartObj().curtask);
         auto thrd=(**kGlobObjs->procMgr)[pid]->defaultTask();
         if(childStack)thrd->ctx.sp()=childStack;
         // if(func)thrd->ctx.pc=func;
-        Log(debug,"clone curproc=%d, new proc=%d",kHartObjs.curtask->getProcess()->pid(),pid);
+        Log(debug,"clone curproc=%d, new proc=%d",kHartObj().curtask->getProcess()->pid(),pid);
         return pid;
     }
     int waitpid(tid_t pid,xlen_t wstatus,int options){
         Log(debug,"waitpid(pid=%d,options=%d)",pid,options);
-        auto curproc=kHartObjs.curtask->getProcess();
+        auto curproc=kHartObj().curtask->getProcess();
         proc::Process* target=nullptr;
         if(pid==-1){
             // get child procs
@@ -551,21 +552,21 @@ namespace syscall {
         return rt;
     }
     xlen_t wait(){
-        auto &cur=kHartObjs.curtask;
+        auto &cur=kHartObj().curtask;
         auto &ctx=cur->ctx;
         pid_t pid=ctx.x(10);
         xlen_t wstatus=ctx.x(11);
         return waitpid(pid,wstatus,0);
     }
     xlen_t brk(){
-        auto &ctx=kHartObjs.curtask->ctx;
-        auto &curproc=*kHartObjs.curtask->getProcess();
+        auto &ctx=kHartObj().curtask->ctx;
+        auto &curproc=*kHartObj().curtask->getProcess();
         xlen_t addr=ctx.x(10);
         return curproc.brk(addr);
     }
     xlen_t mmap(){
-        auto &curproc=*kHartObjs.curtask->getProcess();
-        auto &ctx=kHartObjs.curtask->ctx;
+        auto &curproc=*kHartObj().curtask->getProcess();
+        auto &ctx=kHartObj().curtask->ctx;
         xlen_t addr=ctx.x(10),len=ctx.x(11);
         int prot=ctx.x(12),flags=ctx.x(13),fd=ctx.x(14),offset=ctx.x(15);
         using namespace vm;
@@ -598,8 +599,8 @@ namespace syscall {
         return pn2addr(vpn);
     }
     xlen_t munmap(){
-        auto &ctx=kHartObjs.curtask->ctx;
-        auto &curproc=*kHartObjs.curtask->getProcess();
+        auto &ctx=kHartObj().curtask->ctx;
+        auto &curproc=*kHartObj().curtask->getProcess();
         xlen_t addr=ctx.x(10),len=ctx.x(11);
         /// @todo len, partial unmap?
         using namespace vm;
@@ -616,19 +617,19 @@ namespace syscall {
     }
     // xlen_t mprotect(){}
     int execve(klib::ByteArray buf,tinystl::vector<klib::ByteArray> &args,char **envp){
-        auto &ctx=kHartObjs.curtask->ctx;
+        auto &ctx=kHartObj().curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
-        kHartObjs.curtask->getProcess()->vmar.reset();
+        kHartObj().curtask->getProcess()->vmar.reset();
         /// @todo destroy other threads
         /// @todo reset curtask cpu context
         ctx=proc::Context();
-        // static_cast<proc::Context>(kHartObjs.curtask->kctx)=proc::Context();
+        // static_cast<proc::Context>(kHartObj().curtask->kctx)=proc::Context();
         ctx.sp()=proc::UserStackDefault;
         /// load elf
         ctx.pc=
-            ld::loadElf(buf.buff,kHartObjs.curtask->getProcess()->vmar);
+            ld::loadElf(buf.buff,kHartObj().curtask->getProcess()->vmar);
         /// setup stack
-        auto &vmar=kHartObjs.curtask->getProcess()->vmar;
+        auto &vmar=kHartObj().curtask->getProcess()->vmar;
         klib::ArrayBuff<xlen_t> argv(args.size()+1);
         int argc=0;
         for(auto arg:args){
@@ -650,7 +651,7 @@ namespace syscall {
         return ctx.sp();
     }
     xlen_t execve(){
-        auto &cur=kHartObjs.curtask;
+        auto &cur=kHartObj().curtask;
         auto &ctx=cur->ctx;
         auto curproc=cur->getProcess();
         xlen_t pathuva=ctx.x(10),argv=ctx.x(11),envp=ctx.x(12);
@@ -682,7 +683,7 @@ namespace syscall {
         return execve(buf,args,0);
     }
     expected<xlen_t,tinystl::string> reboot(){
-        auto &ctx=kHartObjs.curtask->ctx;
+        auto &ctx=kHartObj().curtask->ctx;
         int magic=ctx.x(10),magic2=ctx.x(11),cmd=ctx.x(12);
         if(!(magic==LINUX_REBOOT_MAGIC1 && magic2==LINUX_REBOOT_MAGIC2))return nonstd::make_unexpected("magic num unmatched!");
         if(cmd==LINUX_REBOOT_CMD_POWER_OFF){

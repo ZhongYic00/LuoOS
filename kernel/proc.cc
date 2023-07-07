@@ -14,41 +14,58 @@ xlen_t Process::newUstack(){
     vmar.map(vm::addr2pn(ustack),kGlobObjs->pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
     return ustack;
 }
-xlen_t Process::newTrapframe(){
-    /// @todo should be hartid or threadid related ?
-    auto kstackv=kInfo.segments.kstack.second;
-    xlen_t kstackppn;
+auto Process::newTrapframe(){
+    // trapframe is mapped into proc space uniquely, sscratch is set accordingly
+    xlen_t ppn=kGlobObjs->pageMgr->alloc(TrapframePages);
+    auto vaddr=vm::pn2addr(ppn);
     using perm=vm::PageTableEntry::fieldMasks;
-    vmar.map(vm::addr2pn(kstackv),kstackppn=kGlobObjs->pageMgr->alloc(TrapframePages),1,perm::r|perm::w|perm::u|perm::v,vm::VMO::CloneType::alloc);
-    return vm::pn2addr(kstackppn);
+    /// @todo vaddr should be in specific region?
+    vmar.map(vm::addr2pn(vaddr),ppn,1,perm::r|perm::w|perm::u|perm::v,vm::VMO::CloneType::alloc);
+    return eastl::make_tuple(vaddr,vm::pn2addr(ppn));
 }
 
 Task* Process::newKTask(prior_t prior){
-    auto thrd=Task::createTask(**kGlobObjs->taskMgr,newTrapframe(),prior,this->pid());
+    auto [vaddr,buff]=newTrapframe();
+    auto thrd=Task::createTask(**kGlobObjs->taskMgr,buff,prior,this->pid());
     thrd->lastpriv=Task::Priv::AlwaysKernel;
-    thrd->kctx.sp()=(xlen_t)thrd->kctx.kstack;
     addTask(thrd);
     kGlobObjs->scheduler->add(thrd);
     return thrd;
 }
 Task* Process::newTask(){
-    // auto thrd=kGlobObjs->taskMgr->alloc(0,this->pid(),proc::UserStackDefault);
-    auto thrd=Task::createTask(**kGlobObjs->taskMgr,newTrapframe(),0,this->pid());
+    auto [vaddr,buff]=newTrapframe();
+    auto thrd=Task::createTask(**kGlobObjs->taskMgr,buff,0,this->pid());
     thrd->ctx.sp()=newUstack();
     thrd->ctx.a0()=0;
+    thrd->kctx.vaddr=vaddr;
     addTask(thrd);
     kGlobObjs->scheduler->add(thrd);
     return thrd;
 }
 
 Task* Process::newTask(const Task &other,bool allocStack){
-    auto thrd=Task::createTask(**kGlobObjs->taskMgr,newTrapframe(),other,this->pid());
+    auto [vaddr,buff]=newTrapframe();
+    auto thrd=Task::createTask(**kGlobObjs->taskMgr,buff,other,this->pid());
+    thrd->kctx.vaddr=vaddr;
     if(allocStack){
         thrd->ctx.sp()=newUstack();
     }
     addTask(thrd);
     kGlobObjs->scheduler->add(thrd);
     return thrd;
+}
+
+template<typename ...Ts>
+Task* Task::createTask(ObjManager<Task> &mgr,xlen_t buff,Ts&& ...args){
+    /**
+     * @brief mem layout. low -> high
+     * | task struct | kstack |
+     */
+    Task* task=reinterpret_cast<Task*>(buff);
+    auto id=mgr.newId();
+    new (task) Task(id,args...);
+    mgr.addObj(id,task);
+    return task;
 }
 
 void validate(){
@@ -63,34 +80,12 @@ void validate(){
 
 extern void _strapexit();
 void Task::switchTo(){
-    // task->ctx.pc=0x80200000l;
-    kHartObjs.curtask=this;
+    kHartObj().curtask=this;
     kctx.tp()=kernel::readHartId();
-    // if(lastpriv==Priv::User){
-    //     csrWrite(sscratch,ctx.gpr);
-    //     csrWrite(sepc,ctx.pc);
-    //     auto proc=getProcess();
-    //     /// @todo chaos
-    //     csrClear(sstatus,1l<<csr::mstatus::spp);
-    //     csrSet(sstatus,BIT(csr::mstatus::spie));
-    // } else {
-    //     if(lastpriv!=Priv::AlwaysKernel)lastpriv=Priv::User;
-    //     // csrWrite(satp,kctx.satp);
-    //     // ExecInst(sfence.vma);
-    //     volatile register ptr_t t6 asm("t6")=kctx.gpr;
-    //     restoreContext();
-    //     /// @bug suppose this swap has problem when switching process
-    //     csrSwap(sscratch,t6);
-    //     csrSet(sstatus,BIT(csr::mstatus::sie));
-    //     ExecInst(ret);
-    // }
-    // task->getProcess()->vmar.print();
 }
 void Task::sleep(){
     Log(info,"sleep(this=Task<%d>)",this->id);
     kGlobObjs->scheduler->sleep(this);
-    // register xlen_t sp asm("sp");
-    // saveContextTo(kctx.gpr);
 }
 void Process::print(){
     Log(info,"Process[%d]",pid());
@@ -142,6 +137,7 @@ void Process::exit(int status){
     /// @todo resource recycle
 
     for(auto task:tasks){
+        task->state=sched::Zombie;
         kGlobObjs->scheduler->remove(task);
     }
 

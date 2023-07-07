@@ -15,7 +15,7 @@
 
 extern char _kstack_end;
 xlen_t kstack_end=(xlen_t)&_kstack_end;
-kernel::KernelHartObjs kHartObjs;
+kernel::KernelHartObjs kHartObjs[8];
 kernel::KernelInfo kInfo={
     .segments={
         .dev=(vm::segment_t){0x0,0x40000000},
@@ -35,7 +35,7 @@ void nextTimeout(){
     sbi_set_timer(time+kernel::timerInterval);
 }
 static void timerInit(){
-    kHartObjs.g_ticks = 0;
+    kHartObj().g_ticks = 0;
     csrSet(sie,BIT(csr::mie::stie));
     nextTimeout();
 }
@@ -74,13 +74,6 @@ static void plicInit(){
     mmio<word_t>(thresholdOf(hart))=0;
     
     uartInitTest();
-}
-
-__attribute__((nacked, section("stub")))
-static void stub(){
-    csrWrite(satp,kernelPageTableRoot);
-    ExecInst(sfence.vma);
-    ExecInst(j strapwrapper);
 }
 
 // __attribute__((section("init")))
@@ -160,7 +153,7 @@ std::atomic<uint32_t> started;
 mutex::spinlock spin;
 extern void schedule();
 extern void program0();
-extern "C" void strapwrapper();
+extern void strapwrapper();
 extern void _strapexit();
 
 FORCEDINLINE
@@ -171,12 +164,14 @@ void init(int hartid){
     puts("\n\n>>>Hello LuoOS<<<\n\n");
     sbi_init();
     int prevStarted=started.fetch_add(1);
+    bool isinit=false;
     Log(info,"Hart %d online!",hartid);
     
     if(!prevStarted){   // is first hart
         // @todo needs plic and uart init?
         csrWrite(stvec,strapwrapper);
         puts=IO::_blockingputs;
+        isinit=true;
 
         infoInit();
         memInit();
@@ -190,8 +185,6 @@ void init(int hartid){
         for(int i=0;i<10;i++)
             printf("%d:Hello LuoOS!\n",i);
         extern char _uimg_start;
-        auto kidle=proc::createKProcess(sched::maxPrior);
-        kidle->defaultTask()->kctx.ra()=(xlen_t)idle;
         auto uproc=proc::createProcess();
         uproc->name="uprog00";
         uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
@@ -222,12 +215,14 @@ void init(int hartid){
         printf("lock acquired! %d\n",hartid);
     }
     assert(hartid==1||hartid==0);
-    if(hartid==0){
+    if(true){
         timerInit();
         plicInit();
         std::atomic_thread_fence(std::memory_order_acquire);
+        auto kidle=proc::createKProcess(sched::maxPrior);
+        kidle->defaultTask()->kctx.ra()=(xlen_t)idle;
         schedule();
-        Log(info,"first schedule");
+        Log(info,"first schedule on hart%d",kernel::readHartId());
         kLogger.outputLevel=warning;
         _strapexit();
     }
