@@ -38,15 +38,6 @@ namespace fs {
         LNE lne; // long name entry
         void readEntName(char *a_buf) const;
     };
-    class INode:public internal::INode {
-        private:
-            uint8 attribute;  // 属性
-            uint32 first_clus;  // 起始簇号
-            uint32 cur_clus;  // 当前簇号
-            uint clus_cnt;  // 当前簇是该文件的第几个簇
-        public:
-            INode(const union Ent& a_ent):internal::INode(), attribute(a_ent.sne.attr), first_clus(((uint32)a_ent.sne.fst_clus_hi<<16) | a_ent.sne.fst_clus_lo), cur_clus(first_clus), clus_cnt(0) {}
-    };
     class DirEnt {
         public:
             char  filename[FAT32_MAX_FILENAME + 1];  // 文件名
@@ -90,10 +81,55 @@ namespace fs {
             inline bool isEmpty() { return entNext(2 * 32) == -1; }  // skip the "." and ".."
             int entMount(const DirEnt *a_dev);
             int entUnmount();
+            int entLink(DirEnt *a_entry) const;
+            int entUnlink() const;
     };
     struct Link{
         union Ent de;
         uint32 link_count;
+    };
+    class INode {
+        private:
+            DirEnt *entry;
+            inline void nodRelse() const { if(entry != nullptr) { entry->entRelse(); } }
+            inline DirEnt *nodDup() const { return entry==nullptr ? nullptr : entry->entDup(); }
+            inline DirEnt *nodDup(DirEnt *a_entry) const { return a_entry==nullptr ? nullptr : a_entry->entDup(); }
+        public:
+            INode():entry(nullptr) {}
+            INode(const INode& a_inode):entry(a_inode.nodDup()) {}
+            INode(DirEnt *a_entry):entry(nodDup(a_entry)) {}
+            ~INode() { nodRelse(); }
+            inline INode& operator=(const INode& a_inode) { nodRelse(); entry = a_inode.nodDup(); return *this; }
+            inline INode& operator=(DirEnt *a_entry) { nodRelse(); entry = nodDup(a_entry); return *this; }
+            inline DirEnt *operator->() const { return nodDup(); }
+            // inline bool operator==(DirEnt *a_entry) const { return entry == a_entry; }
+            inline DirEnt *rawPtr() const { return nodDup(); }
+            inline uint8 rAttr() const { return entry->attribute; }
+            inline DirEnt *nodCreate(string a_name, int a_attr) const { return entry==nullptr ? nullptr : entry->entCreate(a_name, a_attr); }
+            inline void nodRemove() const { entry->entRemove(); }
+            inline int nodLink(shared_ptr<INode> a_inode) const { return entry->entLink(a_inode->entry); }
+            inline int nodUnlink() const { return entry->entUnlink(); }
+    };
+    class DEntry {
+        private:
+            shared_ptr<INode> inode;
+            DirEnt *entry;
+            inline void dERelse() const { if(entry != nullptr) { entry->entRelse(); } }
+        public:
+            DEntry():inode(nullptr), entry(nullptr) {}
+            DEntry(const DEntry& a_dentry):inode(a_dentry.inode), entry(a_dentry.inode->rawPtr()) {}
+            DEntry(shared_ptr<INode> a_inode):inode(a_inode), entry(a_inode->rawPtr()) {}
+            DEntry(DirEnt *a_entry):inode(make_shared<INode>(a_entry)), entry(inode->rawPtr()) {}
+            ~DEntry() { dERelse(); }
+            inline DEntry& operator=(const DEntry& a_dentry) { dERelse(); inode = a_dentry.inode; entry = a_dentry.inode->rawPtr(); return *this; }
+            inline DEntry& operator=(shared_ptr<INode> a_inode) { dERelse(); inode = a_inode; entry = a_inode->rawPtr(); return *this; }
+            inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
+            // inline DirEnt *operator->() const { return dEDup(); }
+            // inline bool operator==(DirEnt *a_entry) const { return entry == a_entry; }
+            inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
+            inline shared_ptr<INode> getINode() const { return inode; }
+            inline DirEnt *entSearch(string a_dirname, uint *a_off = nullptr) const { return entry==nullptr ? nullptr : entry->entSearch(a_dirname, a_off); }
+            inline bool isEmpty() const { return entry->isEmpty(); }
     };
     class SuperBlock {
         private:
@@ -196,10 +232,10 @@ namespace fs {
             inline int pathLink(shared_ptr<File> a_f1, const Path& a_newpath) const { return pathLink(a_f1, a_newpath, nullptr); }
             inline int pathLink(const Path& a_newpath) const { return pathLink(nullptr, a_newpath, nullptr); }
             int pathUnlink(shared_ptr<File> a_file = nullptr) const;
-            shared_ptr<File> pathOpen(int a_flags, shared_ptr<File> a_file) const;
-            inline shared_ptr<File> pathOpen(shared_ptr<File> a_file) const { return pathOpen(0, a_file); }
-            inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
-            inline shared_ptr<File> pathOpen() const { return pathOpen(0, nullptr); }
+            // shared_ptr<File> pathOpen(int a_flags, shared_ptr<File> a_file) const;
+            // inline shared_ptr<File> pathOpen(shared_ptr<File> a_file) const { return pathOpen(0, a_file); }
+            // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
+            // inline shared_ptr<File> pathOpen() const { return pathOpen(0, nullptr); }
     };
 	class DStat {
         public:

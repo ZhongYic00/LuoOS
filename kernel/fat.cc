@@ -536,6 +536,83 @@ int DirEnt::entUnmount() {
     dev=0;
     return 0;
 }
+int DirEnt::entLink(DirEnt *a_entry) const {
+    if(a_entry == nullptr ) { return -1; }
+    DirEnt *parent1 = parent;
+    int off2 = parent1->relocClus(off, false);
+    union Ent de;
+    if (dev_fat[parent1->dev].rwClus(parent1->cur_clus, false, false, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
+        printf("can't read Ent\n");
+        return -1;
+    }
+    struct Link li;
+    int clus;
+    if(!(de.sne.attr & ATTR_LINK)){
+        clus = allocClus();
+        li.de = de;
+        li.link_count = 2;
+        if(dev_fat[dev].rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
+            printf("write li wrong\n");
+            return -1;
+        }
+        de.sne.attr = ATTR_DIRECTORY | ATTR_LINK;
+        de.sne.fst_clus_hi = (uint16)(clus >> 16);       
+        de.sne.fst_clus_lo = (uint16)(clus & 0xffff);
+        de.sne.file_size = 36;
+        if(dev_fat[parent1->dev].rwClus(parent1->cur_clus, true, false, (uint64)&de, off2, 32) != 32){
+            printf("write parent1 wrong\n");
+            return -1;
+        }
+    }
+    else {
+        clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
+        dev_fat[dev].rwClus(clus, false, false, (uint64)&li, 0, 36);
+        li.link_count++;
+        if(dev_fat[dev].rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
+            printf("write li wrong\n");
+            return -1;
+        }
+    }
+    uint off = 0;
+    DirEnt *ep = a_entry->entSearch(a_entry->filename, &off);
+    if(ep != nullptr) {
+        printf("%s exits", a_entry->filename);
+        return -1;
+    }
+    off = a_entry->relocClus(off, true);
+    if(dev_fat[a_entry->dev].rwClus(a_entry->cur_clus, true, false, (uint64)&de, off, 32) != 32){
+        printf("write de into %s wrong",a_entry->filename);
+        return -1;
+    }
+    return 0;
+}
+int DirEnt::entUnlink() const {
+    DirEnt *eparent = parent;
+    int off2 = eparent->relocClus(off, false);
+    union Ent de;
+    if (dev_fat[eparent->dev].rwClus(eparent->cur_clus, false, false, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
+        printf("can't read Ent\n");
+        return -1;
+    }
+    if(de.sne.attr & ATTR_LINK) {
+        int clus;
+        struct Link li;
+        clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
+        if(dev_fat[dev].rwClus(clus, false, false, (uint64)&li, 0, 36) != 36) {
+            printf("read li wrong\n");
+            return -1;
+        }
+        if(--li.link_count == 0){
+            dev_fat[dev].freeClus(clus);
+            de = li.de;
+            if(dev_fat[eparent->dev].rwClus(eparent->cur_clus, true, false, (uint64)&de, off2, 32) != 32){
+                printf("write de into %s wrong\n",eparent->filename);
+                return -1;
+            }
+        }
+    }
+    return 0;
+}
 const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, uint64 a_buf, uint a_off, uint a_len) const {
     if (a_off + a_len > rBPC()) { panic("offset out of range"); }
     uint tot, m;
@@ -609,159 +686,69 @@ void Path::pathBuild() {
     return;
 }
 DirEnt *Path::pathSearch(shared_ptr<File> a_file, bool a_parent) const {  // @todo 改成返回File
-    DirEnt *entry, *next;
+    shared_ptr<DEntry> entry;
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
-    else if(pathname[0] == '/') { entry = dev_fat[0].getRoot()->entDup(); }  // 绝对路径
-    else if(a_file != nullptr) { entry = a_file->obj.ep->entDup(); }  // 相对路径（指定目录）
-    else { entry = kHartObj().curtask->getProcess()->cwd->entDup(); }  // 相对路径（工作目录）
+    else if(pathname[0] == '/') { entry = make_shared<DEntry>(dev_fat[0].getRoot()); }  // 绝对路径
+    else if(a_file != nullptr) { entry = make_shared<DEntry>(a_file->obj.ep); }  // 相对路径（指定目录）
+    else { entry = make_shared<DEntry>(kHartObj().curtask->getProcess()->cwd); }  // 相对路径（工作目录）
     for(int i = 0; i < dirnum; ++i) {
-        if (!(entry->attribute & ATTR_DIRECTORY)) {
-            entry->entRelse();
-            return nullptr;
-        }
-        if (a_parent && i == dirnum-1) { return entry; }
-        if ((next = entry->entSearch(dirname[i])) == nullptr) {
-           entry->entRelse();
-            return nullptr;
-        }
-        entry->entRelse();
+        if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
+        if (a_parent && i == dirnum-1) { return entry->rawPtr(); }
+        shared_ptr<DEntry> next = make_shared<DEntry>(entry->entSearch(dirname[i]));
+        if (next == nullptr) { return nullptr; }
         entry = next;
     }
-    return entry;
+    return entry->rawPtr();
 }
 DirEnt *Path::pathCreate(short a_type, int a_mode, shared_ptr<File> a_file) const {  // @todo 改成返回File
-    DirEnt *ep, *dp;
-    if((dp = pathSearch(a_file, true)) == nullptr){
+    shared_ptr<DEntry> dp = make_shared<DEntry>(pathSearch(a_file, true));
+    if(dp == nullptr){
         printf("can't find dir\n");
         return nullptr;
     }
     if (a_type == T_DIR) { a_mode = ATTR_DIRECTORY; }
     else if (a_mode & O_RDONLY) { a_mode = ATTR_READ_ONLY; }
     else { a_mode = 0; }
-    if ((ep = dp->entCreate(dirname.back(), a_mode)) == nullptr) {
-        dp->entRelse();
-        return nullptr;
-    }
-    if ((a_type==T_DIR && !(ep->attribute&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->attribute&ATTR_DIRECTORY))) {
-        ep->entRelse();
-        dp->entRelse();
-        return nullptr;
-    }
-    dp->entRelse();
-    return ep;
+    shared_ptr<DEntry> ep = make_shared<DEntry>(dp->getINode()->nodCreate(dirname.back(), a_mode));
+    if (ep == nullptr) { return nullptr; }
+    if ((a_type==T_DIR && !(ep->getINode()->rAttr()&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->getINode()->rAttr()&ATTR_DIRECTORY))) { return nullptr; }
+    return ep->rawPtr();
 }
 int Path::pathRemove(shared_ptr<File> a_file) const {
-    DirEnt *ep = pathSearch(a_file);
+    shared_ptr<DEntry> ep = make_shared<DEntry>(pathSearch(a_file));
     if(ep == nullptr) { return -1; }
-    if((ep->attribute & ATTR_DIRECTORY) && !ep->isEmpty()) {
-        ep->entRelse();
-        return -1;
-    }
-    ep->entRemove();
-    ep->entRelse();
+    if((ep->getINode()->rAttr() & ATTR_DIRECTORY) && !ep->isEmpty()) { return -1; }
+    ep->getINode()->nodRemove();
     return 0;
 }
 int Path::pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const {
-    DirEnt *dp1 = pathSearch(a_f1);
-    if(dp1 == nullptr) {
+    shared_ptr<DEntry> dp1 = make_shared<DEntry>(pathSearch(a_f1));
+    shared_ptr<DEntry> dp2 = make_shared<DEntry>(a_newpath.pathSearch(a_f2));
+    if(dp1==nullptr || dp2==nullptr) {
         printf("can't find dir\n");
         return -1;
     }
-    DirEnt *parent1 = dp1->parent;
-    int off2 = parent1->relocClus(dp1->off, false);
-    union Ent de;
-    if (dev_fat[parent1->dev].rwClus(parent1->cur_clus, false, false, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
-        printf("can't read Ent\n");
-        return -1;
-    }
-    struct Link li;
-    int clus;
-    if(!(de.sne.attr & ATTR_LINK)){
-        clus = dp1->allocClus();
-        li.de = de;
-        li.link_count = 2;
-        if(dev_fat[dp1->dev].rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
-            printf("write li wrong\n");
-            return -1;
-        }
-        de.sne.attr = ATTR_DIRECTORY | ATTR_LINK;
-        de.sne.fst_clus_hi = (uint16)(clus >> 16);       
-        de.sne.fst_clus_lo = (uint16)(clus & 0xffff);
-        de.sne.file_size = 36;
-        if(dev_fat[parent1->dev].rwClus(parent1->cur_clus, true, false, (uint64)&de, off2, 32) != 32){
-            printf("write parent1 wrong\n");
-            return -1;
-        }
-    }
-    else {
-        clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
-        dev_fat[dp1->dev].rwClus(clus, false, false, (uint64)&li, 0, 36);
-        li.link_count++;
-        if(dev_fat[dp1->dev].rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
-            printf("write li wrong\n");
-            return -1;
-        }
-    }
-    DirEnt *dp2 = a_newpath.pathSearch(a_f2);
-    if(dp2 == nullptr) {
-        printf("can't find dir\n");
-        return NULL;
-    }
-    uint off = 0;
-    DirEnt *ep = dp2->entSearch(a_newpath.dirname.back(), &off);
-    if(ep != nullptr) {
-        printf("%s exits", a_newpath.dirname.back().c_str());
-        return -1;
-    }
-    off = dp2->relocClus(off, true);
-    if(dev_fat[dp2->dev].rwClus(dp2->cur_clus, true, false, (uint64)&de, off, 32) != 32){
-        printf("write de into %s wrong",dp2->filename);
-        return -1;
-    }
-    return 0;
+    return dp1->getINode()->nodLink(dp2->getINode());
 }
 int Path::pathUnlink(shared_ptr<File> a_file) const {
-    DirEnt *dp = pathSearch(a_file);
+    shared_ptr<DEntry> dp = make_shared<DEntry>(pathSearch(a_file));
     if(dp == nullptr) { return -1; }
-    DirEnt *parent = dp->parent;
-    int off = parent->relocClus(dp->off, false);
-    union Ent de;
-    if (dev_fat[parent->dev].rwClus(parent->cur_clus, false, false, (uint64)&de, off, 32) != 32 || de.lne.order == END_OF_ENTRY) {
-        printf("can't read Ent\n");
-        return -1;
-    }
-    if(de.sne.attr & ATTR_LINK) {
-        int clus;
-        struct Link li;
-        clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
-        if(dev_fat[dp->dev].rwClus(clus, false, false, (uint64)&li, 0, 36) != 36) {
-            printf("read li wrong\n");
-            return -1;
-        }
-        if(--li.link_count == 0){
-            dev_fat[dp->dev].freeClus(clus);
-            de = li.de;
-            if(dev_fat[parent->dev].rwClus(parent->cur_clus, true, false, (uint64)&de, off, 32) != 32){
-                printf("write de into %s wrong\n",parent->filename);
-                return -1;
-            }
-        }
-    }
+    if(dp->getINode()->nodUnlink() == -1) { return -1; }
     return pathRemove(a_file);
 }
-shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
-    DirEnt *ep = pathSearch(a_file);
-    if(ep == nullptr) { return nullptr; }
-    if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
-        printf("dir can't write\n");
-        ep->entRelse();
-        return nullptr;
-    }
-    if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
-        printf("it is not dir\n");
-        ep->entRelse();
-        return nullptr;
-    }
-    return make_shared<File>(ep, a_flags);
-}
+// shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
+//     DirEnt *ep = pathSearch(a_file);
+//     if(ep == nullptr) { return nullptr; }
+//     if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
+//         printf("dir can't write\n");
+//         ep->entRelse();
+//         return nullptr;
+//     }
+//     if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
+//         printf("it is not dir\n");
+//         ep->entRelse();
+//         return nullptr;
+//     }
+//     return make_shared<File>(ep, a_flags);
+// }

@@ -47,37 +47,38 @@ namespace fs{
         };
         class INode{
         private:
-        //     struct hlist_node i_hash;
-        //     struct list_head i_list;
-        //     struct list_head i_sb_list;
-        //     struct list_head i_dentry;
-            uint64 i_ino;
-            int i_count;  // @todo: 原类型为atomic_t，寻找替代？
-            uint i_nlink;
-        //     uid_t i_uid;  //inode拥有者id
-        //     gid_t i_gid;  //inode所属群组id
-        //     dev_t i_rdev;  //若是设备文件，表示记录设备的设备号
-        //     u64 i_version;
-            uint32 i_size;  //文件所占字节数(原loff_t类)
-            struct timespec i_atime;  //inode最近一次的存取时间
-            struct timespec i_mtime;  //inode最近一次修改时间
-            struct timespec i_ctime;  //inode的生成时间
-        //     uint  i_blkbits;
-            blkcnt_t  i_blocks;  // 文件所占扇区数
-            uint16 i_bytes;  // inode本身的字节数
-            mode_t i_mode;  // 文件权限
-            SuperBlock *i_sb;
-        //     struct address_space *i_mapping;
-        //     struct address_space i_data;
-        //     struct list_head i_devices;
-        //     union {
-        //         struct pipe_inode_info *i_pipe;
-        //         struct block_device *i_bdev;
-        //         struct cdev  *i_cdev;  //若是字符设备，对应的为cdev结构
-        //     };
+            // struct hlist_node i_hash;
+            // struct list_head i_list;
+            // struct list_head i_sb_list;
+            // struct list_head i_dentry;
+            // uint64 i_ino;
+            // int i_count;  // @todo: 原类型为atomic_t，寻找替代？
+            // uint i_nlink;
+            // uid_t i_uid;  //inode拥有者id
+            // gid_t i_gid;  //inode所属群组id
+            // dev_t i_rdev;  //若是设备文件，表示记录设备的设备号
+            // u64 i_version;
+            // uint32 i_size;  //文件所占字节数(原loff_t类)
+            // struct timespec i_atime;  //inode最近一次的存取时间
+            // struct timespec i_mtime;  //inode最近一次修改时间
+            // struct timespec i_ctime;  //inode的生成时间
+            // uint  i_blkbits;
+            // blkcnt_t  i_blocks;  // 文件所占扇区数
+            // uint16 i_bytes;  // inode本身的字节数
+            // mode_t i_mode;  // 文件权限
+            // SuperBlock *i_sb;
+            // struct address_space *i_mapping;
+            // struct address_space i_data;
+            // struct list_head i_devices;
+            // union {
+            //     struct pipe_inode_info *i_pipe;
+            //     struct block_device *i_bdev;
+            //     struct cdev  *i_cdev;  //若是字符设备，对应的为cdev结构
+            // };
             ///@todo other metadata
         public:
-            // INode(ino_t ino):ino(ino){}
+            virtual DEntry *lookUp(INode *a_inode, DEntry *a_dent, string a_name);
+            
             // virtual ~INode()=default;
             // virtual expected<klib::ByteArray,Err> read(size_t off,size_t len)=0;
             // virtual expected<xlen_t,Err> write(size_t off,klib::ByteArray bytes)=0;
