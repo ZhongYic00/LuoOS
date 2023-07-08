@@ -101,8 +101,6 @@ namespace fs {
             ~INode() { nodRelse(); }
             inline INode& operator=(const INode& a_inode) { nodRelse(); entry = a_inode.nodDup(); return *this; }
             inline INode& operator=(DirEnt *a_entry) { nodRelse(); entry = nodDup(a_entry); return *this; }
-            inline DirEnt *operator->() const { return nodDup(); }
-            // inline bool operator==(DirEnt *a_entry) const { return entry == a_entry; }
             inline DirEnt *rawPtr() const { return nodDup(); }
             inline uint8 rAttr() const { return entry->attribute; }
             inline DirEnt *nodCreate(string a_name, int a_attr) const { return entry==nullptr ? nullptr : entry->entCreate(a_name, a_attr); }
@@ -124,8 +122,6 @@ namespace fs {
             inline DEntry& operator=(const DEntry& a_dentry) { dERelse(); inode = a_dentry.inode; entry = a_dentry.inode->rawPtr(); return *this; }
             inline DEntry& operator=(shared_ptr<INode> a_inode) { dERelse(); inode = a_inode; entry = a_inode->rawPtr(); return *this; }
             inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
-            // inline DirEnt *operator->() const { return dEDup(); }
-            // inline bool operator==(DirEnt *a_entry) const { return entry == a_entry; }
             inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
             inline shared_ptr<INode> getINode() const { return inode; }
             inline DirEnt *entSearch(string a_dirname, uint *a_off = nullptr) const { return entry==nullptr ? nullptr : entry->entSearch(a_dirname, a_off); }
