@@ -103,7 +103,7 @@ namespace fs {
             inline INode& operator=(DirEnt *a_entry) { nodRelse(); entry = nodDup(a_entry); return *this; }
             inline DirEnt *rawPtr() const { return nodDup(); }
             inline uint8 rAttr() const { return entry->attribute; }
-            inline DirEnt *nodCreate(string a_name, int a_attr) const { return entry==nullptr ? nullptr : entry->entCreate(a_name, a_attr); }
+            inline shared_ptr<INode> nodCreate(string a_name, int a_attr) const { return entry==nullptr ? nullptr : make_shared<INode>(entry->entCreate(a_name, a_attr)); }
             inline void nodRemove() const { entry->entRemove(); }
             inline int nodLink(shared_ptr<INode> a_inode) const { return entry->entLink(a_inode->entry); }
             inline int nodUnlink() const { return entry->entUnlink(); }
@@ -124,7 +124,7 @@ namespace fs {
             inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
             inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
             inline shared_ptr<INode> getINode() const { return inode; }
-            inline DirEnt *entSearch(string a_dirname, uint *a_off = nullptr) const { return entry==nullptr ? nullptr : entry->entSearch(a_dirname, a_off); }
+            inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { return entry==nullptr ? nullptr : make_shared<DEntry>(entry->entSearch(a_dirname, a_off)); }
             inline bool isEmpty() const { return entry->isEmpty(); }
     };
     class SuperBlock {
@@ -217,11 +217,11 @@ namespace fs {
             ~Path() = default;
             Path& operator=(const Path& a_path) = default;
             void pathBuild();
-            DirEnt *pathSearch(shared_ptr<File> a_file, bool a_parent) const;  // @todo 返回值改为File类型
-            inline DirEnt *pathSearch(shared_ptr<File> a_file) const { return pathSearch(a_file, false); }
-            inline DirEnt *pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
-            inline DirEnt *pathSearch() const { return pathSearch(nullptr, false); }
-            DirEnt *pathCreate(short a_type, int a_mode, shared_ptr<File> a_file = nullptr) const;
+            shared_ptr<DEntry> pathSearch(shared_ptr<File> a_file, bool a_parent) const;  // @todo 返回值改为File类型
+            inline shared_ptr<DEntry> pathSearch(shared_ptr<File> a_file) const { return pathSearch(a_file, false); }
+            inline shared_ptr<DEntry> pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
+            inline shared_ptr<DEntry> pathSearch() const { return pathSearch(nullptr, false); }
+            shared_ptr<DEntry> pathCreate(short a_type, int a_mode, shared_ptr<File> a_file = nullptr) const;
             int pathRemove(shared_ptr<File> a_file = nullptr) const;
             int pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const;
             inline int pathLink(const Path& a_newpath, shared_ptr<File> a_f2) const { return pathLink(nullptr, a_newpath, a_f2); }

@@ -685,24 +685,24 @@ void Path::pathBuild() {
     }
     return;
 }
-DirEnt *Path::pathSearch(shared_ptr<File> a_file, bool a_parent) const {  // @todo 改成返回File
+shared_ptr<DEntry> Path::pathSearch(shared_ptr<File> a_file, bool a_parent) const {  // @todo 改成返回File
     shared_ptr<DEntry> entry;
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
     else if(pathname[0] == '/') { entry = make_shared<DEntry>(dev_fat[0].getRoot()); }  // 绝对路径
     else if(a_file != nullptr) { entry = make_shared<DEntry>(a_file->obj.ep); }  // 相对路径（指定目录）
-    else { entry = make_shared<DEntry>(kHartObj().curtask->getProcess()->cwd); }  // 相对路径（工作目录）
+    else { entry = kHartObj().curtask->getProcess()->cwd; }  // 相对路径（工作目录）
     for(int i = 0; i < dirnum; ++i) {
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
-        if (a_parent && i == dirnum-1) { return entry->rawPtr(); }
-        shared_ptr<DEntry> next = make_shared<DEntry>(entry->entSearch(dirname[i]));
+        if (a_parent && i == dirnum-1) { return entry; }
+        shared_ptr<DEntry> next = entry->entSearch(dirname[i]);
         if (next == nullptr) { return nullptr; }
         entry = next;
     }
-    return entry->rawPtr();
+    return entry;
 }
-DirEnt *Path::pathCreate(short a_type, int a_mode, shared_ptr<File> a_file) const {  // @todo 改成返回File
-    shared_ptr<DEntry> dp = make_shared<DEntry>(pathSearch(a_file, true));
+shared_ptr<DEntry> Path::pathCreate(short a_type, int a_mode, shared_ptr<File> a_file) const {  // @todo 改成返回File
+    shared_ptr<DEntry> dp = pathSearch(a_file, true);
     if(dp == nullptr){
         printf("can't find dir\n");
         return nullptr;
@@ -713,18 +713,18 @@ DirEnt *Path::pathCreate(short a_type, int a_mode, shared_ptr<File> a_file) cons
     shared_ptr<DEntry> ep = make_shared<DEntry>(dp->getINode()->nodCreate(dirname.back(), a_mode));
     if (ep == nullptr) { return nullptr; }
     if ((a_type==T_DIR && !(ep->getINode()->rAttr()&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->getINode()->rAttr()&ATTR_DIRECTORY))) { return nullptr; }
-    return ep->rawPtr();
+    return ep;
 }
 int Path::pathRemove(shared_ptr<File> a_file) const {
-    shared_ptr<DEntry> ep = make_shared<DEntry>(pathSearch(a_file));
+    shared_ptr<DEntry> ep = pathSearch(a_file);
     if(ep == nullptr) { return -1; }
     if((ep->getINode()->rAttr() & ATTR_DIRECTORY) && !ep->isEmpty()) { return -1; }
     ep->getINode()->nodRemove();
     return 0;
 }
 int Path::pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const {
-    shared_ptr<DEntry> dp1 = make_shared<DEntry>(pathSearch(a_f1));
-    shared_ptr<DEntry> dp2 = make_shared<DEntry>(a_newpath.pathSearch(a_f2));
+    shared_ptr<DEntry> dp1 = pathSearch(a_f1);
+    shared_ptr<DEntry> dp2 = a_newpath.pathSearch(a_f2);
     if(dp1==nullptr || dp2==nullptr) {
         printf("can't find dir\n");
         return -1;
@@ -732,7 +732,7 @@ int Path::pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File
     return dp1->getINode()->nodLink(dp2->getINode());
 }
 int Path::pathUnlink(shared_ptr<File> a_file) const {
-    shared_ptr<DEntry> dp = make_shared<DEntry>(pathSearch(a_file));
+    shared_ptr<DEntry> dp = pathSearch(a_file);
     if(dp == nullptr) { return -1; }
     if(dp->getINode()->nodUnlink() == -1) { return -1; }
     return pathRemove(a_file);

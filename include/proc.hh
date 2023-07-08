@@ -18,7 +18,8 @@ namespace proc
     using eastl::shared_ptr;
     using eastl::make_shared;
     using fs::File;
-    using fs::DirEnt;
+    // using fs::DirEnt;
+    using fs::DEntry;
 
     struct Context
     {
@@ -81,7 +82,7 @@ namespace proc
         shared_ptr<File> files[MaxOpenFile];
         tinystl::string name;
         Tms ti;
-        DirEnt *cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
+        shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
 
         Process(prior_t prior,tid_t parent);
