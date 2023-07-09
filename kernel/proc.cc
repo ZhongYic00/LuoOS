@@ -104,7 +104,7 @@ Process* proc::createProcess(){
     static bool inited = false;
     if(inited) {
         if(proc->cwd == nullptr) { proc->cwd = fs::Path("/").pathSearch(); };
-        proc->files[3] = make_shared<File>(proc->cwd->rawPtr(),0);
+        proc->files[3] = make_shared<File>(proc->cwd,0);
     }
     else { inited = true; }
     using op=fs::FileOp;

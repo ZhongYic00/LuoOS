@@ -690,7 +690,7 @@ shared_ptr<DEntry> Path::pathSearch(shared_ptr<File> a_file, bool a_parent) cons
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
     else if(pathname[0] == '/') { entry = make_shared<DEntry>(dev_fat[0].getRoot()); }  // 绝对路径
-    else if(a_file != nullptr) { entry = make_shared<DEntry>(a_file->obj.ep); }  // 相对路径（指定目录）
+    else if(a_file != nullptr) { entry = a_file->obj.ep; }  // 相对路径（指定目录）
     else { entry = kHartObj().curtask->getProcess()->cwd; }  // 相对路径（工作目录）
     for(int i = 0; i < dirnum; ++i) {
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }

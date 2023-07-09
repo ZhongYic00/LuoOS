@@ -94,6 +94,7 @@ namespace fs {
             inline void nodRelse() const { if(entry != nullptr) { entry->entRelse(); } }
             inline DirEnt *nodDup() const { return entry==nullptr ? nullptr : entry->entDup(); }
             inline DirEnt *nodDup(DirEnt *a_entry) const { return a_entry==nullptr ? nullptr : a_entry->entDup(); }
+            inline void nodPanic() const { if(entry == nullptr) { panic("INode panic!\n"); } }
         public:
             INode():entry(nullptr) {}
             INode(const INode& a_inode) = default;
@@ -102,17 +103,19 @@ namespace fs {
             inline INode& operator=(const INode& a_inode) { nodRelse(); entry = a_inode.nodDup(); return *this; }
             inline INode& operator=(DirEnt *a_entry) { nodRelse(); entry = nodDup(a_entry); return *this; }
             inline DirEnt *rawPtr() const { return nodDup(); }
-            inline uint8 rAttr() const { return entry->attribute; }
-            inline shared_ptr<INode> nodCreate(string a_name, int a_attr) const { DirEnt *ret = entry->entCreate(a_name, a_attr); return entry==nullptr||ret==nullptr ? nullptr : make_shared<INode>(ret); }
-            inline void nodRemove() const { entry->entRemove(); }
-            inline int nodLink(shared_ptr<INode> a_inode) const { return entry->entLink(a_inode->entry); }
-            inline int nodUnlink() const { return entry->entUnlink(); }
+            inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
+            inline shared_ptr<INode> nodCreate(string a_name, int a_attr) const { nodPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<INode>(ret); }
+            inline void nodRemove() const { nodPanic(); entry->entRemove(); }
+            inline int nodLink(shared_ptr<INode> a_inode) const { nodPanic(); return entry->entLink(a_inode->entry); }
+            inline int nodUnlink() const { nodPanic(); return entry->entUnlink(); }
+            inline uint32 rFileSize() const { nodPanic(); return entry->file_size; }
     };
     class DEntry {
         private:
             shared_ptr<INode> inode;
             DirEnt *entry;
             inline void dERelse() const { if(entry != nullptr) { entry->entRelse(); } }
+            inline void dEPanic() const { if(entry == nullptr) { panic("DEntry panic!\n"); } }
         public:
             DEntry():inode(nullptr), entry(nullptr) {}
             DEntry(const DEntry& a_dentry):inode(a_dentry.inode), entry(a_dentry.inode->rawPtr()) {}
@@ -124,8 +127,10 @@ namespace fs {
             inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
             inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
             inline shared_ptr<INode> getINode() const { return inode; }
-            inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { DirEnt *ret = entry->entSearch(a_dirname, a_off); return entry==nullptr||ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
-            inline bool isEmpty() const { return entry->isEmpty(); }
+            inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
+            inline bool isEmpty() const { dEPanic(); return entry->isEmpty(); }
+            inline shared_ptr<DEntry> rParent() const { dEPanic(); return entry->parent==nullptr ? nullptr : make_shared<DEntry>(entry->parent); }
+            inline const char *rName() const { dEPanic(); return entry->filename; }
     };
     class SuperBlock {
         private:

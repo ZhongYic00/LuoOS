@@ -72,7 +72,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         // curproc->cwd = fs::entEnter("/");
         curproc->cwd = fs::Path("/").pathSearch();
-        curproc->files[3] = make_shared<File>(curproc->cwd->rawPtr(),0);
+        curproc->files[3] = make_shared<File>(curproc->cwd,0);
         // DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         shared_ptr<DEntry> ep = fs::Path("/dev").pathCreate(T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
@@ -102,17 +102,17 @@ namespace syscall {
         char path[FAT32_MAX_PATH];
         char *s;  // s为path的元素指针
         // @todo 路径处理过程考虑包装成类
-        if (de->rawPtr()->parent == nullptr) { s = "/"; } // s为字符串指针，必须指向双引号字符串"/"
+        if (de->rParent() == nullptr) { s = "/"; } // s为字符串指针，必须指向双引号字符串"/"
         else {
             s = path + FAT32_MAX_PATH - 1;
             *s = '\0';
-            for(size_t len;de->rawPtr()->parent != nullptr;) {
-                len = strlen(de->rawPtr()->filename);
+            for(size_t len; de->rParent() != nullptr;) {
+                len = strlen(de->rName());
                 s -= len;
                 if (s <= path) { return statcode::err; } // can't reach root '/'
-                strncpy(s, de->rawPtr()->filename, len);
+                strncpy(s, de->rName(), len);
                 *(--s) = '/';
-                de = make_shared<DEntry>(de->rawPtr()->parent);
+                de = de->rParent();
             }
         }
         size_t len = strlen(s)+1;
@@ -289,7 +289,7 @@ namespace syscall {
         if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)){ return statcode::err; }
 
         curproc->cwd = ep;
-        curproc->files[3] = make_shared<File>(curproc->cwd->rawPtr(), O_RDWR);
+        curproc->files[3] = make_shared<File>(curproc->cwd, O_RDWR);
 
         return statcode::ok;
     }
@@ -327,8 +327,8 @@ namespace syscall {
                 return statcode::err;
             }
         }
-        f1 = make_shared<File>(ep->rawPtr(), a_flags);
-        f1->off = (a_flags&O_APPEND) ? ep->rawPtr()->file_size : 0;
+        f1 = make_shared<File>(ep, a_flags);
+        f1->off = (a_flags&O_APPEND) ? ep->getINode()->rFileSize() : 0;
         fd = curproc->fdAlloc(f1);
         if(fdOutRange(fd)) { return statcode::err; }
         if(!(ep->getINode()->rAttr()&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { ep->rawPtr()->entTrunc(); }
@@ -370,7 +370,7 @@ namespace syscall {
         if(f == nullptr) { return statcode::err; }
         // DStat ds;
         // getDStat(f->obj.ep, &ds);
-        DStat ds = *(f->obj.ep);
+        DStat ds = *(f->obj.ep->rawPtr());
         curproc->vmar.copyout((xlen_t)a_buf, klib::ByteArray((uint8_t*)&ds,sizeof(ds)));
 
         return sizeof(ds);
@@ -407,7 +407,7 @@ namespace syscall {
         if(f == nullptr) { return statcode::err; }
         // KStat kst;
         // fs::getKStat(f->obj.ep, &kst);
-        KStat kst = *(f->obj.ep);
+        KStat kst = *(f->obj.ep->rawPtr());
         curproc->vmar.copyout((xlen_t)a_kst, klib::ByteArray((uint8_t*)&kst,sizeof(kst)));
         // @bug 用户态读到的数据混乱
         return statcode::ok;
@@ -652,8 +652,8 @@ namespace syscall {
         Log(debug,"execve(path=%s,)",path);
         // auto Ent=fs::entEnter(path);
         shared_ptr<DEntry> Ent=fs::Path(path).pathSearch();
-        auto file=make_shared<File>(Ent->rawPtr(),fs::FileOp::read);
-        auto buf=file->read(Ent->rawPtr()->file_size);
+        auto file=make_shared<File>(Ent,fs::FileOp::read);
+        auto buf=file->read(Ent->getINode()->rFileSize());
         // auto buf=klib::ByteArray{0};
         // buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
 

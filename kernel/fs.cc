@@ -27,7 +27,7 @@ xlen_t File::write(xlen_t addr,size_t len){
             rt=bytes.len;
             break;
         case FileType::entry:
-            if (obj.ep->entWrite(true, addr, off, len) == len) {
+            if (obj.ep->rawPtr()->entWrite(true, addr, off, len) == len) {
                 off += len;
                 rt = len;
             }
@@ -54,7 +54,7 @@ klib::ByteArray File::read(size_t len, long a_off, bool a_update){
         case FileType::entry: {
             int rdbytes = 0;
             klib::ByteArray buf(len);
-            if((rdbytes = obj.ep->entRead(false, (uint64)buf.buff, a_off, len)) > 0) {
+            if((rdbytes = obj.ep->rawPtr()->entRead(false, (uint64)buf.buff, a_off, len)) > 0) {
                 if(a_update) { off = a_off + rdbytes; }
             }
             return klib::ByteArray(buf.buff, rdbytes);
@@ -69,7 +69,7 @@ klib::ByteArray File::read(size_t len, long a_off, bool a_update){
 klib::ByteArray File::readAll(){
     switch(type){
         case FileType::entry:{
-            size_t size=obj.ep->file_size;
+            size_t size=obj.ep->getINode()->rFileSize();
             return read(size);
         }
         default:
@@ -86,7 +86,6 @@ File::~File() {
             break;
         }
         case FileType::entry: {
-            obj.ep->entRelse();
             break;
         }
         case FileType::dev: {
