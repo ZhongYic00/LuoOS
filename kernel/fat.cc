@@ -79,12 +79,12 @@ static uint8 getCheckSum(string shortname) {
     for (int i = CHAR_SHORT_NAME, j = 0; i != 0; --i, ++j) { sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + shortname[j]; }
     return sum;
 }
-static DirEnt *eCacheAlloc() {
-    DirEnt *root = dev_fat[0].getRoot();
+static DirEnt *eCacheAlloc(uint8 a_dev) {
+    DirEnt *root = dev_fat[a_dev].getFATRoot();
     for (DirEnt *ep = root->prev; ep != root; ep = ep->prev) {  // LRU algo
         if (ep->ref == 0) {
             ep->ref = 1;
-            ep->dev = dev;
+            ep->dev = a_dev;
             ep->off = 0;
             ep->valid = 0;
             ep->dirty = false;
@@ -172,7 +172,7 @@ DirEnt& DirEnt::operator=(const union Ent& a_ent) {
     return *this;
 }
 DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
-    if(mount_flag == true) { return dev_fat[dev].getRoot()->entSearch(a_dirname, a_off); }
+    if(mount_flag == true) { return dev_fat[dev].getFATRoot()->entSearch(a_dirname, a_off); }
     // 当前“目录”非目录
     if (!(attribute & ATTR_DIRECTORY)) { panic("dirLookUp not DIR"); }
     if (attribute & ATTR_LINK){
@@ -185,7 +185,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     if (a_dirname == ".") { return entDup(); }
     // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
     else if (a_dirname == "..") {
-        if (this == dev_fat[dev].findRoot()) { return dev_fat[dev].getRoot()->entDup(); }
+        if (this == dev_fat[dev].findRoot()) { return dev_fat[dev].getFATRoot(); }
         else { return parent->entDup(); }
     }
     // 当前目录无效
@@ -333,19 +333,18 @@ DirEnt *DirEnt::entDup() {
     return this;
 }
 DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成ecache的成员
-    DirEnt *ep;
-    DirEnt *root = dev_fat[0].getRoot();
-    for (ep = root->next; ep != root; ep = ep->next) {  // LRU algo
+    DirEnt *root = dev_fat[dev].getFATRoot();
+    for (DirEnt *ep = root->next; ep != root; ep = ep->next) {  // LRU algo
         if (ep->valid == 1 && ep->parent == this && strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME) == 0) {  // @todo 不区分大小写？
             if (ep->ref++ == 0) { ep->parent->ref++; }
             return ep;
         }
     }
-    return eCacheAlloc();
+    return eCacheAlloc(dev);
 }
 void DirEnt::entRelse() {
     // @todo 重构链表操作
-    DirEnt *root = dev_fat[dev].getRoot();
+    DirEnt *root = dev_fat[dev].getFATRoot();
     if (this != root && valid != 0 && ref == 1) {
         // ref == 1 means no other process can have entry locked,
         // so this acquiresleep() won't block (or deadlock).
@@ -543,7 +542,7 @@ int DirEnt::entMount(const DirEnt *a_dev) {
         ++mount_num;
         mount_num = mount_num % 8;
     }
-    DirEnt *root = eCacheAlloc();
+    DirEnt *root = eCacheAlloc(mount_num);
     *root = DirEnt({'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, 0, mount_num, root->next, root->prev);
     {  // eliminate lifecycle
         auto buf = bcache[{ a_dev->dev, 0 }];
@@ -717,7 +716,7 @@ shared_ptr<DEntry> Path::pathSearch(shared_ptr<File> a_file, bool a_parent) cons
     shared_ptr<DEntry> entry;
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
-    else if(pathname[0] == '/') { entry = make_shared<DEntry>(dev_fat[0].getRoot()); }  // 绝对路径
+    else if(pathname[0] == '/') { entry = dev_fat[0].getRoot(); }  // 绝对路径
     else if(a_file != nullptr) { entry = a_file->obj.ep; }  // 相对路径（指定目录）
     else { entry = kHartObj().curtask->getProcess()->cwd; }  // 相对路径（工作目录）
     for(int i = 0; i < dirnum; ++i) {

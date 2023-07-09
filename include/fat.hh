@@ -164,6 +164,7 @@ namespace fs {
             FileSystem& operator=(const FileSystem& a_fs) = default;
             inline bool isValid() const { return valid; }
             inline shared_ptr<DEntry> getRoot() const { return &root; }
+            inline DirEnt *getFATRoot() const { return root->rawPtr(); }
             inline bool isMounted() const { return mount_mode; }
     };
     extern FileSystem dev_fat[8];  // @todo 移到内核对象中
