@@ -96,14 +96,14 @@ namespace fs {
             inline DirEnt *nodDup(DirEnt *a_entry) const { return a_entry==nullptr ? nullptr : a_entry->entDup(); }
         public:
             INode():entry(nullptr) {}
-            INode(const INode& a_inode):entry(a_inode.nodDup()) {}
-            INode(DirEnt *a_entry):entry(nodDup(a_entry)) {}
+            INode(const INode& a_inode) = default;
+            INode(DirEnt *a_entry):entry(a_entry) {}
             ~INode() { nodRelse(); }
             inline INode& operator=(const INode& a_inode) { nodRelse(); entry = a_inode.nodDup(); return *this; }
             inline INode& operator=(DirEnt *a_entry) { nodRelse(); entry = nodDup(a_entry); return *this; }
             inline DirEnt *rawPtr() const { return nodDup(); }
             inline uint8 rAttr() const { return entry->attribute; }
-            inline shared_ptr<INode> nodCreate(string a_name, int a_attr) const { return entry==nullptr ? nullptr : make_shared<INode>(entry->entCreate(a_name, a_attr)); }
+            inline shared_ptr<INode> nodCreate(string a_name, int a_attr) const { DirEnt *ret = entry->entCreate(a_name, a_attr); return entry==nullptr||ret==nullptr ? nullptr : make_shared<INode>(ret); }
             inline void nodRemove() const { entry->entRemove(); }
             inline int nodLink(shared_ptr<INode> a_inode) const { return entry->entLink(a_inode->entry); }
             inline int nodUnlink() const { return entry->entUnlink(); }
@@ -124,7 +124,7 @@ namespace fs {
             inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
             inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
             inline shared_ptr<INode> getINode() const { return inode; }
-            inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { return entry==nullptr ? nullptr : make_shared<DEntry>(entry->entSearch(a_dirname, a_off)); }
+            inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { DirEnt *ret = entry->entSearch(a_dirname, a_off); return entry==nullptr||ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
             inline bool isEmpty() const { return entry->isEmpty(); }
     };
     class SuperBlock {
