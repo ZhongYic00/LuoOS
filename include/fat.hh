@@ -88,50 +88,6 @@ namespace fs {
         union Ent de;
         uint32 link_count;
     };
-    class INode {
-        private:
-            DirEnt *entry;
-            inline void nodRelse() const { if(entry != nullptr) { entry->entRelse(); } }
-            inline DirEnt *nodDup() const { return entry==nullptr ? nullptr : entry->entDup(); }
-            inline DirEnt *nodDup(DirEnt *a_entry) const { return a_entry==nullptr ? nullptr : a_entry->entDup(); }
-            inline void nodPanic() const { if(entry == nullptr) { panic("INode panic!\n"); } }
-        public:
-            INode():entry(nullptr) {}
-            INode(const INode& a_inode) = default;
-            INode(DirEnt *a_entry):entry(a_entry) {}
-            ~INode() { nodRelse(); }
-            inline INode& operator=(const INode& a_inode) { nodRelse(); entry = a_inode.nodDup(); return *this; }
-            inline INode& operator=(DirEnt *a_entry) { nodRelse(); entry = nodDup(a_entry); return *this; }
-            inline DirEnt *rawPtr() const { return nodDup(); }
-            inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
-            inline shared_ptr<INode> nodCreate(string a_name, int a_attr) const { nodPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<INode>(ret); }
-            inline void nodRemove() const { nodPanic(); entry->entRemove(); }
-            inline int nodLink(shared_ptr<INode> a_inode) const { nodPanic(); return entry->entLink(a_inode->entry); }
-            inline int nodUnlink() const { nodPanic(); return entry->entUnlink(); }
-            inline uint32 rFileSize() const { nodPanic(); return entry->file_size; }
-    };
-    class DEntry {
-        private:
-            shared_ptr<INode> inode;
-            DirEnt *entry;
-            inline void dERelse() const { if(entry != nullptr) { entry->entRelse(); } }
-            inline void dEPanic() const { if(entry == nullptr) { panic("DEntry panic!\n"); } }
-        public:
-            DEntry():inode(nullptr), entry(nullptr) {}
-            DEntry(const DEntry& a_dentry):inode(a_dentry.inode), entry(a_dentry.inode->rawPtr()) {}
-            DEntry(shared_ptr<INode> a_inode):inode(a_inode), entry(a_inode->rawPtr()) {}
-            DEntry(DirEnt *a_entry):inode(make_shared<INode>(a_entry)), entry(inode->rawPtr()) {}
-            ~DEntry() { dERelse(); }
-            inline DEntry& operator=(const DEntry& a_dentry) { dERelse(); inode = a_dentry.inode; entry = a_dentry.inode->rawPtr(); return *this; }
-            inline DEntry& operator=(shared_ptr<INode> a_inode) { dERelse(); inode = a_inode; entry = a_inode->rawPtr(); return *this; }
-            inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
-            inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
-            inline shared_ptr<INode> getINode() const { return inode; }
-            inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
-            inline bool isEmpty() const { dEPanic(); return entry->isEmpty(); }
-            inline shared_ptr<DEntry> rParent() const { dEPanic(); return entry->parent==nullptr ? nullptr : make_shared<DEntry>(entry->parent); }
-            inline const char *rName() const { dEPanic(); return entry->filename; }
-    };
     class SuperBlock {
         private:
             uint32 first_data_sec; // data所在的第一个扇区
@@ -210,6 +166,55 @@ namespace fs {
             inline const uint8 rMM() const { return mount_mode; }
     };
     extern FileSystem dev_fat[8];  // @todo 移到内核对象中
+    class INode {
+        private:
+            uint32 inode_num;
+            SuperBlock *spblk;
+            DirEnt *entry;
+            inline void nodRelse() const { if(entry != nullptr) { entry->entRelse(); } }
+            inline DirEnt *nodDup() const { return entry==nullptr ? nullptr : entry->entDup(); }
+            inline DirEnt *nodDup(DirEnt *a_entry) const { return a_entry==nullptr ? nullptr : a_entry->entDup(); }
+            inline void nodPanic() const { if(entry == nullptr) { panic("INode panic!\n"); } }
+        public:
+            INode():inode_num(0), spblk(nullptr), entry(nullptr) {}
+            INode(const INode& a_inode) = default;
+            INode(DirEnt *a_entry):inode_num(a_entry->first_clus), spblk(&(dev_fat[a_entry->dev])), entry(a_entry) {}
+            ~INode() { nodRelse(); }
+            inline INode& operator=(const INode& a_inode) { nodRelse(); inode_num = a_inode.inode_num; spblk = a_inode.spblk; entry = a_inode.nodDup(); return *this; }
+            inline INode& operator=(DirEnt *a_entry) { nodRelse(); inode_num = a_entry->first_clus; spblk = &(dev_fat[a_entry->dev]); entry = nodDup(a_entry); return *this; }
+            inline DirEnt *rawPtr() const { return nodDup(); }
+            inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
+            inline shared_ptr<INode> nodCreate(string a_name, int a_attr) const { nodPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<INode>(ret); }
+            inline void nodRemove() const { nodPanic(); entry->entRemove(); }
+            inline int nodLink(shared_ptr<INode> a_inode) const { nodPanic(); return entry->entLink(a_inode->entry); }
+            inline int nodUnlink() const { nodPanic(); return entry->entUnlink(); }
+            inline uint32 rFileSize() const { nodPanic(); return entry->file_size; }
+            inline uint32 rINo() const { nodPanic(); return inode_num; }
+            inline uint8 rDev() const { nodPanic(); return entry->dev; }
+            inline SuperBlock *getFS() const { nodPanic(); return spblk; }
+    };
+    class DEntry {
+        private:
+            shared_ptr<INode> inode;
+            DirEnt *entry;
+            inline void dERelse() const { if(entry != nullptr) { entry->entRelse(); } }
+            inline void dEPanic() const { if(entry == nullptr) { panic("DEntry panic!\n"); } }
+        public:
+            DEntry():inode(nullptr), entry(nullptr) {}
+            DEntry(const DEntry& a_dentry):inode(a_dentry.inode), entry(a_dentry.inode->rawPtr()) {}
+            DEntry(shared_ptr<INode> a_inode):inode(a_inode), entry(a_inode->rawPtr()) {}
+            DEntry(DirEnt *a_entry):inode(make_shared<INode>(a_entry)), entry(inode->rawPtr()) {}
+            ~DEntry() { dERelse(); }
+            inline DEntry& operator=(const DEntry& a_dentry) { dERelse(); inode = a_dentry.inode; entry = a_dentry.inode->rawPtr(); return *this; }
+            inline DEntry& operator=(shared_ptr<INode> a_inode) { dERelse(); inode = a_inode; entry = a_inode->rawPtr(); return *this; }
+            inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
+            inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
+            inline shared_ptr<INode> getINode() const { return inode; }
+            inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
+            inline bool isEmpty() const { dEPanic(); return entry->isEmpty(); }
+            inline shared_ptr<DEntry> rParent() const { dEPanic(); return entry->parent==nullptr ? nullptr : make_shared<DEntry>(entry->parent); }
+            inline const char *rName() const { dEPanic(); return entry->filename; }
+    };
     class Path {
         private:
             string pathname;
@@ -248,7 +253,7 @@ namespace fs {
         // public:
             DStat() = default;
             DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, STAT_MAX_NAME); }
-            DStat(const DirEnt& a_entry):d_ino(a_entry.first_clus), d_off(0), d_reclen(a_entry.file_size), d_type((a_entry.attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry.filename, STAT_MAX_NAME); }
+            DStat(shared_ptr<DEntry> a_entry):d_ino(a_entry->getINode()->rINo()), d_off(0), d_reclen(a_entry->getINode()->rFileSize()), d_type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry->rName(), STAT_MAX_NAME); }
             ~DStat() = default;
 	};
 	class Stat {
@@ -260,7 +265,7 @@ namespace fs {
         // public:
             Stat() = default;
             Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
-            Stat(const DirEnt& a_entry):name(), dev(a_entry.dev), type((a_entry.attribute&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry.file_size) { strncpy(name, a_entry.filename, STAT_MAX_NAME); }
+            Stat(shared_ptr<DEntry> a_entry):name(), dev(a_entry->getINode()->rDev()), type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry->getINode()->rFileSize()) { strncpy(name, a_entry->rName(), STAT_MAX_NAME); }
             ~Stat() = default;
 	};
 	class KStat {
@@ -288,7 +293,7 @@ namespace fs {
         // public:
             KStat() = default;
             KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
-            KStat(const DirEnt& a_entry):st_dev(a_entry.dev), st_ino(a_entry.first_clus), st_mode((a_entry.attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry.file_size), st_blksize(dev_fat[a_entry.dev].rBPC()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
+            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getFS()->rBPC()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
             ~KStat() = default;
 
 	};

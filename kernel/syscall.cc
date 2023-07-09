@@ -370,7 +370,7 @@ namespace syscall {
         if(f == nullptr) { return statcode::err; }
         // DStat ds;
         // getDStat(f->obj.ep, &ds);
-        DStat ds = *(f->obj.ep->rawPtr());
+        DStat ds = f->obj.ep;
         curproc->vmar.copyout((xlen_t)a_buf, klib::ByteArray((uint8_t*)&ds,sizeof(ds)));
 
         return sizeof(ds);
@@ -407,7 +407,7 @@ namespace syscall {
         if(f == nullptr) { return statcode::err; }
         // KStat kst;
         // fs::getKStat(f->obj.ep, &kst);
-        KStat kst = *(f->obj.ep->rawPtr());
+        KStat kst = f->obj.ep;
         curproc->vmar.copyout((xlen_t)a_kst, klib::ByteArray((uint8_t*)&kst,sizeof(kst)));
         // @bug 用户态读到的数据混乱
         return statcode::ok;
