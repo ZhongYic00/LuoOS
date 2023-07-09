@@ -59,8 +59,9 @@ namespace fs {
             // @todo 暂时不能写构造函数，会禁用初始化列表
             DirEnt() = default;
             DirEnt(const DirEnt& a_entry):filename(), attribute(a_entry.attribute), first_clus(a_entry.first_clus), file_size(a_entry.file_size), cur_clus(a_entry.cur_clus), clus_cnt(a_entry.clus_cnt), dev(a_entry.dev), dirty(a_entry.dirty), valid(a_entry.valid), ref(a_entry.ref), off(a_entry.off), parent(a_entry.parent), next(a_entry.next), prev(a_entry.prev), mount_flag(a_entry.mount_flag) { strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME); }
-            DirEnt(const char *a_name, uint8 a_attr, uint32 a_first_clus, uint8 a_dev, bool a_mount_flag):filename(), attribute(a_attr), first_clus(a_first_clus), file_size(0), cur_clus(first_clus), clus_cnt(0), dev(a_dev), dirty(false), valid(1), ref(0), off(0), parent(nullptr), next(this), prev(this), mount_flag(a_mount_flag) { strncpy(filename, a_name, FAT32_MAX_FILENAME); }
+            DirEnt(const char *a_name, uint8 a_attr, uint32 a_first_clus, uint8 a_dev, DirEnt *a_next, DirEnt *a_prev):filename(), attribute(a_attr), first_clus(a_first_clus), file_size(0), cur_clus(first_clus), clus_cnt(0), dev(a_dev), dirty(false), valid(1), ref(1), off(0), parent(nullptr), next(a_next), prev(a_prev), mount_flag(false) { strncpy(filename, a_name, FAT32_MAX_FILENAME); }
             ~DirEnt() = default;
+            DirEnt& operator=(const DirEnt& a_entry);
             DirEnt& operator=(const union Ent& a_ent);
             DirEnt *entSearch(string a_dirname, uint *a_off = nullptr);
             int entNext(DirEnt *const a_entry, uint a_off, int *const a_count);

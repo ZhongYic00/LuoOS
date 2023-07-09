@@ -79,20 +79,38 @@ static uint8 getCheckSum(string shortname) {
     for (int i = CHAR_SHORT_NAME, j = 0; i != 0; --i, ++j) { sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + shortname[j]; }
     return sum;
 }
+static DirEnt *eCacheAlloc() {
+    DirEnt *root = dev_fat[0].getRoot();
+    for (DirEnt *ep = root->prev; ep != root; ep = ep->prev) {  // LRU algo
+        if (ep->ref == 0) {
+            ep->ref = 1;
+            ep->dev = dev;
+            ep->off = 0;
+            ep->valid = 0;
+            ep->dirty = false;
+            return ep;
+        }
+    }
+    panic("entHit: insufficient ecache");
+    return nullptr;
+}
 
 int fs::rootFSInit() {  // @todo 重构为entMount + eCacheInit
     auto buf=bcache[{0,0}];
-    dev_fat[0] = FileSystem(*buf, true, { 0 }, false);
+    DirEnt *root = &(ecache.entries[0]);
+    *root = DirEnt({'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, 0, 0, root, root);
+    dev_fat[0] = FileSystem(*buf, true, make_shared<DEntry>(root), false);
     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
     if (BlockBuf::blockSize != dev_fat[0].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-    DirEnt *root = dev_fat[0].getRoot();
-    *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[0].rRC(), 0, dev_fat[0].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
-    for(DirEnt *de = ecache.entries; de < ecache.entries + ENTRY_CACHE_NUM; de++) {  // @todo 重构链表操作
+    root->first_clus = root->cur_clus = dev_fat[0].rRC();
+    // DirEnt *root = dev_fat[0].getRoot();
+    // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[0].rRC(), 0, dev_fat[0].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
+    for(DirEnt *de = ecache.entries + 1; de < ecache.entries + ENTRY_CACHE_NUM; de++) {  // @todo 重构链表操作
         de->dev = 0;
         de->valid = 0;
         de->ref = 0;
         de->dirty = false;
-        de->parent = 0;
+        de->parent = nullptr;
         de->next = root->next;
         de->prev = root;
         root->next->prev = de;
@@ -127,6 +145,24 @@ void Ent::readEntName(char *a_buf) const {
     if (lne.attr == ATTR_LONG_NAME) { lne.readEntName(a_buf); }
     else { sne.readEntName(a_buf); }
     return;
+}
+DirEnt& DirEnt::operator=(const DirEnt& a_entry) {
+    strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME);
+    uint8 attribute = a_entry.attribute;
+    uint32 first_clus = a_entry.first_clus;
+    uint32 file_size = a_entry.file_size;
+    uint32 cur_clus = a_entry.cur_clus;
+    uint clus_cnt = a_entry.clus_cnt;
+    uint8 dev = a_entry.dev;
+    bool dirty = a_entry.dirty;
+    short valid = a_entry.valid;
+    int ref = a_entry.ref;
+    uint32 off = a_entry.off;
+    DirEnt *parent = a_entry.parent;
+    DirEnt *next = a_entry.next;
+    DirEnt *prev = a_entry.prev;
+    bool mount_flag = a_entry.mount_flag;
+    return *this;
 }
 DirEnt& DirEnt::operator=(const union Ent& a_ent) {
     attribute = a_ent.sne.attr;
@@ -298,25 +334,14 @@ DirEnt *DirEnt::entDup() {
 }
 DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成ecache的成员
     DirEnt *ep;
-    DirEnt *root = dev_fat[dev].getRoot();
+    DirEnt *root = dev_fat[0].getRoot();
     for (ep = root->next; ep != root; ep = ep->next) {  // LRU algo
         if (ep->valid == 1 && ep->parent == this && strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME) == 0) {  // @todo 不区分大小写？
             if (ep->ref++ == 0) { ep->parent->ref++; }
             return ep;
         }
     }
-    for (ep = root->prev; ep != root; ep = ep->prev) {  // LRU algo
-        if (ep->ref == 0) {
-            ep->ref = 1;
-            ep->dev = dev;
-            ep->off = 0;
-            ep->valid = 0;
-            ep->dirty = false;
-            return ep;
-        }
-    }
-    panic("entHit: insufficient ecache");
-    return nullptr;
+    return eCacheAlloc();
 }
 void DirEnt::entRelse() {
     // @todo 重构链表操作
@@ -518,14 +543,17 @@ int DirEnt::entMount(const DirEnt *a_dev) {
         ++mount_num;
         mount_num = mount_num % 8;
     }
+    DirEnt *root = eCacheAlloc();
+    *root = DirEnt({'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, 0, mount_num, root->next, root->prev);
     {  // eliminate lifecycle
         auto buf = bcache[{ a_dev->dev, 0 }];
-        dev_fat[mount_num] = FileSystem(*buf, true, { 0 }, true);
+        dev_fat[mount_num] = FileSystem(*buf, true, make_shared<DEntry>(root), true);
     }
     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
     if (BlockBuf::blockSize != dev_fat[mount_num].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-    DirEnt *root = dev_fat[mount_num].getRoot();
-    *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
+    root->first_clus = first->curclus = dev_fat[mount_num].rRC();
+    // DirEnt *root = dev_fat[mount_num].getRoot();
+    // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, mount_num, false, 1, 0, 0, nullptr, root, root, false };
     mount_flag = true;
     dev = mount_num;
     return 0;
