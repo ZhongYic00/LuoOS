@@ -331,7 +331,7 @@ namespace syscall {
         f1->off = (a_flags&O_APPEND) ? ep->getINode()->rFileSize() : 0;
         fd = curproc->fdAlloc(f1);
         if(fdOutRange(fd)) { return statcode::err; }
-        if(!(ep->getINode()->rAttr()&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { ep->rawPtr()->entTrunc(); }
+        if(!(ep->getINode()->rAttr()&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { ep->getINode()->nodTrunc(); }
 
         return fd;
     }

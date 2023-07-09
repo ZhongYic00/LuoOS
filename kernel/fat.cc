@@ -82,7 +82,7 @@ static uint8 getCheckSum(string shortname) {
 
 int fs::rootFSInit() {  // @todo 重构为entMount + eCacheInit
     auto buf=bcache[{0,0}];
-    dev_fat[0] = FileSystem(*buf, true, { 0 }, 0);
+    dev_fat[0] = FileSystem(*buf, true, { 0 }, false);
     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
     if (BlockBuf::blockSize != dev_fat[0].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
     DirEnt *root = dev_fat[0].getRoot();
@@ -136,7 +136,7 @@ DirEnt& DirEnt::operator=(const union Ent& a_ent) {
     return *this;
 }
 DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
-    if(mount_flag == 1) { return dev_fat[dev].getRoot()->entSearch(a_dirname, a_off); }
+    if(mount_flag == true) { return dev_fat[dev].getRoot()->entSearch(a_dirname, a_off); }
     // 当前“目录”非目录
     if (!(attribute & ATTR_DIRECTORY)) { panic("dirLookUp not DIR"); }
     if (attribute & ATTR_LINK){
@@ -518,22 +518,22 @@ int DirEnt::entMount(const DirEnt *a_dev) {
         ++mount_num;
         mount_num = mount_num % 8;
     }
-    {// eliminate lifecycle
-        auto buf=bcache[{a_dev->dev,0}];
-        dev_fat[mount_num] = FileSystem(*buf, true, { 0 }, 1);
+    {  // eliminate lifecycle
+        auto buf = bcache[{ a_dev->dev, 0 }];
+        dev_fat[mount_num] = FileSystem(*buf, true, { 0 }, true);
     }
     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
     if (BlockBuf::blockSize != dev_fat[mount_num].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
     DirEnt *root = dev_fat[mount_num].getRoot();
     *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
-    mount_flag = 1;
+    mount_flag = true;
     dev = mount_num;
     return 0;
 }
 int DirEnt::entUnmount() {
-    mount_flag = 0;
+    mount_flag = false;
     memset(&dev_fat[dev], 0, sizeof(dev_fat[dev]));
-    dev=0;
+    dev = 0;
     return 0;
 }
 int DirEnt::entLink(DirEnt *a_entry) const {

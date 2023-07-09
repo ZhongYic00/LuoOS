@@ -54,11 +54,12 @@ namespace fs {
             DirEnt *parent; // because FAT32 doesn't have such thing like inum, use this for cache trick
             DirEnt *next; // 
             DirEnt *prev; // 
-            uint8 mount_flag;
+            bool mount_flag;
         // public:
             // @todo 暂时不能写构造函数，会禁用初始化列表
-            // DirEnt() {}
-            // DirEnt(const DirEnt& a_entry):filename(), attribute(a_entry.attribute), first_clus(a_entry.first_clus), file_size(a_entry.file_size), cur_clus(a_entry.cur_clus), clus_cnt(a_entry.clus_cnt), dev(a_entry.dev), dirty(a_entry.dirty), valid(a_entry.valid), ref(a_entry.ref), off(a_entry.off), parent(a_entry.parent), next(a_entry.next), prev(a_entry.prev), mount_flag(a_entry.mount_flag) { strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME); }
+            DirEnt() = default;
+            DirEnt(const DirEnt& a_entry):filename(), attribute(a_entry.attribute), first_clus(a_entry.first_clus), file_size(a_entry.file_size), cur_clus(a_entry.cur_clus), clus_cnt(a_entry.clus_cnt), dev(a_entry.dev), dirty(a_entry.dirty), valid(a_entry.valid), ref(a_entry.ref), off(a_entry.off), parent(a_entry.parent), next(a_entry.next), prev(a_entry.prev), mount_flag(a_entry.mount_flag) { strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME); }
+            DirEnt(const char *a_name, uint8 a_attr, uint32 a_first_clus, uint8 a_dev, bool a_mount_flag):filename(), attribute(a_attr), first_clus(a_first_clus), file_size(0), cur_clus(first_clus), clus_cnt(0), dev(a_dev), dirty(false), valid(1), ref(0), off(0), parent(nullptr), next(this), prev(this), mount_flag(a_mount_flag) { strncpy(filename, a_name, FAT32_MAX_FILENAME); }
             ~DirEnt() = default;
             DirEnt& operator=(const union Ent& a_ent);
             DirEnt *entSearch(string a_dirname, uint *a_off = nullptr);
@@ -147,23 +148,22 @@ namespace fs {
     class FileSystem:public SuperBlock {
         private:
             bool valid;
-            DirEnt root; //这个文件系统的根目录文件
-            uint8 mount_mode; //是否被挂载的标志
+            shared_ptr<DEntry> root;  //这个文件系统的根目录文件
+            bool mount_mode;  //是否被挂载的标志
         public:
             FileSystem() = default;
-            FileSystem(const FileSystem& a_fs):SuperBlock(a_fs), valid(a_fs.valid), root(a_fs.root), mount_mode(a_fs.mount_mode) {}
-            FileSystem(const SuperBlock& a_spblk, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_spblk), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, BPB a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_fds, a_dsc, a_dcc, a_bpc, a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_fds, a_dsc, a_dcc, a_bpc, a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(const BPB& a_bpb, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(const BlockBuf& a_blk, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_blk), valid(a_valid), root(a_root), mount_mode(a_mm) {}
-            FileSystem(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, DirEnt a_root, uint8 a_mm):SuperBlock(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(const FileSystem& a_fs) = default;
+            FileSystem(const SuperBlock& a_spblk, bool a_valid, shared_ptr<DEntry> a_root, bool a_mm):SuperBlock(a_spblk), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, BPB a_bpb, bool a_valid, shared_ptr<DEntry> a_root, bool a_mm):SuperBlock(a_fds, a_dsc, a_dcc, a_bpc, a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, shared_ptr<DEntry> a_root, bool a_mm):SuperBlock(a_fds, a_dsc, a_dcc, a_bpc, a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(const BPB& a_bpb, bool a_valid, shared_ptr<DEntry> a_root, bool a_mm):SuperBlock(a_bpb), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(const BlockBuf& a_blk, bool a_valid, shared_ptr<DEntry> a_root, bool a_mm):SuperBlock(a_blk), valid(a_valid), root(a_root), mount_mode(a_mm) {}
+            FileSystem(uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc, bool a_valid, shared_ptr<DEntry> a_root, bool a_mm):SuperBlock(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc), valid(a_valid), root(a_root), mount_mode(a_mm) {}
             ~FileSystem() = default;
             FileSystem& operator=(const FileSystem& a_fs) = default;
-            inline const bool isValid() const { return valid; }
-            inline DirEnt *const getRoot() { return &root; }
-            inline const DirEnt *const findRoot() const { return &root; }
-            inline const uint8 rMM() const { return mount_mode; }
+            inline bool isValid() const { return valid; }
+            inline shared_ptr<DEntry> getRoot() const { return &root; }
+            inline bool isMounted() const { return mount_mode; }
     };
     extern FileSystem dev_fat[8];  // @todo 移到内核对象中
     class INode {
@@ -182,16 +182,19 @@ namespace fs {
             ~INode() { nodRelse(); }
             inline INode& operator=(const INode& a_inode) { nodRelse(); inode_num = a_inode.inode_num; spblk = a_inode.spblk; entry = a_inode.nodDup(); return *this; }
             inline INode& operator=(DirEnt *a_entry) { nodRelse(); inode_num = a_entry->first_clus; spblk = &(dev_fat[a_entry->dev]); entry = nodDup(a_entry); return *this; }
-            inline DirEnt *rawPtr() const { return nodDup(); }
-            inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
             inline shared_ptr<INode> nodCreate(string a_name, int a_attr) const { nodPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<INode>(ret); }
             inline void nodRemove() const { nodPanic(); entry->entRemove(); }
             inline int nodLink(shared_ptr<INode> a_inode) const { nodPanic(); return entry->entLink(a_inode->entry); }
             inline int nodUnlink() const { nodPanic(); return entry->entUnlink(); }
+            inline void nodTrunc() const { nodPanic(); entry->entTrunc(); }
+            inline int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) const { nodPanic(); return entry->entRead(a_usrdst, a_dst, a_off, a_len); }
+            inline int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) const { nodPanic(); return entry->entWrite(a_usrsrc, a_src, a_off, a_len); }
+            inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
+            inline uint8 rDev() const { nodPanic(); return entry->dev; }
             inline uint32 rFileSize() const { nodPanic(); return entry->file_size; }
             inline uint32 rINo() const { nodPanic(); return inode_num; }
-            inline uint8 rDev() const { nodPanic(); return entry->dev; }
             inline SuperBlock *getFS() const { nodPanic(); return spblk; }
+            inline DirEnt *rawPtr() const { return nodDup(); }
     };
     class DEntry {
         private:
@@ -208,12 +211,13 @@ namespace fs {
             inline DEntry& operator=(const DEntry& a_dentry) { dERelse(); inode = a_dentry.inode; entry = a_dentry.inode->rawPtr(); return *this; }
             inline DEntry& operator=(shared_ptr<INode> a_inode) { dERelse(); inode = a_inode; entry = a_inode->rawPtr(); return *this; }
             inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
-            inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
-            inline shared_ptr<INode> getINode() const { return inode; }
             inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
             inline bool isEmpty() const { dEPanic(); return entry->isEmpty(); }
-            inline shared_ptr<DEntry> rParent() const { dEPanic(); return entry->parent==nullptr ? nullptr : make_shared<DEntry>(entry->parent); }
             inline const char *rName() const { dEPanic(); return entry->filename; }
+            inline shared_ptr<DEntry> rParent() const { dEPanic(); return entry->parent==nullptr ? nullptr : make_shared<DEntry>(entry->parent); }
+            inline bool isMntPoint() const { dEPanic(); return entry->mount_flag; }
+            inline shared_ptr<INode> getINode() const { return inode; }
+            inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
     };
     class Path {
         private:
