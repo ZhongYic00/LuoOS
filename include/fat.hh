@@ -4,8 +4,13 @@
 #include "fs.hh"
 #include "bio.hh"
 
-namespace fs {
+namespace fat {
     using BlockBuf = struct bio::BlockBuf;
+    using fs::File;
+    using eastl::vector;
+    using eastl::string;
+    using eastl::shared_ptr;
+    using eastl::make_shared;
     class SuperBlock;
     class DEntry;
     typedef struct ShortNameEntry_t {
@@ -184,13 +189,13 @@ namespace fs {
             ~INode() { nodRelse(); }
             inline INode& operator=(const INode& a_inode) { nodRelse(); inode_num = a_inode.inode_num; spblk = a_inode.spblk; entry = a_inode.nodDup(); return *this; }
             inline INode& operator=(DirEnt *a_entry) { nodRelse(); inode_num = a_entry->first_clus; spblk = &(dev_fat[a_entry->dev]); entry = nodDup(a_entry); return *this; }
-            inline shared_ptr<INode> nodCreate(string a_name, int a_attr) const { nodPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<INode>(ret); }
-            inline void nodRemove() const { nodPanic(); entry->entRemove(); }
-            inline int nodLink(shared_ptr<INode> a_inode) const { nodPanic(); return entry->entLink(a_inode->entry); }
-            inline int nodUnlink() const { nodPanic(); return entry->entUnlink(); }
-            inline void nodTrunc() const { nodPanic(); entry->entTrunc(); }
-            inline int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) const { nodPanic(); return entry->entRead(a_usrdst, a_dst, a_off, a_len); }
-            inline int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) const { nodPanic(); return entry->entWrite(a_usrsrc, a_src, a_off, a_len); }
+            inline shared_ptr<INode> nodCreate(string a_name, int a_attr) { nodPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<INode>(ret); }
+            inline void nodRemove() { nodPanic(); entry->entRemove(); }
+            inline int nodLink(shared_ptr<INode> a_inode) { nodPanic(); return entry->entLink(a_inode->entry); }
+            inline int nodUnlink() { nodPanic(); return entry->entUnlink(); }
+            inline void nodTrunc() { nodPanic(); entry->entTrunc(); }
+            inline int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) { nodPanic(); return entry->entRead(a_usrdst, a_dst, a_off, a_len); }
+            inline int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) { nodPanic(); return entry->entWrite(a_usrsrc, a_src, a_off, a_len); }
             inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
             inline uint8 rDev() const { nodPanic(); return entry->dev; }
             inline uint32 rFileSize() const { nodPanic(); return entry->file_size; }
@@ -213,9 +218,9 @@ namespace fs {
             inline DEntry& operator=(const DEntry& a_dentry) { dERelse(); inode = a_dentry.inode; entry = a_dentry.inode->rawPtr(); return *this; }
             inline DEntry& operator=(shared_ptr<INode> a_inode) { dERelse(); inode = a_inode; entry = a_inode->rawPtr(); return *this; }
             inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
-            inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
-            int entMount(shared_ptr<DEntry> a_dev) const;
-            int entUnmount() const;
+            inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
+            int entMount(shared_ptr<DEntry> a_dev);
+            int entUnmount();
             inline bool isEmpty() const { dEPanic(); return entry->isEmpty(); }
             inline const char *rName() const { dEPanic(); return entry->filename; }
             inline shared_ptr<DEntry> rParent() const { dEPanic(); return entry->parent==nullptr ? nullptr : make_shared<DEntry>(entry->parent); }
@@ -223,88 +228,6 @@ namespace fs {
             inline shared_ptr<INode> getINode() const { return inode; }
             inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
     };
-    class Path {
-        private:
-            string pathname;
-            vector<string> dirname;
-        public:
-            Path() = default;
-            Path(const Path& a_path) = default;
-            Path(const string& a_str):pathname(a_str), dirname() { pathBuild(); }
-            Path(const char *a_str):pathname(a_str), dirname() { pathBuild(); }
-            ~Path() = default;
-            Path& operator=(const Path& a_path) = default;
-            void pathBuild();
-            shared_ptr<DEntry> pathSearch(shared_ptr<File> a_file, bool a_parent) const;  // @todo 返回值改为File类型
-            inline shared_ptr<DEntry> pathSearch(shared_ptr<File> a_file) const { return pathSearch(a_file, false); }
-            inline shared_ptr<DEntry> pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
-            inline shared_ptr<DEntry> pathSearch() const { return pathSearch(nullptr, false); }
-            shared_ptr<DEntry> pathCreate(short a_type, int a_mode, shared_ptr<File> a_file = nullptr) const;
-            int pathRemove(shared_ptr<File> a_file = nullptr) const;
-            int pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const;
-            inline int pathLink(const Path& a_newpath, shared_ptr<File> a_f2) const { return pathLink(nullptr, a_newpath, a_f2); }
-            inline int pathLink(shared_ptr<File> a_f1, const Path& a_newpath) const { return pathLink(a_f1, a_newpath, nullptr); }
-            inline int pathLink(const Path& a_newpath) const { return pathLink(nullptr, a_newpath, nullptr); }
-            int pathUnlink(shared_ptr<File> a_file = nullptr) const;
-            // shared_ptr<File> pathOpen(int a_flags, shared_ptr<File> a_file) const;
-            // inline shared_ptr<File> pathOpen(shared_ptr<File> a_file) const { return pathOpen(0, a_file); }
-            // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
-            // inline shared_ptr<File> pathOpen() const { return pathOpen(0, nullptr); }
-    };
-	class DStat {
-        public:
-            uint64 d_ino;	// 索引结点号
-            int64 d_off;	// 到下一个dirent的偏移
-            uint16 d_reclen;	// 当前dirent的长度
-            uint8 d_type;	// 文件类型
-            char d_name[STAT_MAX_NAME + 1];	//文件名
-        // public:
-            DStat() = default;
-            DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, STAT_MAX_NAME); }
-            DStat(shared_ptr<DEntry> a_entry):d_ino(a_entry->getINode()->rINo()), d_off(0), d_reclen(a_entry->getINode()->rFileSize()), d_type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry->rName(), STAT_MAX_NAME); }
-            ~DStat() = default;
-	};
-	class Stat {
-        public:
-            char name[STAT_MAX_NAME + 1]; // 文件名
-            int dev;     // File system's disk device // 文件系统的磁盘设备
-            short type;  // Type of file // 文件类型
-            uint64 size; // Size of file in bytes // 文件大小(字节)
-        // public:
-            Stat() = default;
-            Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
-            Stat(shared_ptr<DEntry> a_entry):name(), dev(a_entry->getINode()->rDev()), type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry->getINode()->rFileSize()) { strncpy(name, a_entry->rName(), STAT_MAX_NAME); }
-            ~Stat() = default;
-	};
-	class KStat {
-        public:
-            dev_t st_dev;  			/* ID of device containing file */
-            ino_t st_ino;  			/* Inode number */
-            mode_t st_mode;  		/* File type and mode */
-            nlink_t st_nlink;  		/* Number of hard links */
-            uid_t st_uid;			/* User ID of owner */
-            gid_t st_gid;			/* Group ID of owner */
-            dev_t st_rdev;			/* Device ID (if special file) */
-            unsigned long __pad;	
-            size_t st_size;			/* Total size, in bytes */
-            blksize_t st_blksize;	/* Block size for filesystem I/O */
-            int __pad2; 			
-            blkcnt_t st_blocks;		/* Number of 512B blocks allocated */
-            long st_atime_sec;		/* Time of last access */
-            long st_atime_nsec;		
-            long st_mtime_sec;		/* Time of last modification */
-            long st_mtime_nsec;
-            long st_ctime_sec;		/* Time of last status change */
-            long st_ctime_nsec;
-            // unsigned __unused[2];
-            unsigned _unused[2]; // @todo 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
-        // public:
-            KStat() = default;
-            KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
-            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getFS()->rBPC()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
-            ~KStat() = default;
-
-	};
     int rootFSInit();
 }
 

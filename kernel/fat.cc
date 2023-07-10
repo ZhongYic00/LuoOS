@@ -1,8 +1,9 @@
 #include "fat.hh"
 #include "kernel.hh"
 
-namespace fs { FileSystem dev_fat[8]; }  //挂载设备集合
-using namespace fs;
+namespace fat { FileSystem dev_fat[8]; }  //挂载设备集合
+using namespace fat;
+using fs::File;
 // #define moduleLevel LogLevel::trace
 
 static SuperBlock fat;
