@@ -7,6 +7,7 @@
 namespace fs {
     using BlockBuf = struct bio::BlockBuf;
     class SuperBlock;
+    class DEntry;
     typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）
         uint8 attr; // 属性
@@ -56,11 +57,10 @@ namespace fs {
             DirEnt *prev; // 
             bool mount_flag;
         // public:
-            // @todo 暂时不能写构造函数，会禁用初始化列表
             DirEnt() = default;
             DirEnt(const DirEnt& a_entry):filename(), attribute(a_entry.attribute), first_clus(a_entry.first_clus), file_size(a_entry.file_size), cur_clus(a_entry.cur_clus), clus_cnt(a_entry.clus_cnt), dev(a_entry.dev), dirty(a_entry.dirty), valid(a_entry.valid), ref(a_entry.ref), off(a_entry.off), parent(a_entry.parent), next(a_entry.next), prev(a_entry.prev), mount_flag(a_entry.mount_flag) { strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME); }
             DirEnt(const char *a_name, uint8 a_attr, uint32 a_first_clus, uint8 a_dev, DirEnt *a_next, DirEnt *a_prev):filename(), attribute(a_attr), first_clus(a_first_clus), file_size(0), cur_clus(first_clus), clus_cnt(0), dev(a_dev), dirty(false), valid(1), ref(1), off(0), parent(nullptr), next(a_next), prev(a_prev), mount_flag(false) { strncpy(filename, a_name, FAT32_MAX_FILENAME); }
-            ~DirEnt() = default;
+            ~DirEnt() { ref = 0; valid = 0; }
             DirEnt& operator=(const DirEnt& a_entry);
             DirEnt& operator=(const union Ent& a_ent);
             DirEnt *entSearch(string a_dirname, uint *a_off = nullptr);
@@ -81,8 +81,8 @@ namespace fs {
             int entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len);
             void entRemove();
             inline bool isEmpty() { return entNext(2 * 32) == -1; }  // skip the "." and ".."
-            int entMount(const DirEnt *a_dev);
-            int entUnmount();
+            // int entMount(const DirEnt *a_dev);
+            // int entUnmount();
             int entLink(DirEnt *a_entry) const;
             int entUnlink() const;
     };
@@ -163,8 +163,8 @@ namespace fs {
             ~FileSystem() = default;
             FileSystem& operator=(const FileSystem& a_fs) = default;
             inline bool isValid() const { return valid; }
-            inline shared_ptr<DEntry> getRoot() const { return &root; }
-            inline DirEnt *getFATRoot() const { return root->rawPtr(); }
+            inline shared_ptr<DEntry> getRoot() const { return root; }
+            inline DirEnt *getFATRoot() const;
             inline bool isMounted() const { return mount_mode; }
     };
     extern FileSystem dev_fat[8];  // @todo 移到内核对象中
@@ -214,6 +214,8 @@ namespace fs {
             inline DEntry& operator=(shared_ptr<INode> a_inode) { dERelse(); inode = a_inode; entry = a_inode->rawPtr(); return *this; }
             inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
             inline shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) const { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
+            int entMount(shared_ptr<DEntry> a_dev) const;
+            int entUnmount() const;
             inline bool isEmpty() const { dEPanic(); return entry->isEmpty(); }
             inline const char *rName() const { dEPanic(); return entry->filename; }
             inline shared_ptr<DEntry> rParent() const { dEPanic(); return entry->parent==nullptr ? nullptr : make_shared<DEntry>(entry->parent); }

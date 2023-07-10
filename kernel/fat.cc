@@ -80,8 +80,8 @@ static uint8 getCheckSum(string shortname) {
     return sum;
 }
 static DirEnt *eCacheAlloc(uint8 a_dev) {
-    DirEnt *root = dev_fat[a_dev].getFATRoot();
-    for (DirEnt *ep = root->prev; ep != root; ep = ep->prev) {  // LRU algo
+    DirEnt *head = &(ecache.entries[0]);
+    for (DirEnt *ep = head->prev; ep != head; ep = ep->prev) {  // LRU algo
         if (ep->ref == 0) {
             ep->ref = 1;
             ep->dev = a_dev;
@@ -96,9 +96,9 @@ static DirEnt *eCacheAlloc(uint8 a_dev) {
 }
 
 int fs::rootFSInit() {  // @todo 重构为entMount + eCacheInit
-    auto buf=bcache[{0,0}];
+    auto buf=bcache[{ 0, 0 }];
     DirEnt *root = &(ecache.entries[0]);
-    *root = DirEnt({'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, 0, 0, root, root);
+    *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, 0, root, root);
     dev_fat[0] = FileSystem(*buf, true, make_shared<DEntry>(root), false);
     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
     if (BlockBuf::blockSize != dev_fat[0].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
@@ -148,20 +148,20 @@ void Ent::readEntName(char *a_buf) const {
 }
 DirEnt& DirEnt::operator=(const DirEnt& a_entry) {
     strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME);
-    uint8 attribute = a_entry.attribute;
-    uint32 first_clus = a_entry.first_clus;
-    uint32 file_size = a_entry.file_size;
-    uint32 cur_clus = a_entry.cur_clus;
-    uint clus_cnt = a_entry.clus_cnt;
-    uint8 dev = a_entry.dev;
-    bool dirty = a_entry.dirty;
-    short valid = a_entry.valid;
-    int ref = a_entry.ref;
-    uint32 off = a_entry.off;
-    DirEnt *parent = a_entry.parent;
-    DirEnt *next = a_entry.next;
-    DirEnt *prev = a_entry.prev;
-    bool mount_flag = a_entry.mount_flag;
+    attribute = a_entry.attribute;
+    first_clus = a_entry.first_clus;
+    file_size = a_entry.file_size;
+    cur_clus = a_entry.cur_clus;
+    clus_cnt = a_entry.clus_cnt;
+    dev = a_entry.dev;
+    dirty = a_entry.dirty;
+    valid = a_entry.valid;
+    ref = a_entry.ref;
+    off = a_entry.off;
+    parent = a_entry.parent;
+    next = a_entry.next;
+    prev = a_entry.prev;
+    mount_flag = a_entry.mount_flag;
     return *this;
 }
 DirEnt& DirEnt::operator=(const union Ent& a_ent) {
@@ -185,7 +185,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     if (a_dirname == ".") { return entDup(); }
     // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
     else if (a_dirname == "..") {
-        if (this == dev_fat[dev].findRoot()) { return dev_fat[dev].getFATRoot(); }
+        if (this == dev_fat[dev].getFATRoot()) { return this; }
         else { return parent->entDup(); }
     }
     // 当前目录无效
@@ -333,8 +333,8 @@ DirEnt *DirEnt::entDup() {
     return this;
 }
 DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成ecache的成员
-    DirEnt *root = dev_fat[dev].getFATRoot();
-    for (DirEnt *ep = root->next; ep != root; ep = ep->next) {  // LRU algo
+    DirEnt *head = &(ecache.entries[0]);
+    for (DirEnt *ep = head->next; ep != head; ep = ep->next) {  // LRU algo
         if (ep->valid == 1 && ep->parent == this && strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME) == 0) {  // @todo 不区分大小写？
             if (ep->ref++ == 0) { ep->parent->ref++; }
             return ep;
@@ -537,32 +537,6 @@ void DirEnt::entRemove() {
     valid = -1;
     return;
 }
-int DirEnt::entMount(const DirEnt *a_dev) {
-    while(dev_fat[mount_num].isValid()) {
-        ++mount_num;
-        mount_num = mount_num % 8;
-    }
-    DirEnt *root = eCacheAlloc(mount_num);
-    *root = DirEnt({'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, 0, mount_num, root->next, root->prev);
-    {  // eliminate lifecycle
-        auto buf = bcache[{ a_dev->dev, 0 }];
-        dev_fat[mount_num] = FileSystem(*buf, true, make_shared<DEntry>(root), true);
-    }
-    // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
-    if (BlockBuf::blockSize != dev_fat[mount_num].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-    root->first_clus = first->curclus = dev_fat[mount_num].rRC();
-    // DirEnt *root = dev_fat[mount_num].getRoot();
-    // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, mount_num, false, 1, 0, 0, nullptr, root, root, false };
-    mount_flag = true;
-    dev = mount_num;
-    return 0;
-}
-int DirEnt::entUnmount() {
-    mount_flag = false;
-    memset(&dev_fat[dev], 0, sizeof(dev_fat[dev]));
-    dev = 0;
-    return 0;
-}
 int DirEnt::entLink(DirEnt *a_entry) const {
     if(a_entry == nullptr ) { return -1; }
     DirEnt *parent1 = parent;
@@ -682,6 +656,33 @@ const int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
     auto buf = bcache[{0, fat_sec}];
     uint off = secOffset(a_cluster);
     (*buf)[off] = a_content;
+    return 0;
+}
+inline DirEnt *FileSystem::getFATRoot() const { return root->rawPtr(); }
+int DEntry::entMount(shared_ptr<DEntry> a_dev) const {
+    while(dev_fat[mount_num].isValid()) {
+        ++mount_num;
+        mount_num = mount_num % 8;
+    }
+    DirEnt *root = eCacheAlloc(mount_num);
+    *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, mount_num, root->next, root->prev);
+    {  // eliminate lifecycle
+        auto buf = bcache[{ a_dev->getINode()->rDev(), 0 }];
+        dev_fat[mount_num] = FileSystem(*buf, true, make_shared<DEntry>(root), true);
+    }
+    // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
+    if (BlockBuf::blockSize != dev_fat[mount_num].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
+    root->first_clus = root->cur_clus = dev_fat[mount_num].rRC();
+    // DirEnt *root = dev_fat[mount_num].getRoot();
+    // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, mount_num, false, 1, 0, 0, nullptr, root, root, false };
+    entry->mount_flag = true;
+    entry->dev = mount_num;
+    return 0;
+}
+int DEntry::entUnmount() const {
+    entry->mount_flag = false;
+    memset(&dev_fat[entry->dev], 0, sizeof(dev_fat[entry->dev]));
+    entry->dev = 0;  // @todo 记录原来的设备号
     return 0;
 }
 void Path::pathBuild() {

@@ -68,7 +68,8 @@ namespace syscall {
     }
     xlen_t testFATInit() {
         Log(info, "initializing fat\n");
-        if(fs::rootFSInit() != 0) { panic("fat init failed\n"); }
+        auto tmp = fs::rootFSInit();
+        if(tmp != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObj().curtask->getProcess();
         // curproc->cwd = fs::entEnter("/");
         curproc->cwd = fs::Path("/").pathSearch();
@@ -229,7 +230,7 @@ namespace syscall {
             return statcode::err;
         }
 
-        return ep->rawPtr()->entUnmount();
+        return ep->entUnmount();
     }
     xlen_t mount() {
         auto &ctx = kHartObj().curtask->ctx;
@@ -273,7 +274,7 @@ namespace syscall {
             return statcode::err;
         }
 
-        return ep->rawPtr()->entMount(dev_ep->rawPtr());
+        return ep->entMount(dev_ep);
     }
     xlen_t chDir(void) {
         auto &ctx = kHartObj().curtask->ctx;
