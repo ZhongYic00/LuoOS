@@ -13,35 +13,37 @@ namespace fs{
     using eastl::string;
     using eastl::shared_ptr;
     using eastl::make_shared;
+    using eastl::map;
 
     class DEntry;
 
     class SuperBlock {
         public:
-            virtual SuperBlock();
-            virtual SuperBlock(const SuperBlock& a_spblk);
+            SuperBlock() = default;
+            SuperBlock(const SuperBlock& a_spblk) = default;
             virtual ~SuperBlock();
             virtual SuperBlock& operator=(const SuperBlock& a_spblk);
             virtual shared_ptr<DEntry> getRoot() const;  // 返回指向该超级块的根目录项的共享指针
     };
     class FileSystem {
         public:
-            virtual FileSystem();
-            virtual FileSystem(const FileSystem& a_fs);
+            FileSystem() = default;
+            FileSystem(const FileSystem& a_fs) = default;
             virtual ~FileSystem();
             virtual FileSystem& operator=(const FileSystem& a_fs);
             virtual string rFSType() const;  // 返回该文件系统的类型
+            virtual shared_ptr<SuperBlock> getSpBlk() const;  // 返回指向该文件系统超级块的共享指针
     };
     class INode {
         public:
-            virtual INode();
-            virtual INode(const INode& a_inode);
+            INode() = default;
+            INode(const INode& a_inode) = default;
             virtual ~INode();  // 需要保证脏数据落盘
             virtual INode& operator=(const INode& a_inode);
             virtual shared_ptr<INode> nodCreate(string a_name, int a_attr);  // 在该INode（必须是目录）下创建一个名为a_name、属性为a_attr的文件，返回指向该文件对应INode的共享指针
             virtual void nodRemove();  // 删除该INode对应的磁盘文件内容
             virtual int nodLink(shared_ptr<INode> a_inode);  // 软链接，返回错误码
-            virtual int nodUnlink();  // 删除该软链接INode，返回错误码
+            virtual int nodUnlink();  // 删除该软链接，返回错误码
             virtual void nodTrunc();  // 清空该INode的元信息，并标志该INode为脏
             virtual int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len);  // 从该文件的a_off偏移处开始，读取a_len字节的数据到a_dst处，返回实际读取的字节数
             virtual int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len);  // 从a_src处开始，写入a_len字节的数据到该文件的a_off偏移处，返回实际写入的字节数
@@ -49,12 +51,12 @@ namespace fs{
             virtual uint8 rDev() const;  // 返回该文件所在文件系统的设备号
             virtual uint32 rFileSize() const;  // 返回该文件的字节数
             virtual uint32 rINo() const;  // 返回该INode的ino
-            virtual SuperBlock *getFS() const;  // 返回指向该INode所属文件系统超级块的指针;
+            virtual shared_ptr<SuperBlock> getSpBlk() const;  // 返回指向该INode所属文件系统超级块的共享指针;
     };
     class DEntry {
         public:
-            virtual DEntry();
-            virtual DEntry(const FileSystem& a_entry);
+            DEntry() = default;
+            DEntry(const FileSystem& a_entry) = default;
             virtual ~DEntry();
             virtual DEntry& operator=(const FileSystem& a_entry);
             virtual shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off);  // 在该目录项下搜索名为a_dirname的目录项，返回指向目标目录项的共享指针（找不到则返回nullptr）
@@ -187,6 +189,8 @@ namespace fs{
             ~KStat() = default;
 
 	};
+
+    extern map<uint8, shared_ptr<FileSystem>> dev_table;
     // namespace internal{
     //     class SuperBlock {};
     //     /// @bug sharedptr会直接删除，需要引入cache

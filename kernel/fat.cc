@@ -1,7 +1,7 @@
 #include "fat.hh"
 #include "kernel.hh"
 
-namespace fat { FileSystem dev_fat[8]; }  //挂载设备集合
+// namespace fat { FileSystem dev_fat[8]; }  //挂载设备集合
 using namespace fat;
 using fs::File;
 // #define moduleLevel LogLevel::trace
@@ -80,12 +80,12 @@ static uint8 getCheckSum(string shortname) {
     for (int i = CHAR_SHORT_NAME, j = 0; i != 0; --i, ++j) { sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + shortname[j]; }
     return sum;
 }
-static DirEnt *eCacheAlloc(uint8 a_dev) {
+static DirEnt *eCacheAlloc(shared_ptr<SuperBlock> a_spblk) {
     DirEnt *head = &(ecache.entries[0]);
     for (DirEnt *ep = head->prev; ep != head; ep = ep->prev) {  // LRU algo
         if (ep->ref == 0) {
             ep->ref = 1;
-            ep->dev = a_dev;
+            ep->spblk = a_spblk;
             ep->off = 0;
             ep->valid = 0;
             ep->dirty = false;
@@ -107,7 +107,7 @@ int fs::rootFSInit() {  // @todo 重构为entMount + eCacheInit
     // DirEnt *root = dev_fat[0].getRoot();
     // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[0].rRC(), 0, dev_fat[0].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
     for(DirEnt *de = ecache.entries + 1; de < ecache.entries + ENTRY_CACHE_NUM; de++) {  // @todo 重构链表操作
-        de->dev = 0;
+        de->spblk = nullptr;
         de->valid = 0;
         de->ref = 0;
         de->dirty = false;
@@ -154,7 +154,7 @@ DirEnt& DirEnt::operator=(const DirEnt& a_entry) {
     file_size = a_entry.file_size;
     cur_clus = a_entry.cur_clus;
     clus_cnt = a_entry.clus_cnt;
-    dev = a_entry.dev;
+    spblk = a_entry.spblk;
     dirty = a_entry.dirty;
     valid = a_entry.valid;
     ref = a_entry.ref;
@@ -173,12 +173,12 @@ DirEnt& DirEnt::operator=(const union Ent& a_ent) {
     return *this;
 }
 DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
-    if(mount_flag == true) { return dev_fat[dev].getFATRoot()->entSearch(a_dirname, a_off); }
+    if(mount_flag == true) { return spblk->getFATRoot()->entSearch(a_dirname, a_off); }
     // 当前“目录”非目录
     if (!(attribute & ATTR_DIRECTORY)) { panic("dirLookUp not DIR"); }
     if (attribute & ATTR_LINK){
         struct Link li;
-        dev_fat[dev].rwClus(first_clus, false, false, (uint64)&li, 0, 36);
+        spblk->rwClus(first_clus, false, false, (uint64)&li, 0, 36);
         first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         attribute = li.de.sne.attr;
     }
@@ -186,7 +186,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     if (a_dirname == ".") { return entDup(); }
     // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
     else if (a_dirname == "..") {
-        if (this == dev_fat[dev].getFATRoot()) { return this; }
+        if (this == spblk->getFATRoot()) { return this; }
         else { return parent->entDup(); }
     }
     // 当前目录无效
@@ -235,7 +235,7 @@ int DirEnt::entNext(DirEnt *const a_entry, uint a_off, int *const a_count) {
     if (valid != 1) { return -1; }  // 搜索目录无效
     if (attribute & ATTR_LINK){
         struct Link li;
-        dev_fat[dev].rwClus(first_clus, false, false, (uint64)&li, 0, 36);
+        spblk->rwClus(first_clus, false, false, (uint64)&li, 0, 36);
         first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         attribute = li.de.sne.attr;
     }
@@ -246,7 +246,7 @@ int DirEnt::entNext(DirEnt *const a_entry, uint a_off, int *const a_count) {
     // 遍历dp的簇
     for (int off2; (off2 = relocClus(a_off, false)) != -1; a_off += 32) {  // off2: 簇内偏移 off: 目录内偏移
         // 没对齐或在非"."和".."目录的情形下到达结尾
-        auto bytes = dev_fat[dev].rwClus(cur_clus, false, false, (uint64)&de, off2, 32);
+        auto bytes = spblk->rwClus(cur_clus, false, false, (uint64)&de, off2, 32);
         auto fchar = ((char*)&de)[0];
         auto leorder = de.lne.order;
         if (bytes!= 32 || leorder==END_OF_ENTRY) { return -1; }
@@ -282,13 +282,13 @@ int DirEnt::entNext(DirEnt *const a_entry, uint a_off, int *const a_count) {
     return -1;
 }
 int DirEnt::relocClus(uint a_off, bool a_alloc) {
-    int clus_num = a_off / dev_fat[dev].rBPC();
+    int clus_num = a_off / spblk->rBPC();
     while (clus_num > clus_cnt) {
-        int clus = dev_fat[dev].fatRead(cur_clus);
+        int clus = spblk->fatRead(cur_clus);
         if (clus >= FAT32_EOC) {
             if (a_alloc) {
                 clus = allocClus();
-                dev_fat[dev].fatWrite(cur_clus, clus);
+                spblk->fatWrite(cur_clus, clus);
             }
             else {
                 cur_clus = first_clus;
@@ -303,26 +303,26 @@ int DirEnt::relocClus(uint a_off, bool a_alloc) {
         cur_clus = first_clus;
         clus_cnt = 0;
         while (clus_cnt < clus_num) {
-            cur_clus = dev_fat[dev].fatRead(cur_clus);
+            cur_clus = spblk->fatRead(cur_clus);
             if (cur_clus >= FAT32_EOC) { panic("relocClus"); }
             clus_cnt++;
         }
     }
-    return a_off % dev_fat[dev].rBPC();
+    return a_off % spblk->rBPC();
 }
 const uint32 DirEnt::allocClus() const {  // @todo 应该写成FileSystem的成员？
     // should we keep a free cluster list? instead of searching fat every time.
     struct buf *b;
-    uint32 sec = dev_fat[dev].rRSC();
-    uint32 const ent_per_sec = dev_fat[dev].rBPS() / sizeof(uint32);
-    for (uint32 i = 0; i < dev_fat[dev].rFS(); i++, sec++) {
-        auto ref = bcache[{dev, sec}];
+    uint32 sec = spblk->rRSC();
+    uint32 const ent_per_sec = spblk->rBPS() / sizeof(uint32);
+    for (uint32 i = 0; i < spblk->rFS(); i++, sec++) {
+        auto ref = bcache[{spblk->rDev(), sec}];
         auto buf = *ref;
         for (uint32 j = 0; j < ent_per_sec; j++) {
             if (buf.as<uint32_t>(j) == 0) {
                 buf.as<uint32_t>(j) = FAT32_EOC + 7;
                 uint32 clus = i * ent_per_sec + j;
-                dev_fat[dev].clearClus(clus);
+                spblk->clearClus(clus);
                 return clus;
             }
         }
@@ -341,11 +341,11 @@ DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成
             return ep;
         }
     }
-    return eCacheAlloc(dev);
+    return eCacheAlloc(spblk);
 }
 void DirEnt::entRelse() {
     // @todo 重构链表操作
-    DirEnt *root = dev_fat[dev].getFATRoot();
+    DirEnt *root = spblk->getFATRoot();
     if (this != root && valid != 0 && ref == 1) {
         // ref == 1 means no other process can have entry locked,
         // so this acquiresleep() won't block (or deadlock).
@@ -370,8 +370,8 @@ void DirEnt::entRelse() {
 void DirEnt::entTrunc() {
     if(!(attribute & ATTR_LINK)){
         for (uint32 clus = first_clus; clus >= 2 && clus < FAT32_EOC; ) {
-            uint32 next = dev_fat[dev].fatRead(clus);
-            dev_fat[dev].freeClus(clus);
+            uint32 next = spblk->fatRead(clus);
+            spblk->freeClus(clus);
             clus = next;
         }
     }
@@ -383,15 +383,15 @@ void DirEnt::parentUpdate() {
     if (!dirty || valid != 1) { return; }
     uint entcnt = 0;
     uint32 poff = parent->relocClus(off, false);
-    dev_fat[dev].rwClus(parent->cur_clus, 0, 0, (uint64) &entcnt, poff, 1);
+    spblk->rwClus(parent->cur_clus, 0, 0, (uint64) &entcnt, poff, 1);
     entcnt &= ~LAST_LONG_ENTRY;
     poff = parent->relocClus(off + (entcnt<<5), 0);
     union Ent de;
-    dev_fat[dev].rwClus(parent->cur_clus, 0, 0, (uint64)&de, poff, sizeof(de));
+    spblk->rwClus(parent->cur_clus, 0, 0, (uint64)&de, poff, sizeof(de));
     de.sne.fst_clus_hi = (uint16)(first_clus >> 16);
     de.sne.fst_clus_lo = (uint16)(first_clus & 0xffff);
     de.sne.file_size = file_size;
-    dev_fat[dev].rwClus(parent->cur_clus, 1, 0, (uint64)&de, poff, sizeof(de));
+    spblk->rwClus(parent->cur_clus, 1, 0, (uint64)&de, poff, sizeof(de));
     dirty = false;
 }
 DirEnt *DirEnt::entCreate(string a_name, int a_attr) {
@@ -436,7 +436,7 @@ void DirEnt::entCreateOnDisk(const DirEnt *a_entry, uint a_off) {
         de.sne.fst_clus_lo = (uint16)(a_entry->first_clus & 0xffff);  // low 16 bits
         de.sne.file_size = 0;  // filesize is updated in dirUpdate()
         a_off = relocClus(a_off, true);
-        dev_fat[dev].rwClus(cur_clus, true, false, (uint64)&de, a_off, sizeof(de));
+        spblk->rwClus(cur_clus, true, false, (uint64)&de, a_off, sizeof(de));
     }
     else {  // 长名
         int entcnt = (strlen(a_entry->filename) + CHAR_LONG_NAME - 1) / CHAR_LONG_NAME;   // count of l-n-entries, rounds up
@@ -463,7 +463,7 @@ void DirEnt::entCreateOnDisk(const DirEnt *a_entry, uint a_off) {
                 }
             }
             uint off2 = relocClus(a_off, true);
-            dev_fat[dev].rwClus(cur_clus, true, false, (uint64)&de, off2, sizeof(de));
+            spblk->rwClus(cur_clus, true, false, (uint64)&de, off2, sizeof(de));
             a_off += sizeof(de);
         }
         memset(&de, 0, sizeof(de));
@@ -473,14 +473,14 @@ void DirEnt::entCreateOnDisk(const DirEnt *a_entry, uint a_off) {
         de.sne.fst_clus_lo = (uint16)(a_entry->first_clus & 0xffff);  // low 16 bits
         de.sne.file_size = a_entry->file_size;  // filesize is updated in dirUpdate()
         a_off = relocClus(a_off, true);
-        dev_fat[dev].rwClus(cur_clus, true, false, (uint64)&de, a_off, sizeof(de));
+        spblk->rwClus(cur_clus, true, false, (uint64)&de, a_off, sizeof(de));
     }
 }
 int DirEnt::entRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) {
     if (a_off > file_size || a_off + a_len < a_off || (attribute & ATTR_DIRECTORY)) { return 0; }
     if (attribute & ATTR_LINK){
         struct Link li;
-        dev_fat[dev].rwClus(first_clus, false, false, (uint64)&li, 0, 36);
+        spblk->rwClus(first_clus, false, false, (uint64)&li, 0, 36);
         first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         attribute = li.de.sne.attr;
     }
@@ -488,9 +488,9 @@ int DirEnt::entRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) {
     uint tot, m;
     for (tot = 0; cur_clus < FAT32_EOC && tot < a_len; tot += m, a_off += m, a_dst += m) {
         relocClus(a_off, false);
-        m = dev_fat[dev].rBPC() - a_off % dev_fat[dev].rBPC();
+        m = spblk->rBPC() - a_off % spblk->rBPC();
         if (a_len - tot < m) { m = a_len - tot; }
-        if (dev_fat[dev].rwClus(cur_clus, false, a_usrdst, a_dst, a_off % dev_fat[dev].rBPC(), m) != m) { break; }
+        if (spblk->rwClus(cur_clus, false, a_usrdst, a_dst, a_off % spblk->rBPC(), m) != m) { break; }
     }
     return tot;
 }
@@ -498,7 +498,7 @@ int DirEnt::entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) {
     if (a_off > file_size || a_off + a_len < a_off || (uint64)a_off + a_len > 0xffffffff || (attribute & ATTR_READ_ONLY)) { return -1; }
     if (attribute & ATTR_LINK){
         struct Link li;
-        dev_fat[dev].rwClus(first_clus, false, false, (uint64)&li, 0, 36);
+        spblk->rwClus(first_clus, false, false, (uint64)&li, 0, 36);
         first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         attribute = li.de.sne.attr;
     }
@@ -510,9 +510,9 @@ int DirEnt::entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) {
     uint tot, m;
     for (tot = 0; tot < a_len; tot += m, a_off += m, a_src += m) {
         relocClus(a_off, true);
-        m = dev_fat[dev].rBPC() - a_off % dev_fat[dev].rBPC();
+        m = spblk->rBPC() - a_off % spblk->rBPC();
         if (a_len - tot < m) { m = a_len - tot; }
-        if (dev_fat[dev].rwClus(cur_clus, true, a_usrsrc, a_src, a_off % dev_fat[dev].rBPC(), m) != m) { break; }
+        if (spblk->rwClus(cur_clus, true, a_usrsrc, a_src, a_off % spblk->rBPC(), m) != m) { break; }
     }
     if(a_len > 0) {
         if(a_off > file_size) {
@@ -527,11 +527,11 @@ void DirEnt::entRemove() {
     uint entcnt = 0;
     uint32 off1 = off;
     uint32 off2 = parent->relocClus(off1, false);
-    dev_fat[parent->dev].rwClus(parent->cur_clus, false, false, (uint64)&entcnt, off2, 1);
+    parent->spblk->rwClus(parent->cur_clus, false, false, (uint64)&entcnt, off2, 1);
     entcnt &= ~LAST_LONG_ENTRY;
     uint8 flag = EMPTY_ENTRY;
     for (int i = 0; i <= entcnt; i++) {
-        dev_fat[parent->dev].rwClus(parent->cur_clus, true, false, (uint64)&flag, off2, 1);
+        parent->spblk->rwClus(parent->cur_clus, true, false, (uint64)&flag, off2, 1);
         off1 += 32;
         off2 = parent->relocClus(off1, false);
     }
@@ -543,7 +543,7 @@ int DirEnt::entLink(DirEnt *a_entry) const {
     DirEnt *parent1 = parent;
     int off2 = parent1->relocClus(off, false);
     union Ent de;
-    if (dev_fat[parent1->dev].rwClus(parent1->cur_clus, false, false, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
+    if (parent1->spblk->rwClus(parent1->cur_clus, false, false, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
         printf("can't read Ent\n");
         return -1;
     }
@@ -553,7 +553,7 @@ int DirEnt::entLink(DirEnt *a_entry) const {
         clus = allocClus();
         li.de = de;
         li.link_count = 2;
-        if(dev_fat[dev].rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
+        if(spblk->rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
             printf("write li wrong\n");
             return -1;
         }
@@ -561,16 +561,16 @@ int DirEnt::entLink(DirEnt *a_entry) const {
         de.sne.fst_clus_hi = (uint16)(clus >> 16);       
         de.sne.fst_clus_lo = (uint16)(clus & 0xffff);
         de.sne.file_size = 36;
-        if(dev_fat[parent1->dev].rwClus(parent1->cur_clus, true, false, (uint64)&de, off2, 32) != 32){
+        if(parent1->spblk->rwClus(parent1->cur_clus, true, false, (uint64)&de, off2, 32) != 32){
             printf("write parent1 wrong\n");
             return -1;
         }
     }
     else {
         clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
-        dev_fat[dev].rwClus(clus, false, false, (uint64)&li, 0, 36);
+        spblk->rwClus(clus, false, false, (uint64)&li, 0, 36);
         li.link_count++;
-        if(dev_fat[dev].rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
+        if(spblk->rwClus(clus, true, false, (uint64)&li, 0, 36) != 36){
             printf("write li wrong\n");
             return -1;
         }
@@ -582,7 +582,7 @@ int DirEnt::entLink(DirEnt *a_entry) const {
         return -1;
     }
     off = a_entry->relocClus(off, true);
-    if(dev_fat[a_entry->dev].rwClus(a_entry->cur_clus, true, false, (uint64)&de, off, 32) != 32){
+    if(a_entry->spblk->rwClus(a_entry->cur_clus, true, false, (uint64)&de, off, 32) != 32){
         printf("write de into %s wrong",a_entry->filename);
         return -1;
     }
@@ -592,7 +592,7 @@ int DirEnt::entUnlink() const {
     DirEnt *eparent = parent;
     int off2 = eparent->relocClus(off, false);
     union Ent de;
-    if (dev_fat[eparent->dev].rwClus(eparent->cur_clus, false, false, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
+    if (eparent->spblk->rwClus(eparent->cur_clus, false, false, (uint64)&de, off2, 32) != 32 || de.lne.order == END_OF_ENTRY) {
         printf("can't read Ent\n");
         return -1;
     }
@@ -600,14 +600,14 @@ int DirEnt::entUnlink() const {
         int clus;
         struct Link li;
         clus = ((uint32)(de.sne.fst_clus_hi) << 16) + (uint32)(de.sne.fst_clus_lo);
-        if(dev_fat[dev].rwClus(clus, false, false, (uint64)&li, 0, 36) != 36) {
+        if(spblk->rwClus(clus, false, false, (uint64)&li, 0, 36) != 36) {
             printf("read li wrong\n");
             return -1;
         }
         if(--li.link_count == 0){
-            dev_fat[dev].freeClus(clus);
+            spblk->freeClus(clus);
             de = li.de;
-            if(dev_fat[eparent->dev].rwClus(eparent->cur_clus, true, false, (uint64)&de, off2, 32) != 32){
+            if(eparent->spblk->rwClus(eparent->cur_clus, true, false, (uint64)&de, off2, 32) != 32){
                 printf("write de into %s wrong\n",eparent->filename);
                 return -1;
             }
@@ -659,125 +659,35 @@ const int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
     (*buf)[off] = a_content;
     return 0;
 }
-inline DirEnt *FileSystem::getFATRoot() const { return root->rawPtr(); }
+// inline DirEnt *FileSystem::getFATRoot() const { return root->rawPtr(); }
 int DEntry::entMount(shared_ptr<DEntry> a_dev) const {
-    while(dev_fat[mount_num].isValid()) {
-        ++mount_num;
-        mount_num = mount_num % 8;
-    }
+    // while(dev_fat[mount_num].isValid()) {
+    //     ++mount_num;
+    //     mount_num = mount_num % 8;
+    // }
+    uint8 mount_num = dev_table.size();
     DirEnt *root = eCacheAlloc(mount_num);
-    *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, mount_num, root->next, root->prev);
+    *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, nullptr, root->next, root->prev);
+    shared_ptr<FileSystem> nfs;
     {  // eliminate lifecycle
         auto buf = bcache[{ a_dev->getINode()->rDev(), 0 }];
-        dev_fat[mount_num] = FileSystem(*buf, true, make_shared<DEntry>(root), true);
+        nfs = make_shared<FileSystem>(*buf, true, make_shared<DEntry>(root), true);
+        root->spblk = nfs->getSpBlk();
+        dev_table[mount_num] = nfs;
     }
     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
-    if (BlockBuf::blockSize != dev_fat[mount_num].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-    root->first_clus = root->cur_clus = dev_fat[mount_num].rRC();
+    if (BlockBuf::blockSize != nfs.rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
+    root->first_clus = root->cur_clus = nfs.rRC();
     // DirEnt *root = dev_fat[mount_num].getRoot();
     // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, mount_num, false, 1, 0, 0, nullptr, root, root, false };
     entry->mount_flag = true;
-    entry->dev = mount_num;
+    entry->spblk = root->spblk;
     return 0;
 }
 int DEntry::entUnmount() const {
     entry->mount_flag = false;
-    memset(&dev_fat[entry->dev], 0, sizeof(dev_fat[entry->dev]));
-    entry->dev = 0;  // @todo 记录原来的设备号
+    // memset(&dev_fat[entry->dev], 0, sizeof(dev_fat[entry->dev]));
+    dev_table.erase(entry->spblk->rDev());
+    entry->spblk = entry->spblk->getMntParent();
     return 0;
 }
-void Path::pathBuild() {
-    size_t len = pathname.length();
-    if(len > 0) {  // 保证数组长度不为0
-        auto ind = new size_t[len][2] { { 0, 0 } };
-        bool rep = true;
-        int dirnum = 0;
-        for(size_t i = 0; i < len; ++i) {  // 识别以'/'结尾的目录
-            if(pathname[i] == '/') {
-                if(!rep) {
-                    rep = true;
-                    ++dirnum;
-                }
-            }
-            else {
-                ++(ind[dirnum][1]);
-                if(rep) {
-                    rep = false;
-                    ind[dirnum][0] = i;
-                }
-            }
-        }
-        if(!rep) { ++dirnum; }  // 补齐末尾'/'
-        dirname = vector<string>(dirnum);
-        for(size_t i = 0; i < dirnum; ++i) { dirname[i] = pathname.substr(ind[i][0], ind[i][1]); }
-        delete[] ind;
-    }
-    return;
-}
-shared_ptr<DEntry> Path::pathSearch(shared_ptr<File> a_file, bool a_parent) const {  // @todo 改成返回File
-    shared_ptr<DEntry> entry;
-    int dirnum = dirname.size();
-    if(pathname.length() < 1) { return nullptr; }  // 空路径
-    else if(pathname[0] == '/') { entry = dev_fat[0].getRoot(); }  // 绝对路径
-    else if(a_file != nullptr) { entry = a_file->obj.ep; }  // 相对路径（指定目录）
-    else { entry = kHartObj().curtask->getProcess()->cwd; }  // 相对路径（工作目录）
-    for(int i = 0; i < dirnum; ++i) {
-        if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
-        if (a_parent && i == dirnum-1) { return entry; }
-        shared_ptr<DEntry> next = entry->entSearch(dirname[i]);
-        if (next == nullptr) { return nullptr; }
-        entry = next;
-    }
-    return entry;
-}
-shared_ptr<DEntry> Path::pathCreate(short a_type, int a_mode, shared_ptr<File> a_file) const {  // @todo 改成返回File
-    shared_ptr<DEntry> dp = pathSearch(a_file, true);
-    if(dp == nullptr){
-        printf("can't find dir\n");
-        return nullptr;
-    }
-    if (a_type == T_DIR) { a_mode = ATTR_DIRECTORY; }
-    else if (a_mode & O_RDONLY) { a_mode = ATTR_READ_ONLY; }
-    else { a_mode = 0; }
-    shared_ptr<DEntry> ep = make_shared<DEntry>(dp->getINode()->nodCreate(dirname.back(), a_mode));
-    if (ep == nullptr) { return nullptr; }
-    if ((a_type==T_DIR && !(ep->getINode()->rAttr()&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->getINode()->rAttr()&ATTR_DIRECTORY))) { return nullptr; }
-    return ep;
-}
-int Path::pathRemove(shared_ptr<File> a_file) const {
-    shared_ptr<DEntry> ep = pathSearch(a_file);
-    if(ep == nullptr) { return -1; }
-    if((ep->getINode()->rAttr() & ATTR_DIRECTORY) && !ep->isEmpty()) { return -1; }
-    ep->getINode()->nodRemove();
-    return 0;
-}
-int Path::pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const {
-    shared_ptr<DEntry> dp1 = pathSearch(a_f1);
-    shared_ptr<DEntry> dp2 = a_newpath.pathSearch(a_f2);
-    if(dp1==nullptr || dp2==nullptr) {
-        printf("can't find dir\n");
-        return -1;
-    }
-    return dp1->getINode()->nodLink(dp2->getINode());
-}
-int Path::pathUnlink(shared_ptr<File> a_file) const {
-    shared_ptr<DEntry> dp = pathSearch(a_file);
-    if(dp == nullptr) { return -1; }
-    if(dp->getINode()->nodUnlink() == -1) { return -1; }
-    return pathRemove(a_file);
-}
-// shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
-//     DirEnt *ep = pathSearch(a_file);
-//     if(ep == nullptr) { return nullptr; }
-//     if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
-//         printf("dir can't write\n");
-//         ep->entRelse();
-//         return nullptr;
-//     }
-//     if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
-//         printf("it is not dir\n");
-//         ep->entRelse();
-//         return nullptr;
-//     }
-//     return make_shared<File>(ep, a_flags);
-// }
