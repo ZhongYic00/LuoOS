@@ -135,6 +135,7 @@ shared_ptr<DEntry> Path::pathSearch(shared_ptr<File> a_file, bool a_parent) cons
     for(int i = 0; i < dirnum; ++i) {
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
         if (a_parent && i == dirnum-1) { return entry; }
+        while(entry->isMntPoint()) { entry = entry->getINode()->getSpBlk()->getRoot(); }
         shared_ptr<DEntry> next = entry->entSearch(dirname[i]);
         if (next == nullptr) { return nullptr; }
         entry = next;
@@ -178,14 +179,14 @@ int Path::pathUnlink(shared_ptr<File> a_file) const {
     return pathRemove(a_file);
 }
 int Path::pathMount(const Path& a_devpath, string a_fstype) {
-    if(pathname == "/") {  //mountpoint not allowed the root
-        printf("not allowed\n");
-        return -1;
-    }
     shared_ptr<DEntry> ep = pathSearch();
     shared_ptr<DEntry> dev_ep = a_devpath.pathSearch();
     if(ep==nullptr || dev_ep==nullptr) {
         printf("DEntry not found\n");
+        return -1;
+    }
+    if(ep->isRoot() || ep->isMntPoint()) {  //mountpoint not allowed the root
+        printf("not allowed\n");
         return -1;
     }
     if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)) {
@@ -204,6 +205,23 @@ int Path::pathMount(const Path& a_devpath, string a_fstype) {
         return -1;
     }
     return 1;
+}
+int Path::pathUnmount() const {
+    shared_ptr<DEntry> ep = pathSearch();
+    if(ep == nullptr) {
+        printf("not found file\n");
+        return -1;
+    }
+    if(ep->isRoot() || !ep->isMntPoint()) {
+        printf("not allowed\n");
+        return -1;
+    }
+    uint8 key = ep->getINode()->getSuperBlock()->getFS()->rKey();
+    shared_ptr<FileSystem> umnt = dev_table[key];
+    umnt->unInstall();
+    dev_table.erase(key);
+    ep->clearMnt();
+    return 0;
 }
 // shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
 //     DirEnt *ep = pathSearch(a_file);

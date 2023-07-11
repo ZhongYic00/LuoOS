@@ -219,18 +219,18 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray devpatharr = curproc->vmar.copyinstr((xlen_t)a_devpath, FAT32_MAX_PATH);
         char *devpath = (char*)devpatharr.buff;
-        if(strncmp("/",devpath,2) == 0) {
-            printf("path error\n");
-            return statcode::err;
-        }
-        // DirEnt *ep = fs::entEnter(devpath);
-        shared_ptr<DEntry> ep = fs::Path(devpath).pathSearch();
-        if(ep == nullptr) {
-            printf("not found file\n");
-            return statcode::err;
-        }
-
-        return ep->entUnmount();
+        // if(strncmp("/",devpath,2) == 0) {
+        //     printf("path error\n");
+        //     return statcode::err;
+        // }
+        // // DirEnt *ep = fs::entEnter(devpath);
+        // shared_ptr<DEntry> ep = fs::Path(devpath).pathSearch();
+        // if(ep == nullptr) {
+        //     printf("not found file\n");
+        //     return statcode::err;
+        // }
+        // return ep->entUnmount();
+        return fs::Path(devpath).pathUnmount();
     }
     xlen_t mount() {
         auto &ctx = kHartObj().curtask->ctx;
@@ -247,34 +247,33 @@ namespace syscall {
         klib::ByteArray fstypearr = curproc->vmar.copyinstr((xlen_t)a_fstype, FAT32_MAX_PATH);
         char *devpath = (char*)devpatharr.buff;
         char *mountpath = (char*)mountpatharr.buff;
-        char *FileSystem = (char*)fstypearr.buff;
-        if(strncmp("/",mountpath,2) == 0) { //mountpoint not allowed the root
-            printf("not allowed\n");
-            return statcode::err;
-        }
-        if ((strncmp("vfat",FileSystem,5)!=0) && (strncmp("fat32",FileSystem,6)!=0)) {
-            printf("the FileSystem is not fat32\n");
-            return statcode::err;
-        }
-
-        // DirEnt *dev_ep = fs::entEnter(devpath);
-        // DirEnt *ep = fs::entEnter(mountpath);
-        shared_ptr<DEntry> dev_ep = fs::Path(devpath).pathSearch();
-        shared_ptr<DEntry> ep = fs::Path(mountpath).pathSearch();
-        if(dev_ep == nullptr) {
-            printf("dev not found file\n");
-            return statcode::err;
-        }
-        if(ep == nullptr) {
-            printf("mount not found file\n");
-            return statcode::err;
-        }
-        if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)) {
-            printf("mountpoint is not a dir\n");
-            return statcode::err;
-        }
-
-        return ep->entMount(dev_ep);
+        char *fstype = (char*)fstypearr.buff;
+        // if(strncmp("/",mountpath,2) == 0) { //mountpoint not allowed the root
+        //     printf("not allowed\n");
+        //     return statcode::err;
+        // }
+        // if ((strncmp("vfat",FileSystem,5)!=0) && (strncmp("fat32",FileSystem,6)!=0)) {
+        //     printf("the FileSystem is not fat32\n");
+        //     return statcode::err;
+        // }
+        // // DirEnt *dev_ep = fs::entEnter(devpath);
+        // // DirEnt *ep = fs::entEnter(mountpath);
+        // shared_ptr<DEntry> dev_ep = fs::Path(devpath).pathSearch();
+        // shared_ptr<DEntry> ep = fs::Path(mountpath).pathSearch();
+        // if(dev_ep == nullptr) {
+        //     printf("dev not found file\n");
+        //     return statcode::err;
+        // }
+        // if(ep == nullptr) {
+        //     printf("mount not found file\n");
+        //     return statcode::err;
+        // }
+        // if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)) {
+        //     printf("mountpoint is not a dir\n");
+        //     return statcode::err;
+        // }
+        // return ep->entMount(dev_ep);
+        return fs::Path(mountpath).pathMount(devpath, fstype);
     }
     xlen_t chDir(void) {
         auto &ctx = kHartObj().curtask->ctx;

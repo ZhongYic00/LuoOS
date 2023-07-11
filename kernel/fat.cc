@@ -173,7 +173,7 @@ DirEnt& DirEnt::operator=(const union Ent& a_ent) {
     return *this;
 }
 DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
-    if(mount_flag == true) { return spblk->getFATRoot()->entSearch(a_dirname, a_off); }
+    // if(mount_flag == true) { return spblk->getFATRoot()->entSearch(a_dirname, a_off); }
     // 当前“目录”非目录
     if (!(attribute & ATTR_DIRECTORY)) { panic("dirLookUp not DIR"); }
     if (attribute & ATTR_LINK){
@@ -182,6 +182,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         attribute = li.de.sne.attr;
     }
+    // @todo 判断移到Path中
     // '.'表示当前目录，则增加当前目录引用计数并返回当前目录
     if (a_dirname == ".") { return entDup(); }
     // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
@@ -615,37 +616,37 @@ int DirEnt::entUnlink() const {
     }
     return 0;
 }
-int DEntry::entMount(shared_ptr<DEntry> a_dev) const {
-    // while(dev_fat[mount_num].isValid()) {
-    //     ++mount_num;
-    //     mount_num = mount_num % 8;
-    // }
-    uint8 mount_num = dev_table.size();
-    DirEnt *root = eCacheAlloc(mount_num);
-    *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, nullptr, root->next, root->prev);
-    shared_ptr<FileSystem> nfs;
-    {  // eliminate lifecycle
-        auto buf = bcache[{ a_dev->getINode()->rDev(), 0 }];
-        nfs = make_shared<FileSystem>(*buf, true, make_shared<DEntry>(root), true);
-        root->spblk = nfs->getSpBlk();
-        dev_table[mount_num] = nfs;
-    }
-    // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
-    if (BlockBuf::blockSize != nfs.rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-    root->first_clus = root->cur_clus = nfs.rRC();
-    // DirEnt *root = dev_fat[mount_num].getRoot();
-    // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, mount_num, false, 1, 0, 0, nullptr, root, root, false };
-    entry->mount_flag = true;
-    entry->spblk = root->spblk;
-    return 0;
-}
-int DEntry::entUnmount() const {
-    entry->mount_flag = false;
-    // memset(&dev_fat[entry->dev], 0, sizeof(dev_fat[entry->dev]));
-    dev_table.erase(entry->spblk->rDev());
-    entry->spblk = entry->spblk->getMntParent();
-    return 0;
-}
+// int DEntry::entMount(shared_ptr<DEntry> a_dev) const {
+//     // while(dev_fat[mount_num].isValid()) {
+//     //     ++mount_num;
+//     //     mount_num = mount_num % 8;
+//     // }
+//     uint8 mount_num = dev_table.size();
+//     DirEnt *root = eCacheAlloc(mount_num);
+//     *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, nullptr, root->next, root->prev);
+//     shared_ptr<FileSystem> nfs;
+//     {  // eliminate lifecycle
+//         auto buf = bcache[{ a_dev->getINode()->rDev(), 0 }];
+//         nfs = make_shared<FileSystem>(*buf, true, make_shared<DEntry>(root), true);
+//         root->spblk = nfs->getSpBlk();
+//         dev_table[mount_num] = nfs;
+//     }
+//     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
+//     if (BlockBuf::blockSize != nfs.rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
+//     root->first_clus = root->cur_clus = nfs.rRC();
+//     // DirEnt *root = dev_fat[mount_num].getRoot();
+//     // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, mount_num, false, 1, 0, 0, nullptr, root, root, false };
+//     entry->mount_flag = true;
+//     entry->spblk = root->spblk;
+//     return 0;
+// }
+// int DEntry::entUnmount() const {
+//     entry->mount_flag = false;
+//     // memset(&dev_fat[entry->dev], 0, sizeof(dev_fat[entry->dev]));
+//     dev_table.erase(entry->spblk->rDev());
+//     entry->spblk = entry->spblk->getMntParent();
+//     return 0;
+// }
 const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, uint64 a_buf, uint a_off, uint a_len) const {
     if (a_off + a_len > rBPC()) { panic("offset out of range"); }
     uint tot, m;
@@ -653,7 +654,7 @@ const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, u
     a_off = a_off % rBPS();
     int bad = 0;
     for (tot = 0; tot < a_len; tot += m, a_off += m, a_buf += m, sec++) {
-        auto bp = bcache[{0, sec}];  // @todo 设备号？
+        auto bp = bcache[{dev, sec}];  // @todo 设备号？
         m = BlockBuf::blockSize - a_off % BlockBuf::blockSize;
         if (a_len - tot < m) { m = a_len - tot; }
         // @todo 弃用bufCopyIn/Out()
@@ -696,7 +697,7 @@ int FileSystem::ldSpBlk(shared_ptr<fs::DEntry> a_dev) {
     *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, nullptr, root->next, root->prev);
     {  // eliminate lifecycle
         auto buf = bcache[{ a_dev->getINode()->rDev(), 0 }];
-        root->spblk = spblk = make_shared<SuperBlock>(make_shared<DEntry>(root), a_dev->getINode()->getSpBlk(), a_dev->getInode()->rDev(), buf);
+        root->spblk = spblk = make_shared<SuperBlock>(make_shared<DEntry>(root), this, a_dev->getINode()->rDev(), buf);
     }
     if (BlockBuf::blockSize != spblk.rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
     root->first_clus = root->cur_clus = spblk.rRC();
