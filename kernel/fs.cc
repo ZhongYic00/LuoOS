@@ -1,4 +1,5 @@
 #include "fs.hh"
+#include "fat.hh"
 #include "vm.hh"
 #include "kernel.hh"
 // #include "klib.h"
@@ -175,6 +176,34 @@ int Path::pathUnlink(shared_ptr<File> a_file) const {
     if(dp == nullptr) { return -1; }
     if(dp->getINode()->nodUnlink() == -1) { return -1; }
     return pathRemove(a_file);
+}
+int Path::pathMount(const Path& a_devpath, string a_fstype) {
+    if(pathname == "/") {  //mountpoint not allowed the root
+        printf("not allowed\n");
+        return -1;
+    }
+    shared_ptr<DEntry> ep = pathSearch();
+    shared_ptr<DEntry> dev_ep = a_devpath.pathSearch();
+    if(ep==nullptr || dev_ep==nullptr) {
+        printf("DEntry not found\n");
+        return -1;
+    }
+    if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)) {
+        printf("mountpoint is not a dir\n");
+        return -1;
+    }
+
+    uint8 mount_num = dev_table.size();
+    if(a_devpath.pathname=="fat32" || a_devpath.pathname=="vfat") {
+        dev_table[mount_num] = make_shared<fat::FileSystem>(false, mount_num);
+        if(dev_table[mount_num]->ldSpBlk(dev_ep) == -1) { return -1; }
+        ep->setMntPoint(dev_ep);
+    }
+    else {
+        printf("unsupported file system type\n");
+        return -1;
+    }
+    return 1;
 }
 // shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
 //     DirEnt *ep = pathSearch(a_file);

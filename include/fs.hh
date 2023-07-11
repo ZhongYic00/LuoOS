@@ -33,6 +33,7 @@ namespace fs{
             virtual FileSystem& operator=(const FileSystem& a_fs);
             virtual string rFSType() const;  // 返回该文件系统的类型
             virtual shared_ptr<SuperBlock> getSpBlk() const;  // 返回指向该文件系统超级块的共享指针
+            virtual int ldSpBlk();
     };
     class INode {
         public:
@@ -130,6 +131,7 @@ namespace fs{
             inline int pathLink(shared_ptr<File> a_f1, const Path& a_newpath) const { return pathLink(a_f1, a_newpath, nullptr); }
             inline int pathLink(const Path& a_newpath) const { return pathLink(nullptr, a_newpath, nullptr); }
             int pathUnlink(shared_ptr<File> a_file = nullptr) const;
+            int pathMount(const Path& a_devpath, string a_fstype) const;
             // shared_ptr<File> pathOpen(int a_flags, shared_ptr<File> a_file) const;
             // inline shared_ptr<File> pathOpen(shared_ptr<File> a_file) const { return pathOpen(0, a_file); }
             // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }

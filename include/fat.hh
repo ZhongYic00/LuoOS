@@ -97,7 +97,7 @@ namespace fat {
         union Ent de;
         uint32 link_count;
     };
-    class INode {
+    class INode:public fs::INode {
         private:
             uint32 inode_num;
             DirEnt *entry;
@@ -106,9 +106,9 @@ namespace fat {
             inline DirEnt *nodDup(DirEnt *a_entry) const { return a_entry==nullptr ? nullptr : a_entry->entDup(); }
             inline void nodPanic() const { if(entry == nullptr) { panic("INode panic!\n"); } }
         public:
-            INode():inode_num(0), entry(nullptr) {}
+            INode():fs::INode(), inode_num(0), entry(nullptr) {}
             INode(const INode& a_inode) = default;
-            INode(DirEnt *a_entry):inode_num(a_entry->first_clus), entry(a_entry) {}
+            INode(DirEnt *a_entry):fs::INode(), inode_num(a_entry->first_clus), entry(a_entry) {}
             ~INode() { nodRelse(); }
             inline INode& operator=(const INode& a_inode) { nodRelse(); inode_num = a_inode.inode_num; entry = a_inode.nodDup(); return *this; }
             inline INode& operator=(DirEnt *a_entry) { nodRelse(); inode_num = a_entry->first_clus; entry = nodDup(a_entry); return *this; }
@@ -126,17 +126,17 @@ namespace fat {
             inline shared_ptr<SuperBlock> getSpBlk() const { nodPanic(); return entry->spblk; }
             inline DirEnt *rawPtr() const { return nodDup(); }
     };
-    class DEntry {
+    class DEntry:public fs::DEntry {
         private:
             shared_ptr<INode> inode;
             DirEnt *entry;
             inline void dERelse() const { if(entry != nullptr) { entry->entRelse(); } }
             inline void dEPanic() const { if(entry == nullptr) { panic("DEntry panic!\n"); } }
         public:
-            DEntry():inode(nullptr), entry(nullptr) {}
-            DEntry(const DEntry& a_dentry):inode(a_dentry.inode), entry(a_dentry.inode->rawPtr()) {}
-            DEntry(shared_ptr<INode> a_inode):inode(a_inode), entry(a_inode->rawPtr()) {}
-            DEntry(DirEnt *a_entry):inode(make_shared<INode>(a_entry)), entry(inode->rawPtr()) {}
+            DEntry():fs::DEntry(), inode(nullptr), entry(nullptr) {}
+            DEntry(const DEntry& a_dentry):fs::DEntry(), inode(a_dentry.inode), entry(a_dentry.inode->rawPtr()) {}
+            DEntry(shared_ptr<INode> a_inode):fs::DEntry(), inode(a_inode), entry(a_inode->rawPtr()) {}
+            DEntry(DirEnt *a_entry):fs::DEntry(), inode(make_shared<INode>(a_entry)), entry(inode->rawPtr()) {}
             ~DEntry() { dERelse(); }
             inline DEntry& operator=(const DEntry& a_dentry) { dERelse(); inode = a_dentry.inode; entry = a_dentry.inode->rawPtr(); return *this; }
             inline DEntry& operator=(shared_ptr<INode> a_inode) { dERelse(); inode = a_inode; entry = a_inode->rawPtr(); return *this; }
@@ -150,11 +150,12 @@ namespace fat {
             inline bool isMntPoint() const { dEPanic(); return entry->mount_flag; }
             inline shared_ptr<INode> getINode() const { return inode; }
             inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
+            inline setMntPoint(shared_ptr<fs::DEntry> a_entry) { dEPanic(); entry->mount_flag = true; entry->spblk = a_entry->getINode()->getSpBlk(); }
     };
     class SuperBlock:public fs::SuperBlock {
         private:
             shared_ptr<DEntry> root;  //根目录
-            shared_ptr<SuperBlock> mnt_parent;
+            shared_ptr<fs::SuperBlock> mnt_parent;
             bool valid;
             uint8 dev;
             uint32 first_data_sec; // data所在的第一个扇区
@@ -181,11 +182,11 @@ namespace fat {
         public:
             SuperBlock() = default;
             SuperBlock(const SuperBlock& a_spblk) = default;
-            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<SuperBlock> a_parent, uint8 a_dev, uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, BPB a_bpb):root(a_root), mnt_parent(a_parent), valid(true), dev(a_dev), first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bpb) {}
-            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<SuperBlock> a_parent, uint8 a_dev, uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):root(a_root), mnt_parent(a_parent), valid(true), dev(a_dev), first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc) {}
-            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<SuperBlock> a_parent, uint8 a_dev, const BPB& a_bpb):root(a_root), mnt_parent(a_parent), valid(true), dev(a_dev), first_data_sec(a_bpb.rsvd_sec_cnt+a_bpb.fat_cnt*a_bpb.fat_sz), data_sec_cnt(a_bpb.tot_sec-first_data_sec), data_clus_cnt(data_sec_cnt/a_bpb.sec_per_clus), byts_per_clus(a_bpb.sec_per_clus*a_bpb.byts_per_sec), bpb(a_bpb) {}
-            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<SuperBlock> a_parent, uint8 a_dev, const BlockBuf &a_blk):SuperBlock(a_root, a_parent, a_dev, BPB(a_blk)) {}
-            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<SuperBlock> a_parent, uint8 a_dev, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):SuperBlock(a_root, a_parent, a_dev, BPB(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc)) {}
+            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<fs::SuperBlock> a_parent, uint8 a_dev, uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, BPB a_bpb):fs::SuperBlock(), root(a_root), mnt_parent(a_parent), valid(true), dev(a_dev), first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bpb) {}
+            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<fs::SuperBlock> a_parent, uint8 a_dev, uint32 a_fds, uint32 a_dsc, uint32 a_dcc, uint32 a_bpc, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):fs::SuperBlock(), root(a_root), mnt_parent(a_parent), valid(true), dev(a_dev), first_data_sec(a_fds), data_sec_cnt(a_dsc), data_clus_cnt(a_dcc), byts_per_clus(a_bpc), bpb(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc) {}
+            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<fs::SuperBlock> a_parent, uint8 a_dev, const BPB& a_bpb):fs::SuperBlock(), root(a_root), mnt_parent(a_parent), valid(true), dev(a_dev), first_data_sec(a_bpb.rsvd_sec_cnt+a_bpb.fat_cnt*a_bpb.fat_sz), data_sec_cnt(a_bpb.tot_sec-first_data_sec), data_clus_cnt(data_sec_cnt/a_bpb.sec_per_clus), byts_per_clus(a_bpb.sec_per_clus*a_bpb.byts_per_sec), bpb(a_bpb) {}
+            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<fs::SuperBlock> a_parent, uint8 a_dev, const BlockBuf &a_blk):SuperBlock(a_root, a_parent, a_dev, BPB(a_blk)) {}
+            SuperBlock(shared_ptr<DEntry> a_root, shared_ptr<fs::SuperBlock> a_parent, uint8 a_dev, uint16 a_bps, uint8 a_spc, uint16 a_rsc, uint8 a_fc, uint32 a_hs, uint32 a_ts, uint32 a_fs, uint32 a_rc):SuperBlock(a_root, a_parent, a_dev, BPB(a_bps, a_spc, a_rsc, a_fc, a_hs, a_ts, a_fs, a_rc)) {}
             ~SuperBlock() = default;
             SuperBlock& operator=(const SuperBlock& a_spblk) = default;
             inline uint32 rFDS() const { return first_data_sec; }
@@ -220,14 +221,18 @@ namespace fat {
             string fstype;  // 文件系统类型
             shared_ptr<SuperBlock> spblk;  // 超级块
             bool isroot;  //是否是根文件系统
+            uint8 key;
         public:
             FileSystem() = default;
             FileSystem(const FileSystem& a_fs) = default;
-            FileSystem(shared_ptr<SuperBlock> a_spblk, bool a_isroot):fs::FileSystem(), fstype("FAT32"), spblk(a_spblk), isroot(a_isroot) {}
+            FileSystem(shared_ptr<SuperBlock> a_spblk, bool a_isroot, uint8 a_key):fs::FileSystem(), fstype("FAT32"), spblk(a_spblk), isroot(a_isroot), key(a_key) {}
+            FileSystem(bool a_isroot, uint8 a_key):fs::FileSystem(), fstype("FAT32"), spblk(nullptr), isroot(a_isroot), key(a_key) {}
             ~FileSystem() = default;
             FileSystem& operator=(const FileSystem& a_fs) = default;
             inline string rFSType() const { return fstype; }
             inline bool isRootFS() const { return isroot; }
+            inline shared_ptr<fs::SuperBlock> getSpBlk() const { return spblk; }
+            int ldSpBlk(shared_ptr<fs::DEntry> a_dev);
     };
     int rootFSInit();
 }
