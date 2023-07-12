@@ -10,10 +10,9 @@
 #define FMT_PROC(fmt,...) printf(fmt,__VA_ARGS__)
 
 // @todo error handling
-namespace fs {
-    map<uint8, shared_ptr<FileSystem>> dev_table;
-}
 using namespace fs;
+
+map<uint8, shared_ptr<FileSystem>> dev_table;
 
 xlen_t File::write(xlen_t addr,size_t len){
     xlen_t rt=sys::statcode::err;
@@ -151,7 +150,7 @@ shared_ptr<DEntry> Path::pathCreate(short a_type, int a_mode, shared_ptr<File> a
     if (a_type == T_DIR) { a_mode = ATTR_DIRECTORY; }
     else if (a_mode & O_RDONLY) { a_mode = ATTR_READ_ONLY; }
     else { a_mode = 0; }
-    shared_ptr<DEntry> ep = make_shared<DEntry>(dp->getINode()->nodCreate(dirname.back(), a_mode));
+    shared_ptr<DEntry> ep = dp->entCreate(dirname.back(), a_mode);
     if (ep == nullptr) { return nullptr; }
     if ((a_type==T_DIR && !(ep->getINode()->rAttr()&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->getINode()->rAttr()&ATTR_DIRECTORY))) { return nullptr; }
     return ep;
@@ -163,22 +162,39 @@ int Path::pathRemove(shared_ptr<File> a_file) const {
     ep->getINode()->nodRemove();
     return 0;
 }
-int Path::pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const {
-    shared_ptr<DEntry> dp1 = pathSearch(a_f1);
-    shared_ptr<DEntry> dp2 = a_newpath.pathSearch(a_f2);
-    if(dp1==nullptr || dp2==nullptr) {
+int Path::pathHardLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const {
+    shared_ptr<INode> ino1 = pathSearch(a_f1)->getINode();
+    shared_ptr<INode> ino2 = a_newpath.pathSearch(a_f2)->getINode();
+    if(ino1==nullptr || ino2==nullptr) {
         printf("can't find dir\n");
         return -1;
     }
-    return dp1->getINode()->nodLink(dp2->getINode());
+    string fs1 = ino1->getSpBlk()->getFS()->rFSType();
+    string fs2 = ino2->getSpBlk()->getFS()->rFSType();
+    if(fs1 != fs2) {
+        printf("different filesystem\n");
+        return -1;
+    }
+    if(fs1=="fat32" || fs1=="vfat") {
+        fat::INode *fatino1 = (fat::INode*)(ino1.get());
+        fat::INode *fatino2 = (fat::INode*)(ino2.get());
+        if(fatino1->nodHardLink(fatino2) == -1) { return -1; }
+        ino1.reset();
+        ino2.reset();
+    }
+    else {
+        printf("unsupported filesystem type\n");
+        return -1;
+    }
+    return 0;
 }
-int Path::pathUnlink(shared_ptr<File> a_file) const {
+int Path::pathHardUnlink(shared_ptr<File> a_file) const {
     shared_ptr<DEntry> dp = pathSearch(a_file);
     if(dp == nullptr) { return -1; }
-    if(dp->getINode()->nodUnlink() == -1) { return -1; }
+    if(dp->getINode()->nodHardUnlink() == -1) { return -1; }
     return pathRemove(a_file);
 }
-int Path::pathMount(const Path& a_devpath, string a_fstype) {
+int Path::pathMount(const Path& a_devpath, string a_fstype) const {
     shared_ptr<DEntry> ep = pathSearch();
     shared_ptr<DEntry> dev_ep = a_devpath.pathSearch();
     if(ep==nullptr || dev_ep==nullptr) {
@@ -197,11 +213,11 @@ int Path::pathMount(const Path& a_devpath, string a_fstype) {
     uint8 mount_num = dev_table.size();
     if(a_devpath.pathname=="fat32" || a_devpath.pathname=="vfat") {
         dev_table[mount_num] = make_shared<fat::FileSystem>(false, mount_num);
-        if(dev_table[mount_num]->ldSpBlk(dev_ep) == -1) { return -1; }
+        if(dev_table[mount_num]->ldSpBlk(dev_ep->getINode()->rDev()) == -1) { return -1; }
         ep->setMntPoint(dev_ep);
     }
     else {
-        printf("unsupported file system type\n");
+        printf("unsupported filesystem type\n");
         return -1;
     }
     return 1;
@@ -216,7 +232,7 @@ int Path::pathUnmount() const {
         printf("not allowed\n");
         return -1;
     }
-    uint8 key = ep->getINode()->getSuperBlock()->getFS()->rKey();
+    uint8 key = ep->getINode()->getSpBlk()->getFS()->rKey();
     shared_ptr<FileSystem> umnt = dev_table[key];
     umnt->unInstall();
     dev_table.erase(key);
@@ -238,5 +254,9 @@ int Path::pathUnmount() const {
 //     }
 //     return make_shared<File>(ep, a_flags);
 // }
-
+int rootFSInit() {
+    dev_table[0] = make_shared<fat::FileSystem>(true, 0);
+    if(dev_table[0]->ldSpBlk(0) == -1) { return -1; }
+    return 0;
+}
 

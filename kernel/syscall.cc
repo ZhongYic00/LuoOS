@@ -1,6 +1,6 @@
 #include "kernel.hh"
 #include "sched.hh"
-#include "fat.hh"
+#include "fs.hh"
 #include "ld.hh"
 #include "sbi.hh"
 #include "TINYSTL/vector.h"
@@ -67,26 +67,26 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t testFATInit() {
-        Log(info, "initializing fat\n");
-        auto tmp = fs::rootFSInit();
-        if(tmp != 0) { panic("fat init failed\n"); }
-        auto curproc = kHartObj().curtask->getProcess();
-        // curproc->cwd = fs::entEnter("/");
-        curproc->cwd = fs::Path("/").pathSearch();
-        curproc->files[3] = make_shared<File>(curproc->cwd,0);
-        // DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
-        shared_ptr<DEntry> ep = fs::Path("/dev").pathCreate(T_DIR, 0);
-        if(ep == nullptr) { panic("create /dev failed\n"); }
-        // ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
-        ep = fs::Path("/dev/vda2").pathCreate(T_DIR, 0);
-        // auto isempty = ep->isEmpty();
-        // auto dp = fs::Path("/dev/vda2/test").pathCreate(T_DIR, 0);
-        // isempty = ep->isEmpty();
-        // fs::Path("/dev/vda2/test").pathRemove();
-        // isempty = ep->isEmpty();
-        if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
-        Log(info,"fat initialize ok");
-        return statcode::ok;
+        // Log(info, "initializing fat\n");
+        // auto tmp = fs::rootFSInit();
+        // if(tmp != 0) { panic("fat init failed\n"); }
+        // auto curproc = kHartObj().curtask->getProcess();
+        // // curproc->cwd = fs::entEnter("/");
+        // curproc->cwd = fs::Path("/").pathSearch();
+        // curproc->files[3] = make_shared<File>(curproc->cwd,0);
+        // // DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
+        // shared_ptr<DEntry> ep = fs::Path("/dev").pathCreate(T_DIR, 0);
+        // if(ep == nullptr) { panic("create /dev failed\n"); }
+        // // ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
+        // ep = fs::Path("/dev/vda2").pathCreate(T_DIR, 0);
+        // // auto isempty = ep->isEmpty();
+        // // auto dp = fs::Path("/dev/vda2/test").pathCreate(T_DIR, 0);
+        // // isempty = ep->isEmpty();
+        // // fs::Path("/dev/vda2/test").pathRemove();
+        // // isempty = ep->isEmpty();
+        // if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
+        // Log(info,"fat initialize ok");
+        // return statcode::ok;
     }
     xlen_t getCwd(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -185,7 +185,7 @@ namespace syscall {
         shared_ptr<File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; } // 非绝对路径
 
-        return fs::Path(path).pathUnlink(f);
+        return fs::Path(path).pathHardUnlink(f);
     }
     xlen_t linkAt(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -208,7 +208,7 @@ namespace syscall {
         if(*newpath != '/') { f2 = curproc->files[a_newdirfd]; }
 
         // return fs::entLink(oldpath, f1, newpath, f2);
-        return fs::Path(oldpath).pathLink(f1, newpath, f2);
+        return fs::Path(oldpath).pathHardLink(f1, newpath, f2);
     }
     xlen_t umount2(void) {
         auto &ctx = kHartObj().curtask->ctx;

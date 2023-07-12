@@ -5,7 +5,8 @@
 #include "resmgr.hh"
 #include "linux/fcntl.h"
 #include "error.hh"
-#include "EASTL/string.h"
+// #include "EASTL/string.h"
+#include "EASTL/map.h"
 
 namespace fs{
     using pipe::Pipe;
@@ -16,56 +17,72 @@ namespace fs{
     using eastl::map;
 
     class DEntry;
+    class FileSystem;
 
     class SuperBlock {
         public:
             SuperBlock() = default;
             SuperBlock(const SuperBlock& a_spblk) = default;
-            virtual ~SuperBlock();
-            virtual SuperBlock& operator=(const SuperBlock& a_spblk);
-            virtual shared_ptr<DEntry> getRoot() const;  // 返回指向该超级块的根目录项的共享指针
+            virtual ~SuperBlock() = default;
+            SuperBlock& operator=(const SuperBlock& a_spblk);
+            virtual uint32 rBlkSize() const = 0;
+            virtual shared_ptr<DEntry> getRoot() const = 0;  // 返回指向该超级块的根目录项的共享指针
+            virtual FileSystem *getFS() const = 0;
+            virtual bool isValid() const = 0;
     };
     class FileSystem {
         public:
             FileSystem() = default;
             FileSystem(const FileSystem& a_fs) = default;
-            virtual ~FileSystem();
-            virtual FileSystem& operator=(const FileSystem& a_fs);
-            virtual string rFSType() const;  // 返回该文件系统的类型
-            virtual shared_ptr<SuperBlock> getSpBlk() const;  // 返回指向该文件系统超级块的共享指针
-            virtual int ldSpBlk();
+            virtual ~FileSystem() = default;
+            FileSystem& operator=(const FileSystem& a_fs) = default;
+            virtual string rFSType() const = 0;  // 返回该文件系统的类型
+            virtual uint8 rKey() const = 0;
+            virtual bool isRootFS() const = 0;
+            virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该文件系统超级块的共享指针
+            virtual int ldSpBlk(uint a_dev) = 0;
+            virtual void unInstall() = 0;
     };
     class INode {
         public:
             INode() = default;
             INode(const INode& a_inode) = default;
-            virtual ~INode();  // 需要保证脏数据落盘
-            virtual INode& operator=(const INode& a_inode);
-            virtual shared_ptr<INode> nodCreate(string a_name, int a_attr);  // 在该INode（必须是目录）下创建一个名为a_name、属性为a_attr的文件，返回指向该文件对应INode的共享指针
-            virtual void nodRemove();  // 删除该INode对应的磁盘文件内容
-            virtual int nodLink(shared_ptr<INode> a_inode);  // 软链接，返回错误码
-            virtual int nodUnlink();  // 删除该软链接，返回错误码
-            virtual void nodTrunc();  // 清空该INode的元信息，并标志该INode为脏
-            virtual int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len);  // 从该文件的a_off偏移处开始，读取a_len字节的数据到a_dst处，返回实际读取的字节数
-            virtual int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len);  // 从a_src处开始，写入a_len字节的数据到该文件的a_off偏移处，返回实际写入的字节数
-            virtual uint8 rAttr() const;  // 返回该文件的属性
-            virtual uint8 rDev() const;  // 返回该文件所在文件系统的设备号
-            virtual uint32 rFileSize() const;  // 返回该文件的字节数
-            virtual uint32 rINo() const;  // 返回该INode的ino
-            virtual shared_ptr<SuperBlock> getSpBlk() const;  // 返回指向该INode所属文件系统超级块的共享指针;
+            virtual ~INode() = default;  // 需要保证脏数据落盘
+            INode& operator=(const INode& a_inode) = default;
+            // virtual shared_ptr<INode> nodCreate(string a_name, int a_attr);  // 在该INode（必须是目录）下创建一个名为a_name、属性为a_attr的文件，返回指向该文件对应INode的共享指针
+            virtual void nodRemove() = 0;  // 删除该INode对应的磁盘文件内容
+            // virtual int nodHardLink(shared_ptr<INode> a_inode);  // 硬链接，返回错误码，由pathHardLink区分各文件系统单独调用，不作为统一接口
+            virtual int nodHardUnlink() = 0;  // 删除硬链接，返回错误码
+            // virtual int nodSoftLink(shared_ptr<INode> a_inode);  // 软链接，返回错误码
+            // virtual int nodSoftUnlink();  // 删除软链接，返回错误码
+            virtual void nodTrunc() = 0;  // 清空该INode的元信息，并标志该INode为脏
+            virtual int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) = 0;  // 从该文件的a_off偏移处开始，读取a_len字节的数据到a_dst处，返回实际读取的字节数
+            virtual int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) = 0;  // 从a_src处开始，写入a_len字节的数据到该文件的a_off偏移处，返回实际写入的字节数
+            virtual void setSpBlk(shared_ptr<SuperBlock> a_spblk) = 0;
+            virtual uint8 rAttr() const = 0;  // 返回该文件的属性
+            virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
+            virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
+            virtual uint32 rINo() const = 0;  // 返回该INode的ino
+            virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该INode所属文件系统超级块的共享指针;
     };
     class DEntry {
         public:
             DEntry() = default;
-            DEntry(const FileSystem& a_entry) = default;
-            virtual ~DEntry();
-            virtual DEntry& operator=(const FileSystem& a_entry);
-            virtual shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off);  // 在该目录项下搜索名为a_dirname的目录项，返回指向目标目录项的共享指针（找不到则返回nullptr）
-            virtual int entMount(shared_ptr<DEntry> a_dev);  // 将该目录项作为挂载点，挂载以a_dev作为根目录项的设备，返回错误码
-            virtual int entUnmount();  // 卸载该目录项下挂载的设备，返回错误码
-            virtual const char *rName() const;  // 返回该目录项的文件名
-            virtual shared_ptr<DEntry> rParent() const;  // 返回指向该目录项父目录的共享指针
-            virtual shared_ptr<INode> getINode() const;  // 返回指向该目录项对应INode的共享指针
+            DEntry(const DEntry& a_entry) = default;
+            virtual ~DEntry() = default;
+            DEntry& operator=(const DEntry& a_entry) = default;
+            virtual shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) = 0;  // 在该目录项下(不包含子目录)搜索名为a_dirname的目录项，返回指向目标目录项的共享指针（找不到则返回nullptr）
+            virtual shared_ptr<DEntry> entCreate(string a_name, int a_attr) = 0;
+            // virtual int entMount(shared_ptr<DEntry> a_dev);  // 将该目录项作为挂载点，挂载以a_dev作为根目录项的设备，返回错误码，由pathMount统一管理
+            // virtual int entUnmount();  // 卸载该目录项下挂载的设备，返回错误码，由pathUnmount统一管理
+            virtual void setMntPoint(shared_ptr<fs::DEntry> a_entry) = 0;
+            virtual void clearMnt() = 0;
+            virtual const char *rName() const = 0;  // 返回该目录项的文件名
+            virtual shared_ptr<DEntry> rParent() const = 0;  // 返回指向该目录项父目录的共享指针
+            virtual shared_ptr<INode> getINode() const = 0;  // 返回指向该目录项对应INode的共享指针
+            virtual bool isMntPoint() const = 0;
+            virtual bool isEmpty() const = 0;
+            virtual bool isRoot() const = 0;
     };
     enum class FileOp:uint16_t { none=0,read=0x1,write=0x2,append=0x4, };
     union FileOps {
@@ -126,12 +143,13 @@ namespace fs{
             inline shared_ptr<DEntry> pathSearch() const { return pathSearch(nullptr, false); }
             shared_ptr<DEntry> pathCreate(short a_type, int a_mode, shared_ptr<File> a_file = nullptr) const;
             int pathRemove(shared_ptr<File> a_file = nullptr) const;
-            int pathLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const;
-            inline int pathLink(const Path& a_newpath, shared_ptr<File> a_f2) const { return pathLink(nullptr, a_newpath, a_f2); }
-            inline int pathLink(shared_ptr<File> a_f1, const Path& a_newpath) const { return pathLink(a_f1, a_newpath, nullptr); }
-            inline int pathLink(const Path& a_newpath) const { return pathLink(nullptr, a_newpath, nullptr); }
-            int pathUnlink(shared_ptr<File> a_file = nullptr) const;
+            int pathHardLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const;
+            inline int pathHardLink(const Path& a_newpath, shared_ptr<File> a_f2) const { return pathHardLink(nullptr, a_newpath, a_f2); }
+            inline int pathHardLink(shared_ptr<File> a_f1, const Path& a_newpath) const { return pathHardLink(a_f1, a_newpath, nullptr); }
+            inline int pathHardLink(const Path& a_newpath) const { return pathHardLink(nullptr, a_newpath, nullptr); }
+            int pathHardUnlink(shared_ptr<File> a_file = nullptr) const;
             int pathMount(const Path& a_devpath, string a_fstype) const;
+            int pathUnmount() const;
             // shared_ptr<File> pathOpen(int a_flags, shared_ptr<File> a_file) const;
             // inline shared_ptr<File> pathOpen(shared_ptr<File> a_file) const { return pathOpen(0, a_file); }
             // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
@@ -187,12 +205,12 @@ namespace fs{
         // public:
             KStat() = default;
             KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
-            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getFS()->rBPC()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
+            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->rBlkSize()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
             ~KStat() = default;
 
 	};
+    int rootFSInit();
 
-    extern map<uint8, shared_ptr<FileSystem>> dev_table;
     // namespace internal{
     //     class SuperBlock {};
     //     /// @bug sharedptr会直接删除，需要引入cache
@@ -269,4 +287,5 @@ namespace fs{
     //     struct FileSystem_:private FileSystem{ FileSystem_():FileSystem(){} };
     // }
 }
+extern eastl::map<uint8, eastl::shared_ptr<fs::FileSystem>> dev_table;
 #endif

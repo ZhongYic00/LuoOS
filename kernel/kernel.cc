@@ -8,7 +8,7 @@
 #include "sched.hh"
 #include "proc.hh"
 #include "virtio.hh"
-#include "fat.hh"
+#include "fs.hh"
 #include "fs/ramfs.hh"
 
 #define moduleLevel LogLevel::info

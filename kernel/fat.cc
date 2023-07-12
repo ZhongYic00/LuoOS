@@ -6,10 +6,10 @@ using namespace fat;
 using fs::File;
 // #define moduleLevel LogLevel::trace
 
-static SuperBlock fat;
+// static SuperBlock fat;
 static struct entry_cache { DirEnt entries[ENTRY_CACHE_NUM]; } ecache; // 目录缓冲区
-static DirEnt root; // 根目录
-static int mount_num = 0; //表示寻找在挂载集合的下标
+// static DirEnt root; // 根目录
+// static int mount_num = 0; //表示寻找在挂载集合的下标
 static int bufCopyOut(int user_dst, uint64 dst, void *src, uint64 len) {
     if(user_dst) { kHartObj().curtask->getProcess()->vmar.copyout(dst, klib::ByteArray((uint8_t*)src, len)); }
     else { memmove((void*)dst, src, len); }
@@ -95,31 +95,46 @@ static DirEnt *eCacheAlloc(shared_ptr<SuperBlock> a_spblk = nullptr) {
     panic("entHit: insufficient ecache");
     return nullptr;
 }
-
-int fs::rootFSInit() {  // @todo 重构为entMount + eCacheInit
-    auto buf=bcache[{ 0, 0 }];
-    DirEnt *root = &(ecache.entries[0]);
-    *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, 0, root, root);
-    dev_fat[0] = FileSystem(*buf, true, make_shared<DEntry>(root), false);
-    // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
-    if (BlockBuf::blockSize != dev_fat[0].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-    root->first_clus = root->cur_clus = dev_fat[0].rRC();
-    // DirEnt *root = dev_fat[0].getRoot();
-    // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[0].rRC(), 0, dev_fat[0].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
-    for(DirEnt *de = ecache.entries + 1; de < ecache.entries + ENTRY_CACHE_NUM; de++) {  // @todo 重构链表操作
+static void eCacheInit() {
+    for(DirEnt *de = ecache.entries, de2 = ecache.entries+ENTRY_CACHE_NUM-1; de < ecache.entries+ENTRY_CACHE_NUM; ++de) {  // @todo 重构链表操作
         de->spblk = nullptr;
         de->valid = 0;
         de->ref = 0;
         de->dirty = false;
         de->parent = nullptr;
-        de->next = root->next;
-        de->prev = root;
-        root->next->prev = de;
-        root->next = de;
+        // de->next = de + 1;
+        de->prev = de2;
+        // root->next->prev = de;
+        de2->next = de;
+        de2 = de;
     }
-    //将主存的系统存入设备管理
-    return 0;
+    return;
 }
+
+// int fs::rootFSInit() {  // @todo 重构为entMount + eCacheInit
+//     auto buf=bcache[{ 0, 0 }];
+//     DirEnt *root = &(ecache.entries[0]);
+//     *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, 0, root, root);
+//     dev_fat[0] = FileSystem(*buf, true, make_shared<DEntry>(root), false);
+//     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
+//     if (BlockBuf::blockSize != dev_fat[0].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
+//     root->first_clus = root->cur_clus = dev_fat[0].rRC();
+//     // DirEnt *root = dev_fat[0].getRoot();
+//     // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[0].rRC(), 0, dev_fat[0].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
+//     for(DirEnt *de = ecache.entries + 1; de < ecache.entries + ENTRY_CACHE_NUM; de++) {  // @todo 重构链表操作
+//         de->spblk = nullptr;
+//         de->valid = 0;
+//         de->ref = 0;
+//         de->dirty = false;
+//         de->parent = nullptr;
+//         de->next = root->next;
+//         de->prev = root;
+//         root->next->prev = de;
+//         root->next = de;
+//     }
+//     //将主存的系统存入设备管理
+//     return 0;
+// }
 void LNE::readEntName(char *a_buf) const {
     wchar temp[NELEM(name1)];
     memmove(temp, name1, sizeof(temp));
@@ -647,7 +662,7 @@ int DirEnt::entUnlink() const {
 //     entry->spblk = entry->spblk->getMntParent();
 //     return 0;
 // }
-const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, uint64 a_buf, uint a_off, uint a_len) const {
+uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, uint64 a_buf, uint a_off, uint a_len) const {
     if (a_off + a_len > rBPC()) { panic("offset out of range"); }
     uint tot, m;
     uint sec = firstSec(a_cluster) + a_off / rBPS();
@@ -666,7 +681,7 @@ const uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, u
     }
     return tot;
 }
-const uint32 SuperBlock::fatRead(uint32 a_cluster) const {
+uint32 SuperBlock::fatRead(uint32 a_cluster) const {
     if (a_cluster >= FAT32_EOC) { return a_cluster; }
     if (a_cluster > rDCC() + 1) { return 0; }  // because cluster number starts at 2, not 0
     uint32 fat_sec = numthSec(a_cluster, 1);
@@ -683,7 +698,7 @@ void SuperBlock::clearClus(uint32 a_cluster) const {
     }
     return;
 }
-const int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
+int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
     if (a_cluster > rDCC()+1) { return -1; }
     uint32 fat_sec = numthSec(a_cluster, 1);
     auto buf = bcache[{0, fat_sec}];
@@ -691,15 +706,22 @@ const int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
     (*buf)[off] = a_content;
     return 0;
 }
-// inline DirEnt *FileSystem::getFATRoot() const { return root->rawPtr(); }
-int FileSystem::ldSpBlk(shared_ptr<fs::DEntry> a_dev) {
+inline fs::FileSystem *SuperBlock::getFS() const { return fsclass; }
+inline shared_ptr<fs::DEntry> SuperBlock::getRoot() const { return root; }
+inline DirEnt *SuperBlock::getFATRoot() const { return root->rawPtr(); }
+int FileSystem::ldSpBlk(uint8 a_dev) {
+    static bool ecacheinit = true;
+    if(ecacheinit) {
+        eCacheInit();
+        ecacheinit = false;
+    }
     DirEnt *root = eCacheAlloc();
     *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, nullptr, root->next, root->prev);
     {  // eliminate lifecycle
-        auto buf = bcache[{ a_dev->getINode()->rDev(), 0 }];
-        root->spblk = spblk = make_shared<SuperBlock>(make_shared<DEntry>(root), this, a_dev->getINode()->rDev(), buf);
+        auto buf = bcache[{ a_dev, 0 }];
+        root->spblk = spblk = make_shared<SuperBlock>(make_shared<DEntry>(root), this, a_dev, *buf);
     }
-    if (BlockBuf::blockSize != spblk.rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-    root->first_clus = root->cur_clus = spblk.rRC();
+    if (BlockBuf::blockSize != spblk->rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
+    root->first_clus = root->cur_clus = spblk->rRC();
     return 0;
 }
