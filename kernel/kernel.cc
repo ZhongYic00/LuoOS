@@ -163,13 +163,23 @@ xlen_t irqStackOf(int hart){return kInfo.segments.kstack.first+hart*0x1000+0x100
 void init(int hartid){
     puts=IO::_sbiputs;
     puts("\n\n>>>Hello LuoOS<<<\n\n");
-    sbi_init();
     int prevStarted=started.fetch_add(1);
     bool isinit=false;
     Log(info,"Hart %d online!",hartid);
     
     if(!prevStarted){   // is first hart
         // @todo needs plic and uart init?
+        puts(
+    "__          ___    _ _    _        _                  ____   _____ \n"\
+    "\\ \\        / / |  | | |  | |      | |                / __ \\ / ____|\n"\
+    " \\ \\  /\\  / /| |__| | |  | |______| |    _   _  ___ | |  | | (___  \n"\
+    "  \\ \\/  \\/ / |  __  | |  | |______| |   | | | |/ _ \\| |  | |\\___ \\ \n"\
+    "   \\  /\\  /  | |  | | |__| |      | |___| |_| | (_) | |__| |____) |\n"\
+    "    \\/  \\/   |_|  |_|\\____/       |______\\__,_|\\___/ \\____/|_____/ \n"\
+    "                                                                   \n"\
+    "                                                                   \n"\
+    );
+        sbi_init();
         csrWrite(stvec,strapwrapper);
         puts=IO::_blockingputs;
         isinit=true;

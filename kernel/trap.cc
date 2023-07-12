@@ -37,24 +37,27 @@ void timerInterruptHandler(){
     for(auto hook:hooks)hook();
 }
 extern syscall_t syscallPtrs[];
+namespace syscall{ extern const char* syscallHelper[]; }
 void uecallHandler(){
     /// @bug should get from ctx
     int ecallId=kHartObj().curtask->ctx.x(17);
     xlen_t &rtval=kHartObj().curtask->ctx.x(10);
     kHartObj().curtask->ctx.pc+=4;
-    Log(debug,"uecall [%d]",ecallId);
+    Log(trace,"uecall [%d]",ecallId);
     using namespace sys;
     kHartObj().curtask->lastpriv=proc::Task::Priv::Kernel;
     if(ecallId<nSyscalls){
+        Log(warning,"proc called %s[%d]",syscall::syscallHelper[ecallId],ecallId);
         /// @bug is this needed??
         // kHartObj().curtask->lastpriv=proc::Task::Priv::Kernel;
         csrWrite(sscratch,kHartObj().curtask->kctx.gpr);
         // csrSet(sstatus,BIT(csr::mstatus::sie));
-        rtval=syscallPtrs[ecallId]();
+        if(syscallPtrs[ecallId])
+            rtval=syscallPtrs[ecallId]();
         // csrClear(sstatus,BIT(csr::mstatus::sie));
         Log(debug,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
     } else {
-        Log(warning,"syscall num exceeds valid range");
+        Log(error,"syscall num{%d} exceeds valid range",ecallId);
         rtval=1;
     }
     kHartObj().curtask->lastpriv=proc::Task::Priv::User;
@@ -185,6 +188,8 @@ void _strapexit(){
         csrSet(sstatus,BIT(csr::mstatus::spie));
         csrWrite(stvec,strapwrapper);
         csrWrite(satp,kHartObj().curtask->kctx.satp);
+        if(cur->ctx.pc<0x100000)
+            prevs0--;
         ExecInst(sfence.vma);
         register xlen_t t6 asm("t6");
         csrRead(sscratch,t6);
