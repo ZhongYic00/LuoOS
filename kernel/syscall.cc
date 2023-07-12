@@ -67,26 +67,26 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t testFATInit() {
-        // Log(info, "initializing fat\n");
-        // auto tmp = fs::rootFSInit();
-        // if(tmp != 0) { panic("fat init failed\n"); }
-        // auto curproc = kHartObj().curtask->getProcess();
-        // // curproc->cwd = fs::entEnter("/");
-        // curproc->cwd = fs::Path("/").pathSearch();
-        // curproc->files[3] = make_shared<File>(curproc->cwd,0);
-        // // DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
-        // shared_ptr<DEntry> ep = fs::Path("/dev").pathCreate(T_DIR, 0);
-        // if(ep == nullptr) { panic("create /dev failed\n"); }
-        // // ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
-        // ep = fs::Path("/dev/vda2").pathCreate(T_DIR, 0);
-        // // auto isempty = ep->isEmpty();
-        // // auto dp = fs::Path("/dev/vda2/test").pathCreate(T_DIR, 0);
-        // // isempty = ep->isEmpty();
-        // // fs::Path("/dev/vda2/test").pathRemove();
-        // // isempty = ep->isEmpty();
-        // if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
-        // Log(info,"fat initialize ok");
-        // return statcode::ok;
+        Log(info, "initializing fat\n");
+        int init = fs::rootFSInit();
+        if(init != 0) { panic("fat init failed\n"); }
+        auto curproc = kHartObj().curtask->getProcess();
+        // curproc->cwd = fs::entEnter("/");
+        curproc->cwd = fs::Path("/").pathSearch();
+        curproc->files[3] = make_shared<File>(curproc->cwd,0);
+        // DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
+        shared_ptr<DEntry> ep = fs::Path("/dev").pathCreate(T_DIR, 0);
+        if(ep == nullptr) { panic("create /dev failed\n"); }
+        // ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
+        ep = fs::Path("/dev/vda2").pathCreate(T_DIR, 0);
+        // auto isempty = ep->isEmpty();
+        // auto dp = fs::Path("/dev/vda2/test").pathCreate(T_DIR, 0);
+        // isempty = ep->isEmpty();
+        // fs::Path("/dev/vda2/test").pathRemove();
+        // isempty = ep->isEmpty();
+        if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
+        Log(info,"fat initialize ok");
+        return statcode::ok;
     }
     xlen_t getCwd(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -103,17 +103,17 @@ namespace syscall {
         char path[FAT32_MAX_PATH];
         char *s;  // s为path的元素指针
         // @todo 路径处理过程考虑包装成类
-        if (de->rParent() == nullptr) { s = "/"; } // s为字符串指针，必须指向双引号字符串"/"
+        if (de->getParent() == nullptr) { s = "/"; } // s为字符串指针，必须指向双引号字符串"/"
         else {
             s = path + FAT32_MAX_PATH - 1;
             *s = '\0';
-            for(size_t len; de->rParent() != nullptr;) {
+            for(size_t len; de->getParent() != nullptr;) {
                 len = strlen(de->rName());
                 s -= len;
                 if (s <= path) { return statcode::err; } // can't reach root '/'
                 strncpy(s, de->rName(), len);
                 *(--s) = '/';
-                de = de->rParent();
+                de = de->getParent();
             }
         }
         size_t len = strlen(s)+1;

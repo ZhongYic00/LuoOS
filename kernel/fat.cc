@@ -1,15 +1,11 @@
 #include "fat.hh"
 #include "kernel.hh"
 
-// namespace fat { FileSystem dev_fat[8]; }  //挂载设备集合
 using namespace fat;
 using fs::File;
 // #define moduleLevel LogLevel::trace
 
-// static SuperBlock fat;
 static struct entry_cache { DirEnt entries[ENTRY_CACHE_NUM]; } ecache; // 目录缓冲区
-// static DirEnt root; // 根目录
-// static int mount_num = 0; //表示寻找在挂载集合的下标
 static int bufCopyOut(int user_dst, uint64 dst, void *src, uint64 len) {
     if(user_dst) { kHartObj().curtask->getProcess()->vmar.copyout(dst, klib::ByteArray((uint8_t*)src, len)); }
     else { memmove((void*)dst, src, len); }
@@ -96,7 +92,7 @@ static DirEnt *eCacheAlloc(shared_ptr<SuperBlock> a_spblk = nullptr) {
     return nullptr;
 }
 static void eCacheInit() {
-    for(DirEnt *de = ecache.entries, de2 = ecache.entries+ENTRY_CACHE_NUM-1; de < ecache.entries+ENTRY_CACHE_NUM; ++de) {  // @todo 重构链表操作
+    for(DirEnt *de = ecache.entries, *de2 = ecache.entries+ENTRY_CACHE_NUM-1; de < ecache.entries+ENTRY_CACHE_NUM; ++de) {  // @todo 重构链表操作
         de->spblk = nullptr;
         de->valid = 0;
         de->ref = 0;
@@ -111,30 +107,6 @@ static void eCacheInit() {
     return;
 }
 
-// int fs::rootFSInit() {  // @todo 重构为entMount + eCacheInit
-//     auto buf=bcache[{ 0, 0 }];
-//     DirEnt *root = &(ecache.entries[0]);
-//     *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, 0, root, root);
-//     dev_fat[0] = FileSystem(*buf, true, make_shared<DEntry>(root), false);
-//     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
-//     if (BlockBuf::blockSize != dev_fat[0].rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-//     root->first_clus = root->cur_clus = dev_fat[0].rRC();
-//     // DirEnt *root = dev_fat[0].getRoot();
-//     // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[0].rRC(), 0, dev_fat[0].rRC(), 0, 0, false, 1, 0, 0, nullptr, root, root, 0 };
-//     for(DirEnt *de = ecache.entries + 1; de < ecache.entries + ENTRY_CACHE_NUM; de++) {  // @todo 重构链表操作
-//         de->spblk = nullptr;
-//         de->valid = 0;
-//         de->ref = 0;
-//         de->dirty = false;
-//         de->parent = nullptr;
-//         de->next = root->next;
-//         de->prev = root;
-//         root->next->prev = de;
-//         root->next = de;
-//     }
-//     //将主存的系统存入设备管理
-//     return 0;
-// }
 void LNE::readEntName(char *a_buf) const {
     wchar temp[NELEM(name1)];
     memmove(temp, name1, sizeof(temp));
@@ -170,6 +142,7 @@ DirEnt& DirEnt::operator=(const DirEnt& a_entry) {
     cur_clus = a_entry.cur_clus;
     clus_cnt = a_entry.clus_cnt;
     spblk = a_entry.spblk;
+    mntblk = a_entry.mntblk;
     dirty = a_entry.dirty;
     valid = a_entry.valid;
     ref = a_entry.ref;
@@ -631,37 +604,6 @@ int DirEnt::entUnlink() const {
     }
     return 0;
 }
-// int DEntry::entMount(shared_ptr<DEntry> a_dev) const {
-//     // while(dev_fat[mount_num].isValid()) {
-//     //     ++mount_num;
-//     //     mount_num = mount_num % 8;
-//     // }
-//     uint8 mount_num = dev_table.size();
-//     DirEnt *root = eCacheAlloc(mount_num);
-//     *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, nullptr, root->next, root->prev);
-//     shared_ptr<FileSystem> nfs;
-//     {  // eliminate lifecycle
-//         auto buf = bcache[{ a_dev->getINode()->rDev(), 0 }];
-//         nfs = make_shared<FileSystem>(*buf, true, make_shared<DEntry>(root), true);
-//         root->spblk = nfs->getSpBlk();
-//         dev_table[mount_num] = nfs;
-//     }
-//     // make sure that byts_per_sec has the same value with BlockBuf::blockSize 
-//     if (BlockBuf::blockSize != nfs.rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-//     root->first_clus = root->cur_clus = nfs.rRC();
-//     // DirEnt *root = dev_fat[mount_num].getRoot();
-//     // *root = { {'/','\0'}, ATTR_DIRECTORY|ATTR_SYSTEM, dev_fat[mount_num].rRC(), 0, dev_fat[mount_num].rRC(), 0, mount_num, false, 1, 0, 0, nullptr, root, root, false };
-//     entry->mount_flag = true;
-//     entry->spblk = root->spblk;
-//     return 0;
-// }
-// int DEntry::entUnmount() const {
-//     entry->mount_flag = false;
-//     // memset(&dev_fat[entry->dev], 0, sizeof(dev_fat[entry->dev]));
-//     dev_table.erase(entry->spblk->rDev());
-//     entry->spblk = entry->spblk->getMntParent();
-//     return 0;
-// }
 uint SuperBlock::rwClus(uint32 a_cluster, bool a_iswrite, bool a_usrbuf, uint64 a_buf, uint a_off, uint a_len) const {
     if (a_off + a_len > rBPC()) { panic("offset out of range"); }
     uint tot, m;
@@ -709,19 +651,21 @@ int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
 inline fs::FileSystem *SuperBlock::getFS() const { return fsclass; }
 inline shared_ptr<fs::DEntry> SuperBlock::getRoot() const { return root; }
 inline DirEnt *SuperBlock::getFATRoot() const { return root->rawPtr(); }
-int FileSystem::ldSpBlk(uint8 a_dev) {
+int FileSystem::ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) {
     static bool ecacheinit = true;
     if(ecacheinit) {
         eCacheInit();
         ecacheinit = false;
     }
-    DirEnt *root = eCacheAlloc();
-    *root = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, nullptr, root->next, root->prev);
+    DirEnt *fatroot = eCacheAlloc();
+    *fatroot = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, nullptr, fatroot->next, fatroot->prev);
+    shared_ptr<DEntry> fsroot = make_shared<DEntry>(fatroot);
     {  // eliminate lifecycle
         auto buf = bcache[{ a_dev, 0 }];
-        root->spblk = spblk = make_shared<SuperBlock>(make_shared<DEntry>(root), this, a_dev, *buf);
+        fatroot->spblk = spblk = make_shared<SuperBlock>(fsroot, a_mnt==nullptr ? fsroot : a_mnt, this, a_dev, *buf);
     }
     if (BlockBuf::blockSize != spblk->rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
-    root->first_clus = root->cur_clus = spblk->rRC();
+    fatroot->first_clus = fatroot->cur_clus = spblk->rRC();
+    if(a_mnt != nullptr) { a_mnt->setMntPoint(this); }
     return 0;
 }

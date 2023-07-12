@@ -12,7 +12,9 @@
 // @todo error handling
 using namespace fs;
 
-map<uint8, shared_ptr<FileSystem>> dev_table;
+constexpr uint8 MAX_DEV = 8;
+shared_ptr<FileSystem> dev_table[MAX_DEV];
+static uint8 mount_num = 0;
 
 xlen_t File::write(xlen_t addr,size_t len){
     xlen_t rt=sys::statcode::err;
@@ -125,17 +127,22 @@ void Path::pathBuild() {
     return;
 }
 shared_ptr<DEntry> Path::pathSearch(shared_ptr<File> a_file, bool a_parent) const {  // @todo 改成返回File
-    shared_ptr<DEntry> entry;
+    shared_ptr<DEntry> entry, next;
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
     else if(pathname[0] == '/') { entry = dev_table[0]->getSpBlk()->getRoot(); }  // 绝对路径
     else if(a_file != nullptr) { entry = a_file->obj.ep; }  // 相对路径（指定目录）
     else { entry = kHartObj().curtask->getProcess()->cwd; }  // 相对路径（工作目录）
     for(int i = 0; i < dirnum; ++i) {
+        while(entry->isMntPoint()) { entry = entry->getINode()->getSpBlk()->getRoot(); }
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
         if (a_parent && i == dirnum-1) { return entry; }
-        while(entry->isMntPoint()) { entry = entry->getINode()->getSpBlk()->getRoot(); }
-        shared_ptr<DEntry> next = entry->entSearch(dirname[i]);
+        if(dirname[i] == ".") { next = entry; }
+        else if(dirname[i] == "..") {
+            if(entry->isRoot()) { next = entry->getINode()->getSpBlk()->getMntPoint(); }
+            else { next = entry->getParent(); }
+        }
+        else { next = entry->entSearch(dirname[i]); }
         if (next == nullptr) { return nullptr; }
         entry = next;
     }
@@ -182,6 +189,7 @@ int Path::pathHardLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<
         ino1.reset();
         ino2.reset();
     }
+    // 其它文件系统在此补充
     else {
         printf("unsupported filesystem type\n");
         return -1;
@@ -209,18 +217,21 @@ int Path::pathMount(const Path& a_devpath, string a_fstype) const {
         printf("mountpoint is not a dir\n");
         return -1;
     }
-
-    uint8 mount_num = dev_table.size();
-    if(a_devpath.pathname=="fat32" || a_devpath.pathname=="vfat") {
+    if(mount_num >= MAX_DEV || mount_num < 0) { return -1; }
+    if(a_fstype=="fat32" || a_fstype=="vfat") {
         dev_table[mount_num] = make_shared<fat::FileSystem>(false, mount_num);
-        if(dev_table[mount_num]->ldSpBlk(dev_ep->getINode()->rDev()) == -1) { return -1; }
-        ep->setMntPoint(dev_ep);
+        if(dev_table[mount_num]->ldSpBlk(dev_ep->getINode()->rDev(), ep) == -1) {
+            dev_table[mount_num].reset();
+            return -1;
+        }
     }
+    // 其它文件系统在此补充
     else {
         printf("unsupported filesystem type\n");
         return -1;
     }
-    return 1;
+    ++mount_num;
+    return 0;
 }
 int Path::pathUnmount() const {
     shared_ptr<DEntry> ep = pathSearch();
@@ -234,9 +245,15 @@ int Path::pathUnmount() const {
     }
     uint8 key = ep->getINode()->getSpBlk()->getFS()->rKey();
     shared_ptr<FileSystem> umnt = dev_table[key];
+    if(umnt->isRootFS()) {
+        printf("not allowed\n");
+        return -1;
+    }
     umnt->unInstall();
-    dev_table.erase(key);
+    // dev_table.erase(dev_table.begin() + key);
+    dev_table[key].reset();
     ep->clearMnt();
+    --mount_num;
     return 0;
 }
 // shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
@@ -254,9 +271,14 @@ int Path::pathUnmount() const {
 //     }
 //     return make_shared<File>(ep, a_flags);
 // }
-int rootFSInit() {
-    dev_table[0] = make_shared<fat::FileSystem>(true, 0);
-    if(dev_table[0]->ldSpBlk(0) == -1) { return -1; }
+int fs::rootFSInit() {
+    shared_ptr<FileSystem> tmp = make_shared<fat::FileSystem>(true, 0);
+    dev_table[0] = tmp;
+    if(dev_table[0]->ldSpBlk(0, nullptr) == -1) {
+        dev_table[0].reset();
+        return -1;
+    }
+    ++mount_num;
     return 0;
 }
 

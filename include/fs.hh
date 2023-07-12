@@ -5,7 +5,6 @@
 #include "resmgr.hh"
 #include "linux/fcntl.h"
 #include "error.hh"
-// #include "EASTL/string.h"
 #include "EASTL/map.h"
 
 namespace fs{
@@ -14,7 +13,6 @@ namespace fs{
     using eastl::string;
     using eastl::shared_ptr;
     using eastl::make_shared;
-    using eastl::map;
 
     class DEntry;
     class FileSystem;
@@ -25,10 +23,11 @@ namespace fs{
             SuperBlock(const SuperBlock& a_spblk) = default;
             virtual ~SuperBlock() = default;
             SuperBlock& operator=(const SuperBlock& a_spblk);
-            virtual uint32 rBlkSize() const = 0;
+            virtual uint32 rBlkSize() const = 0;  // 返回块大小
             virtual shared_ptr<DEntry> getRoot() const = 0;  // 返回指向该超级块的根目录项的共享指针
-            virtual FileSystem *getFS() const = 0;
-            virtual bool isValid() const = 0;
+            virtual shared_ptr<DEntry> getMntPoint() const = 0;  // 返回文件系统在父文件系统上的挂载点，如果是根文件系统则返回根目录
+            virtual FileSystem *getFS() const = 0;  // 返回指向该文件系统对象的共享指针
+            virtual bool isValid() const = 0;  // 返回该超级块是否有效（Unmount后失效）
     };
     class FileSystem {
         public:
@@ -37,11 +36,11 @@ namespace fs{
             virtual ~FileSystem() = default;
             FileSystem& operator=(const FileSystem& a_fs) = default;
             virtual string rFSType() const = 0;  // 返回该文件系统的类型
-            virtual uint8 rKey() const = 0;
-            virtual bool isRootFS() const = 0;
+            virtual uint8 rKey() const = 0;  // 返回文件系统在文件系统表中的键值（不同键值的文件系统可以对应同一物理设备/设备号）
+            virtual bool isRootFS() const = 0;  // 返回该文件系统是否为根文件系统
             virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该文件系统超级块的共享指针
-            virtual int ldSpBlk(uint a_dev) = 0;
-            virtual void unInstall() = 0;
+            virtual int ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) = 0;  // 从设备号为a_dev的物理设备上装载该文件系统的超级块，并设挂载点为a_mnt，若a_mnt为nullptr则作为根文件系统装载，返回错误码
+            virtual void unInstall() = 0;  // 卸载该文件系统的超级块
     };
     class INode {
         public:
@@ -49,16 +48,14 @@ namespace fs{
             INode(const INode& a_inode) = default;
             virtual ~INode() = default;  // 需要保证脏数据落盘
             INode& operator=(const INode& a_inode) = default;
-            // virtual shared_ptr<INode> nodCreate(string a_name, int a_attr);  // 在该INode（必须是目录）下创建一个名为a_name、属性为a_attr的文件，返回指向该文件对应INode的共享指针
             virtual void nodRemove() = 0;  // 删除该INode对应的磁盘文件内容
-            // virtual int nodHardLink(shared_ptr<INode> a_inode);  // 硬链接，返回错误码，由pathHardLink区分各文件系统单独调用，不作为统一接口
+            // virtual int nodHardLink(shared_ptr<INode> a_inode);  // 硬链接，返回错误码，由pathHardLink识别各文件系统进行单独调用，不作为统一接口（参数类型不同）
             virtual int nodHardUnlink() = 0;  // 删除硬链接，返回错误码
-            // virtual int nodSoftLink(shared_ptr<INode> a_inode);  // 软链接，返回错误码
-            // virtual int nodSoftUnlink();  // 删除软链接，返回错误码
+            // virtual int nodSoftLink(shared_ptr<INode> a_inode);  // @todo: 软链接，返回错误码
+            // virtual int nodSoftUnlink();  // @todo: 删除软链接，返回错误码
             virtual void nodTrunc() = 0;  // 清空该INode的元信息，并标志该INode为脏
             virtual int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) = 0;  // 从该文件的a_off偏移处开始，读取a_len字节的数据到a_dst处，返回实际读取的字节数
             virtual int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) = 0;  // 从a_src处开始，写入a_len字节的数据到该文件的a_off偏移处，返回实际写入的字节数
-            virtual void setSpBlk(shared_ptr<SuperBlock> a_spblk) = 0;
             virtual uint8 rAttr() const = 0;  // 返回该文件的属性
             virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
             virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
@@ -72,17 +69,15 @@ namespace fs{
             virtual ~DEntry() = default;
             DEntry& operator=(const DEntry& a_entry) = default;
             virtual shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) = 0;  // 在该目录项下(不包含子目录)搜索名为a_dirname的目录项，返回指向目标目录项的共享指针（找不到则返回nullptr）
-            virtual shared_ptr<DEntry> entCreate(string a_name, int a_attr) = 0;
-            // virtual int entMount(shared_ptr<DEntry> a_dev);  // 将该目录项作为挂载点，挂载以a_dev作为根目录项的设备，返回错误码，由pathMount统一管理
-            // virtual int entUnmount();  // 卸载该目录项下挂载的设备，返回错误码，由pathUnmount统一管理
-            virtual void setMntPoint(shared_ptr<fs::DEntry> a_entry) = 0;
-            virtual void clearMnt() = 0;
+            virtual shared_ptr<DEntry> entCreate(string a_name, int a_attr) = 0;  // 在该目录项下以a_attr属性创建名为a_name的文件，返回指向该文件目录项的共享指针
+            virtual void setMntPoint(const FileSystem *a_fs) = 0;  // 设该目录项为a_fs文件系统的挂载点（不更新a_fs）
+            virtual void clearMnt() = 0;  // 清除该目录项的挂载点记录
             virtual const char *rName() const = 0;  // 返回该目录项的文件名
-            virtual shared_ptr<DEntry> rParent() const = 0;  // 返回指向该目录项父目录的共享指针
+            virtual shared_ptr<DEntry> getParent() const = 0;  // 返回指向该目录项父目录的共享指针
             virtual shared_ptr<INode> getINode() const = 0;  // 返回指向该目录项对应INode的共享指针
-            virtual bool isMntPoint() const = 0;
-            virtual bool isEmpty() const = 0;
-            virtual bool isRoot() const = 0;
+            virtual bool isMntPoint() const = 0;  // 返回该目录项是否为一个挂载点
+            virtual bool isEmpty() const = 0;  // 返回该目录项是否为空
+            virtual bool isRoot() const = 0;  // 返回该目录项是否为其所在文件系统的根目录
     };
     enum class FileOp:uint16_t { none=0,read=0x1,write=0x2,append=0x4, };
     union FileOps {
@@ -287,5 +282,4 @@ namespace fs{
     //     struct FileSystem_:private FileSystem{ FileSystem_():FileSystem(){} };
     // }
 }
-extern eastl::map<uint8, eastl::shared_ptr<fs::FileSystem>> dev_table;
 #endif
