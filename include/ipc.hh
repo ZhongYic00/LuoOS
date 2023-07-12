@@ -3,9 +3,12 @@
 #include "common.h"
 #include "klib.hh"
 #include "lock.hh"
-// #include "proc.hh"
+#include <EASTL/bitset.h>
+#include <EASTL/unique_ptr.h>
+
 namespace proc{
     struct Task;
+    struct Process;
 }
 
 namespace pipe{
@@ -55,5 +58,24 @@ namespace pipe{
         void wakeup();
         void sleep();
     };
+}
+namespace signal{
+
+#define SA_RESTORER 1
+    #include <asm-generic/siginfo.h>
+    #include <asm/signal.h>
+
+    using eastl::bitset;
+    using eastl::unique_ptr;
+    using proc::Process;
+    using proc::Task;
+
+    constexpr static int numSignals=32;
+    typedef bitset<numSignals> SignalMask;
+    typedef sigaction SignalAction;
+    typedef siginfo_t SignalInfo;
+    void send(Process &proc,int num,unique_ptr<SignalInfo>& info);
+    void send(Task &task,int num,unique_ptr<SignalInfo>& info);
+    inline SignalMask sigset2bitset(sigset_t set){return set.sig[0];}
 }
 #endif

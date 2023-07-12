@@ -16,6 +16,7 @@ namespace proc
     using sched::prior_t;
     using vm::VMAR;
     using klib::SharedPtr;
+    using namespace signal;
 
     struct Context
     {
@@ -82,6 +83,7 @@ namespace proc
         Tms ti;
         DirEnt *cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
+        SignalAction actions[numSignals];
 
         Process(prior_t prior,tid_t parent);
         Process(tid_t pid,prior_t prior,tid_t parent);
@@ -134,6 +136,9 @@ namespace proc
         KContext kctx;
         const pid_t proc;
         Priv lastpriv;
+        SignalMask block,pendingmask;
+        eastl::unique_ptr<SignalInfo> pending[numSignals];
+        void accept();
         Process *getProcess();
         inline Task(tid_t tid,prior_t pri,tid_t proc):IdManagable(tid),Scheduable(pri),proc(proc),lastpriv(Priv::User){
             ctx.x(2)=UserStackDefault; //x2, sp

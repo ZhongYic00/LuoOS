@@ -17,3 +17,20 @@ namespace pipe
         while(!waiting.empty())waiting.pop_front();
     }
 } // namespace ipc
+
+namespace signal
+{
+    void send(Process &proc,int num,unique_ptr<SignalInfo>& info){
+        for(auto tsk:proc.tasks){
+            if(!tsk->block[num])
+                return send(*tsk,num,info); 
+        }
+    }
+    void send(Task &task,int num,unique_ptr<SignalInfo>& info){
+        if(!task.pending[num]){
+            task.pendingmask[num]=1;
+            task.pending[num]=std::move(info);
+        }
+        return ;
+    }
+} // namespace signal

@@ -173,3 +173,47 @@ int Process::fdAlloc(SharedPtr<File> a_file, int a_fd){ // fd缺省值为-1，�
     }
     return -1;  // 返回错误码
 }
+
+void Task::accept(){
+    int sig=(pendingmask&~block).find_first();
+    if(sig==pendingmask.kSize)return ;
+    pendingmask[sig]=0;
+    auto info=std::move(pending[sig]);
+    /// @todo default kill handler
+    if(sig==SIGKILL) return ;
+    /// @todo default stop handler
+    if(sig==SIGSTOP) return ;
+    auto action=getProcess()->actions[sig];
+    if(action.sa_handler==SIG_ERR);
+    if(action.sa_handler==SIG_DFL);
+    if(action.sa_handler==SIG_IGN) return ;
+    xlen_t signalstack;
+    /// @todo setup signal stack
+
+    if(!action.sa_flags&SA_NODEFER){
+        // prevent nested same signal
+        block[sig]=1;
+    }
+    block|=sigset2bitset(action.sa_mask);
+
+    /// @todo put context
+
+    // handle 
+    if(action.sa_flags&SA_SIGINFO){
+        /// @todo put siginfo
+
+        /// @todo put ucontext
+    }
+#ifdef SA_RESTORER
+    if(action.sa_restorer){
+        ctx.ra()=reinterpret_cast<xlen_t>(action.sa_restorer);
+    } else {
+        /// @todo vDSO sigreturn wrapper
+    }
+#endif
+    // setup args
+    ctx.a0()=sig;
+    if(action.sa_flags&SA_SIGINFO){
+        // args: sig, info, ucontext
+    } else ;// only signum arg
+}
