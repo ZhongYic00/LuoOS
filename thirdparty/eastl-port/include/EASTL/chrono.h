@@ -64,6 +64,8 @@
 		#include <sys/time.h>
 		#include <unistd.h>
 	#endif
+#else
+	#include <time.h>
 #endif
 
 
@@ -618,7 +620,10 @@ namespace chrono
 				return nMicroseconds;
 			#endif
         #else
-			#error "chrono not implemented for platform"
+			// #error "chrono not implemented for platform"
+			uint64_t timerTicks;
+			csrRead(time,timerTicks);
+			return timerTicks;
 		#endif
 		}
 	} // namespace Internal

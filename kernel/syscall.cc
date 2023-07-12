@@ -6,6 +6,8 @@
 #include "TINYSTL/vector.h"
 #include "linux/reboot.h"
 #include "thirdparty/expected.hpp"
+#include <EASTL/chrono.h>
+#include "bio.hh"
 using nonstd::expected;
 
 #define moduleLevel LogLevel::info
@@ -15,12 +17,10 @@ extern void _strapexit();
 extern char _uimg_start;
 namespace syscall {
     using sys::statcode;
-    // using kernel::TimeSpec;
     using kernel::UtSName;
     using fs::File;
     using fs::KStat;
     using fs::DStat;
-    // using fs::DirEnt;
     using fs::DEntry;
     using eastl::shared_ptr;
     using eastl::make_shared;
@@ -34,9 +34,9 @@ namespace syscall {
         return statcode::err;
     }
     xlen_t testBio() {
-        // for(int i=0;i<300;i++){
-        //     auto buf=bcache[{0,i%260}];
-        // }
+        for(int i=0;i<300;i++){
+            auto buf=bcache[{0,i%260}];
+        }
         return statcode::ok;
     }
     xlen_t testIdle() {
@@ -470,14 +470,14 @@ namespace syscall {
     }
     xlen_t getTimeOfDay() {
         auto &ctx = kHartObj().curtask->ctx;
-        struct timespec *a_ts = (struct timespec*)ctx.x(10);
-        if(a_ts == nullptr) { return statcode::err; }
+        auto a_ts = ctx.x(10);
+        if(a_ts == 0) { return statcode::err; }
     
         auto curproc = kHartObj().curtask->getProcess();
-        xlen_t ticks;
-        asm volatile("rdtime %0" : "=r" (ticks) );
+        auto cur=eastl::chrono::system_clock::now();
+        auto ticks=cur.time_since_epoch().count();
         struct timespec ts = { ticks/kernel::CLK_FREQ, ((100000*ticks/kernel::CLK_FREQ)%100000)*10 };
-        curproc->vmar.copyout((xlen_t)a_ts, klib::ByteArray((uint8_t*)&ts, sizeof(ts)));
+        curproc->vmar[a_ts]=ts;
 
         return statcode::ok;
     }
