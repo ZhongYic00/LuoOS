@@ -621,7 +621,7 @@ namespace syscall {
         curproc.vmar.unmap(mapping);
     }
     // xlen_t mprotect(){}
-    int execve(klib::ByteArray buf,tinystl::vector<klib::ByteArray> &args,char **envp){
+    int execve_(klib::ByteArray buf,tinystl::vector<klib::ByteArray> &args,char **envp){
         auto &ctx=kHartObj().curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
         kHartObj().curtask->getProcess()->vmar.reset();
@@ -685,7 +685,7 @@ namespace syscall {
             argv+=sizeof(char*);
         }while(str!=0);
         /// @brief get envs
-        return execve(buf,args,0);
+        return execve_(buf,args,0);
     }
     expected<xlen_t,tinystl::string> reboot(){
         auto &ctx=kHartObj().curtask->ctx;
@@ -704,17 +704,27 @@ namespace syscall {
             return statcode::err;
         }
     }
+    xlen_t setTidAddress(){
+        auto &cur=kHartObj().curtask;
+        auto &ctx=cur->ctx;
+        xlen_t tidptr=ctx.a0();
+        // cur.attrs.clearChildTid=tidptr;
+        return cur->id;
+    }
+const char *syscallHelper[sys::syscalls::nSyscalls];
+#define DECLSYSCALL(x,ptr) syscallPtrs[x]=ptr;syscallHelper[x]=#x;
     void init(){
-        using sys::syscalls;
-        syscallPtrs[syscalls::none]=none;
-        syscallPtrs[syscalls::testexit]=testExit;
-        syscallPtrs[syscalls::testyield]=sysyield;
-        syscallPtrs[syscalls::testwrite]=write;
-        syscallPtrs[syscalls::testbio]=testBio;
-        syscallPtrs[syscalls::testidle]=testIdle;
-        syscallPtrs[syscalls::testmount]=testMount;
-        syscallPtrs[syscalls::testfatinit]=testFATInit;
-        syscallPtrs[syscalls::reboot]=reboot1;
+        using scnum=sys::syscalls;
+        for(int i=0;i<scnum::nSyscalls;i++)syscallHelper[i]="";
+        DECLSYSCALL(scnum::none,none);
+        DECLSYSCALL(scnum::testexit,testExit);
+        DECLSYSCALL(scnum::testyield,sysyield);
+        DECLSYSCALL(scnum::testwrite,write);
+        DECLSYSCALL(scnum::testbio,testBio);
+        DECLSYSCALL(scnum::testidle,testIdle);
+        DECLSYSCALL(scnum::testmount,testMount);
+        DECLSYSCALL(scnum::testfatinit,testFATInit);
+        DECLSYSCALL(scnum::reboot,reboot1);
         // syscallPtrs[SYS_fcntl] = sys_fcntl;
         // syscallPtrs[SYS_ioctl] = sys_ioctl;
         // syscallPtrs[SYS_flock] = sys_flock;
@@ -737,35 +747,36 @@ namespace syscall {
         // syscallPtrs[SYS_vhangup] = sys_vhangup;
         // syscallPtrs[SYS_quotactl] = sys_quotactl;
         // syscallPtrs[SYS_lseek] = sys_lseek;
-        syscallPtrs[syscalls::getcwd] = syscall::getCwd;
-        syscallPtrs[syscalls::dup] = syscall::dup;
-        syscallPtrs[syscalls::dup3] = syscall::dup3;
-        syscallPtrs[syscalls::mkdirat] = syscall::mkDirAt;
-        syscallPtrs[syscalls::linkat] = syscall::linkAt;
-        syscallPtrs[syscalls::unlinkat] = syscall::unlinkAt;
-        syscallPtrs[syscalls::umount2] = syscall::umount2;
-        syscallPtrs[syscalls::mount] = syscall::mount;
-        syscallPtrs[syscalls::chdir] = syscall::chDir;
-        syscallPtrs[syscalls::openat] = syscall::openAt;
-        syscallPtrs[syscalls::close] = syscall::close;
-        syscallPtrs[syscalls::pipe2] = syscall::pipe2;
-        syscallPtrs[syscalls::getdents64] = syscall::getDents64;
-        syscallPtrs[syscalls::read] = syscall::read;
-        syscallPtrs[syscalls::write] = syscall::write;
-        syscallPtrs[syscalls::exit] = syscall::exit;
-        syscallPtrs[syscalls::fstat] = syscall::fStat;
-        syscallPtrs[syscalls::nanosleep] = syscall::nanoSleep;
-        syscallPtrs[syscalls::yield] = syscall::sysyield;
-        syscallPtrs[syscalls::times] = syscall::times;
-        syscallPtrs[syscalls::uname] = syscall::uName;
-        syscallPtrs[syscalls::gettimeofday] = syscall::getTimeOfDay;
-        syscallPtrs[syscalls::getpid] = syscall::getPid;
-        syscallPtrs[syscalls::getppid] = syscall::getPPid;
-        syscallPtrs[syscalls::brk] = syscall::brk;
-        syscallPtrs[syscalls::munmap] = syscall::munmap;
-        syscallPtrs[syscalls::clone] = syscall::clone;
-        syscallPtrs[syscalls::execve] = syscall::execve;
-        syscallPtrs[syscalls::mmap] = syscall::mmap;
-        syscallPtrs[syscalls::wait] = syscall::wait;
+        DECLSYSCALL(scnum::getcwd,getCwd);
+        DECLSYSCALL(scnum::dup,dup);
+        DECLSYSCALL(scnum::dup3,dup3);
+        DECLSYSCALL(scnum::mkdirat,mkDirAt);
+        DECLSYSCALL(scnum::linkat,linkAt);
+        DECLSYSCALL(scnum::unlinkat,unlinkAt);
+        DECLSYSCALL(scnum::umount2,umount2);
+        DECLSYSCALL(scnum::mount,mount);
+        DECLSYSCALL(scnum::chdir,chDir);
+        DECLSYSCALL(scnum::openat,openAt);
+        DECLSYSCALL(scnum::close,close);
+        DECLSYSCALL(scnum::pipe2,pipe2);
+        DECLSYSCALL(scnum::getdents64,getDents64);
+        DECLSYSCALL(scnum::read,read);
+        DECLSYSCALL(scnum::write,write);
+        DECLSYSCALL(scnum::fstat,fStat);
+        DECLSYSCALL(scnum::exit,exit);
+        DECLSYSCALL(scnum::settidaddress,setTidAddress)
+        DECLSYSCALL(scnum::nanosleep,nanoSleep);
+        DECLSYSCALL(scnum::yield,sysyield);
+        DECLSYSCALL(scnum::times,times);
+        DECLSYSCALL(scnum::uname,uName);
+        DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);
+        DECLSYSCALL(scnum::getpid,getPid);
+        DECLSYSCALL(scnum::getppid,getPPid);
+        DECLSYSCALL(scnum::brk,brk);
+        DECLSYSCALL(scnum::munmap,munmap);
+        DECLSYSCALL(scnum::clone,clone);
+        DECLSYSCALL(scnum::execve,execve);
+        DECLSYSCALL(scnum::mmap,mmap);
+        DECLSYSCALL(scnum::wait,wait);
     }
 } // namespace syscall

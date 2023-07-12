@@ -41,6 +41,7 @@ namespace sys
         write=64,
         fstat=80,
         exit=93,
+        settidaddress=96,
         nanosleep=101,
         yield=124,
         reboot=142,
