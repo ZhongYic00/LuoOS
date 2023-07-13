@@ -13,7 +13,7 @@ namespace semaphore
     void Semaphore::rel(){
         count++;
         if(!waiting.empty()){
-            auto front=waiting.pop_front();
+            auto front=waiting.front();waiting.pop_front();
             Log(info,"wakeup%s",front->toString().c_str());
             kGlobObjs->scheduler->wakeup(front);
         }

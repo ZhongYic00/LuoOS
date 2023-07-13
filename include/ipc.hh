@@ -13,7 +13,7 @@ namespace pipe{
     struct Pipe{
         klib::ringbuf<uint8_t> buff;
         semaphore::Semaphore wsem,rsem;
-        klib::list<Task*> waiting;
+        eastl::list<Task*> waiting;
         int wcnt,rcnt;
         Pipe():wsem(64),rsem(0),wcnt(0),rcnt(0){}
         inline void addReader(){rcnt++;}

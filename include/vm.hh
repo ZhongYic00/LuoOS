@@ -206,21 +206,21 @@ namespace vm
             Log(debug,"map %s",mapping.toString().c_str());
             mappings.push_back(mapping);
             pagetable.createMapping(mapping);
-            Log(debug,"after map, VMAR:%s",mappings.toString().c_str());
+            Log(debug,"after map, VMAR:%s",klib::toString(mappings).c_str());
         }
         inline void map(PageNum vpn,PageNum ppn,PageNum pages,perm_t perm,CloneType ct=CloneType::clone){map(PageMapping{vpn,VMO{ppn,pages,ct},perm});}
         inline void unmap(const PageMapping &mapping){
             Log(debug,"unmap %s",mapping.toString().c_str());
             mappings.remove(mapping);
             pagetable.removeMapping(mapping);
-            Log(debug,"after unmap, VMAR:%s",mappings.toString().c_str());
+            Log(debug,"after unmap, VMAR:%s",klib::toString(mappings).c_str());
         }
         inline void reset(){
-            Log(debug,"before reset, VMAR:%s",mappings.toString().c_str());
+            Log(debug,"before reset, VMAR:%s",klib::toString(mappings).c_str());
             tinystl::vector<PageMapping> toremove;
             for(auto mapping:mappings){
                 if(mapping.mapping!=PageMapping::MappingType::normal){
-                    Log(info,"unmap %s",mapping.toString().c_str());
+                    Log(info,"unmap %s",klib::toString(mappings).c_str());
                     toremove.push_back(mapping);
                     pagetable.removeMapping(mapping);
                 }
@@ -228,7 +228,7 @@ namespace vm
             /// @todo better efficiency
             for(auto &mapping:toremove)
                 mappings.remove(mapping);
-            Log(debug,"after reset, VMAR:%s",mappings.toString().c_str());
+            Log(debug,"after reset, VMAR:%s",klib::toString(mappings).c_str());
         }
         inline xlen_t satp(){return PageTable::toSATP(pagetable);}
         // @todo @bug what if region is on border?
@@ -285,12 +285,12 @@ namespace vm
         };
         inline Writer operator[](xlen_t vaddr){return Writer(vaddr,*this);}
         inline void print(){
-            Log(trace,"Mappings:\t%s",mappings.toString().c_str());
+            Log(trace,"Mappings:\t%s",klib::toString(mappings).c_str());
             TRACE(pagetable.print();)
         }
     private:
         // klib::list<VMAR> children;
-        klib::list<PageMapping> mappings;
+        eastl::list<PageMapping> mappings;
         PageTable pagetable;
     };
 

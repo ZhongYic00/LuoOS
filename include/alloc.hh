@@ -5,6 +5,7 @@
 #include "klib.h"
 #include "vm.hh"
 #include "lock.hh"
+#include <EASTL/slist.h>
 // #define DEBUG 1
 namespace alloc
 {
@@ -62,10 +63,18 @@ namespace alloc
         void free(ptr_t ptr);
         ptr_t realloc();
     };
+    using eastl::slist;
+    using eastl::SListNode;
     class HeapMgrGrowable:public HeapMgr{
+        class Allocator{
+        public:
+            explicit Allocator(const char* pName){}
+            void* allocate(size_t n, int flags = 0);
+            void* allocate(size_t n, size_t alignment, size_t offset, int flags = 0);
+            void  deallocate(void* p, size_t n);
+        };
         LockedObject<PageMgr>& pmgr;
-        klib::list<Span> dynPages;
-        klib::ListNode<Span> *reservedNode;
+        slist<Span,Allocator> dynPages;
         int growsize;
         void growHeap() override;
     public:

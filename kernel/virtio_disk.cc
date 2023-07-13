@@ -22,7 +22,7 @@ namespace syscall
 } // namespace syscall
 
 
-klib::list<proc::Task*> waiting;
+eastl::list<proc::Task*> waiting;
 
 static struct disk {
  // memory for virtio descriptors &c for queue 0.
@@ -143,7 +143,10 @@ free_desc(int i)
     panic("virtio_disk_intr 2");
   disk.desc[i].addr = 0;
   disk.free[i] = 1;
-  while(!waiting.empty())kGlobObjs->scheduler->wakeup(waiting.pop_front());
+  while(!waiting.empty()){
+    kGlobObjs->scheduler->wakeup(waiting.front());
+    waiting.pop_front();
+  }
 }
 
 // free a chain of descriptors.

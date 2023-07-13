@@ -20,37 +20,39 @@ HeapMgr::~HeapMgr(){}
 void HeapMgrGrowable::growHeap(){
     Log(warning,"growHeap(growsize=%d)\n",growsize);
     Span newSpan={pmgr->alloc(growsize),growsize};
-    reservedNode->data=newSpan;
+    dynPages.front()=newSpan;
     ptr_t newPool=(ptr_t)vm::pn2addr(newSpan.first);
     tlsf_add_pool(newPool,growsize*vm::pageSize);
-    dynPages.push_back(reservedNode);
-    reservedNode=(klib::ListNode<Span>*)(alloc(sizeof(klib::ListNode<Span>)));
+    dynPages.push_front({0,0});
     DBG(
-        Log(debug,"newPool=%p reservedNode=%p\n",newPool,reservedNode);
+        Log(debug,"newPool=%p\n",newPool);
         tlsf_walk_pool(newPool);
     )
 }
 HeapMgrGrowable::HeapMgrGrowable(ptr_t addr,xlen_t len,LockedObject<PageMgr> &pmgr):HeapMgr(addr,len),pmgr(pmgr),growsize(32){
-    reservedNode=(klib::ListNode<Span>*)(alloc(sizeof(klib::ListNode<Span>)));
+    dynPages.push_front({0,0});
 }
 HeapMgrGrowable::HeapMgrGrowable(HeapMgr &other,LockedObject<PageMgr> &pmgr):pmgr(pmgr),HeapMgr(other),growsize(32){
-    reservedNode=(klib::ListNode<Span>*)(alloc(sizeof(klib::ListNode<Span>)));
+    dynPages.push_front({0,0});
 }
 HeapMgrGrowable::~HeapMgrGrowable(){
     DBG(Log(debug,"%s()\n",__func__);)
     // DBG(
         Log(debug,"pool=%p\n",pool);
         tlsf_walk_pool(pool);
-        if(!dynPages.empty())for(auto node=dynPages.head;node->iter.next!=nullptr;node=node->iter.next){
-            tlsf_walk_pool((ptr_t)vm::pn2addr(node->data.first));
+        if(!dynPages.empty())for(auto span:dynPages){
+            tlsf_walk_pool((ptr_t)vm::pn2addr(span.first));
         }
     // )
     while(!dynPages.empty()){
-        auto span=dynPages.pop_front();
+        auto span=dynPages.front();dynPages.pop_front();
         // pmgr.free(span.first,klib::log2up(span.second));
         DBG(Log(debug,"0x%lx %d\n",span.first,span.second);)
     }
 }
+void* HeapMgrGrowable::Allocator::allocate(size_t n, int flags){return tlsf_malloc(n);}
+void* HeapMgrGrowable::Allocator::allocate(size_t n, size_t alignment, size_t offset, int flags){return tlsf_memalign(alignment,n);}
+void  HeapMgrGrowable::Allocator::deallocate(void* p, size_t n){return tlsf_free(p);}
 
 ptr_t HeapMgr::alloc(xlen_t size){
     if(size==0)return nullptr;

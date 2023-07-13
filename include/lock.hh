@@ -12,7 +12,7 @@ namespace semaphore
     class Semaphore{
         /// @todo use atomic
         int count;
-        klib::list<proc::Task*> waiting;
+        eastl::list<proc::Task*> waiting;
     public:
         Semaphore(int init=1):count(init){}
         void req();
@@ -29,6 +29,7 @@ namespace mutex
     public:
         spinlock():spin(0),count(0){}
         bool lock(){
+            Log(debug,"lock(%p,%d,%d)",this,spin.load());
             /// @todo optimize, use normal read to reduce buslock overhead
             /// @todo use thread class here
             atomic_base_t lockedby;
@@ -54,7 +55,7 @@ again:      atomic_base_t expected=0;
         }
         void unlock(){
             if(!reentrantalbe || count==0)spin.store(0);
-            Log(debug,"unlock(%p,%d)",this,count,spin.load());
+            Log(debug,"unlock(%p,%d)",this,spin.load());
         }
     };
 
