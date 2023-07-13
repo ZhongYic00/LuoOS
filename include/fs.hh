@@ -5,7 +5,7 @@
 #include "resmgr.hh"
 #include "linux/fcntl.h"
 #include "error.hh"
-#include "EASTL/map.h"
+#include "EASTL/unordered_map.h"
 
 namespace fs{
     using pipe::Pipe;
@@ -13,6 +13,7 @@ namespace fs{
     using eastl::string;
     using eastl::shared_ptr;
     using eastl::make_shared;
+    using eastl::unordered_map;
 
     class DEntry;
     class FileSystem;
@@ -204,6 +205,21 @@ namespace fs{
             ~KStat() = default;
 
 	};
+    class MntTable {
+        private:
+            unordered_map<string, shared_ptr<FileSystem>> mnt_table;
+        public:
+            MntTable() = default;
+            MntTable(const MntTable& a_table) = default;
+            ~MntTable() = default;
+            MntTable& operator=(const MntTable& a_table) = default;
+            auto operator[](string a_str) { return mnt_table[a_str]; }
+            auto emplace(string a_str, shared_ptr<FileSystem> a_fs) { return mnt_table.emplace(a_str, a_fs); }
+            auto erase(string a_str) { return mnt_table.erase(a_str); }
+            auto empty() { return mnt_table.empty(); }
+            auto size() { return mnt_table.size(); }
+            auto clear() { return mnt_table.clear(); }
+    };
     int rootFSInit();
 
     // namespace internal{

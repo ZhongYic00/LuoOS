@@ -13,6 +13,7 @@
 using namespace fs;
 
 constexpr uint8 MAX_DEV = 8;
+MntTable mnt_table;
 shared_ptr<FileSystem> dev_table[MAX_DEV];
 static uint8 mount_num = 0;
 
@@ -272,6 +273,7 @@ int Path::pathUnmount() const {
 //     return make_shared<File>(ep, a_flags);
 // }
 int fs::rootFSInit() {
+    new ((void*)&mnt_table) MntTable();
     shared_ptr<FileSystem> tmp = make_shared<fat::FileSystem>(true, 0);
     dev_table[0] = tmp;
     if(dev_table[0]->ldSpBlk(0, nullptr) == -1) {

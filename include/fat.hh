@@ -10,7 +10,7 @@ namespace fat {
     using eastl::string;
     using eastl::shared_ptr;
     using eastl::make_shared;
-    
+    extern fs::MntTable mnt_table;
     extern shared_ptr<fs::FileSystem> dev_table[8];
     class FileSystem;
     class DirEnt;
