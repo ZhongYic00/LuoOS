@@ -37,7 +37,7 @@ namespace fs{
             virtual ~FileSystem() = default;
             FileSystem& operator=(const FileSystem& a_fs) = default;
             virtual string rFSType() const = 0;  // 返回该文件系统的类型
-            virtual uint8 rKey() const = 0;  // 返回文件系统在文件系统表中的键值（不同键值的文件系统可以对应同一物理设备/设备号）
+            virtual string rKey() const = 0;  // 返回文件系统在挂载表中的键值（不同键值的文件系统可以对应同一物理设备/设备号）
             virtual bool isRootFS() const = 0;  // 返回该文件系统是否为根文件系统
             virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该文件系统超级块的共享指针
             virtual int ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) = 0;  // 从设备号为a_dev的物理设备上装载该文件系统的超级块，并设挂载点为a_mnt，若a_mnt为nullptr则作为根文件系统装载，返回错误码
@@ -125,26 +125,23 @@ namespace fs{
         private:
             string pathname;
             vector<string> dirname;
+            shared_ptr<DEntry> base;
         public:
             Path() = default;
             Path(const Path& a_path) = default;
-            Path(const string& a_str):pathname(a_str), dirname() { pathBuild(); }
-            Path(const char *a_str):pathname(a_str), dirname() { pathBuild(); }
+            Path(const string& a_str, shared_ptr<File> a_base = nullptr):pathname(a_str), dirname(), base() { pathBuild(); }
+            Path(const char *a_str, shared_ptr<File> a_base = nullptr):pathname(a_str), dirname(), base() { pathBuild(); }
             ~Path() = default;
             Path& operator=(const Path& a_path) = default;
             void pathBuild();
-            shared_ptr<DEntry> pathSearch(shared_ptr<File> a_file, bool a_parent) const;  // @todo 返回值改为File类型
-            inline shared_ptr<DEntry> pathSearch(shared_ptr<File> a_file) const { return pathSearch(a_file, false); }
-            inline shared_ptr<DEntry> pathSearch(bool a_parent) const { return pathSearch(nullptr, a_parent); }
-            inline shared_ptr<DEntry> pathSearch() const { return pathSearch(nullptr, false); }
-            shared_ptr<DEntry> pathCreate(short a_type, int a_mode, shared_ptr<File> a_file = nullptr) const;
-            int pathRemove(shared_ptr<File> a_file = nullptr) const;
-            int pathHardLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const;
-            inline int pathHardLink(const Path& a_newpath, shared_ptr<File> a_f2) const { return pathHardLink(nullptr, a_newpath, a_f2); }
-            inline int pathHardLink(shared_ptr<File> a_f1, const Path& a_newpath) const { return pathHardLink(a_f1, a_newpath, nullptr); }
-            inline int pathHardLink(const Path& a_newpath) const { return pathHardLink(nullptr, a_newpath, nullptr); }
-            int pathHardUnlink(shared_ptr<File> a_file = nullptr) const;
-            int pathMount(const Path& a_devpath, string a_fstype) const;
+            string pathAbsolute() const;
+            shared_ptr<DEntry> pathHitTable();
+            shared_ptr<DEntry> pathSearch(bool a_parent = false);
+            shared_ptr<DEntry> pathCreate(short a_type, int a_mode);
+            int pathRemove();
+            int pathHardLink(Path a_newpath);
+            int pathHardUnlink();
+            int pathMount(Path a_devpath, string a_fstype);
             int pathUnmount() const;
             // shared_ptr<File> pathOpen(int a_flags, shared_ptr<File> a_file) const;
             // inline shared_ptr<File> pathOpen(shared_ptr<File> a_file) const { return pathOpen(0, a_file); }
@@ -214,11 +211,14 @@ namespace fs{
             ~MntTable() = default;
             MntTable& operator=(const MntTable& a_table) = default;
             auto operator[](string a_str) { return mnt_table[a_str]; }
+            auto find(string a_str) { return mnt_table.find(a_str); }
             auto emplace(string a_str, shared_ptr<FileSystem> a_fs) { return mnt_table.emplace(a_str, a_fs); }
             auto erase(string a_str) { return mnt_table.erase(a_str); }
             auto empty() { return mnt_table.empty(); }
             auto size() { return mnt_table.size(); }
             auto clear() { return mnt_table.clear(); }
+            auto end() { return mnt_table.end(); }
+            unordered_map<string, shared_ptr<FileSystem>>& getTable() { return mnt_table; }
     };
     int rootFSInit();
 

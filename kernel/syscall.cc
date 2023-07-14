@@ -19,6 +19,7 @@ namespace syscall {
     using sys::statcode;
     using kernel::UtSName;
     using fs::File;
+    using fs::Path;
     using fs::KStat;
     using fs::DStat;
     using fs::DEntry;
@@ -44,11 +45,11 @@ namespace syscall {
     }
     xlen_t testMount() {
         // int rt = fs::rootFSInit();
-        // kHartObj().curtask->getProcess()->cwd = fs::Path("/").pathSearch();
+        // kHartObj().curtask->getProcess()->cwd = Path("/").pathSearch();
         // printf("0x%lx\n", kHartObj().curtask->getProcess()->cwd);
         // shared_ptr<File> f;
         // // auto testfile = fs::pathCreateAt("/testfile", T_FILE, O_CREATE|O_RDWR, f);
-        // auto testfile = fs::Path("/testfile").pathCreate(T_FILE, O_CREATE|O_RDWR, f);
+        // auto testfile = Path("/testfile").pathCreate(T_FILE, O_CREATE|O_RDWR, f);
         // assert(rt == 0);
         // Log(info, "pathCreateAt success\n---------------------------------------------------------");
         // klib::string content = "test write";
@@ -56,7 +57,7 @@ namespace syscall {
         // assert(rt == content.size());
         // testfile->entRelse();
         // Log(info, "entWrite success\n---------------------------------------------------------");
-        // testfile = fs::Path("/testfile").pathSearch(f);
+        // testfile = Path("/testfile").pathSearch(f);
         // char buf[2 * content.size()];
         // rt = testfile->entRead(false, (xlen_t)buf, 0, content.size());
         // assert(rt == content.size());
@@ -72,18 +73,13 @@ namespace syscall {
         if(init != 0) { panic("fat init failed\n"); }
         auto curproc = kHartObj().curtask->getProcess();
         // curproc->cwd = fs::entEnter("/");
-        curproc->cwd = fs::Path("/").pathSearch();
+        curproc->cwd = Path("/").pathSearch();
         curproc->files[3] = make_shared<File>(curproc->cwd,0);
         // DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
-        shared_ptr<DEntry> ep = fs::Path("/dev").pathCreate(T_DIR, 0);
+        shared_ptr<DEntry> ep = Path("/dev").pathCreate(T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
         // ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
-        ep = fs::Path("/dev/vda2").pathCreate(T_DIR, 0);
-        // auto isempty = ep->isEmpty();
-        // auto dp = fs::Path("/dev/vda2/test").pathCreate(T_DIR, 0);
-        // isempty = ep->isEmpty();
-        // fs::Path("/dev/vda2/test").pathRemove();
-        // isempty = ep->isEmpty();
+        ep = Path("/dev/vda2").pathCreate(T_DIR, 0);
         if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
         Log(info,"fat initialize ok");
         return statcode::ok;
@@ -163,7 +159,7 @@ namespace syscall {
         char *path = (char*)patharr.buff;
         shared_ptr<File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; }
-        shared_ptr<DEntry> ep = fs::Path(path).pathCreate(T_DIR, 0, f);
+        shared_ptr<DEntry> ep = Path(path, f).pathCreate(T_DIR, 0);
         if(ep == nullptr) {
             printf("can't create %s\n", path);
             return statcode::err;
@@ -185,7 +181,7 @@ namespace syscall {
         shared_ptr<File> f;
         if(*path != '/') { f = curproc->files[a_dirfd]; } // 非绝对路径
 
-        return fs::Path(path).pathHardUnlink(f);
+        return Path(path, f).pathHardUnlink();
     }
     xlen_t linkAt(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -208,7 +204,7 @@ namespace syscall {
         if(*newpath != '/') { f2 = curproc->files[a_newdirfd]; }
 
         // return fs::entLink(oldpath, f1, newpath, f2);
-        return fs::Path(oldpath).pathHardLink(f1, newpath, f2);
+        return Path(oldpath, f1).pathHardLink(Path(newpath, f2));
     }
     xlen_t umount2(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -219,18 +215,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray devpatharr = curproc->vmar.copyinstr((xlen_t)a_devpath, FAT32_MAX_PATH);
         char *devpath = (char*)devpatharr.buff;
-        // if(strncmp("/",devpath,2) == 0) {
-        //     printf("path error\n");
-        //     return statcode::err;
-        // }
-        // // DirEnt *ep = fs::entEnter(devpath);
-        // shared_ptr<DEntry> ep = fs::Path(devpath).pathSearch();
-        // if(ep == nullptr) {
-        //     printf("not found file\n");
-        //     return statcode::err;
-        // }
-        // return ep->entUnmount();
-        return fs::Path(devpath).pathUnmount();
+        return Path(devpath).pathUnmount();
     }
     xlen_t mount() {
         auto &ctx = kHartObj().curtask->ctx;
@@ -248,32 +233,7 @@ namespace syscall {
         char *devpath = (char*)devpatharr.buff;
         char *mountpath = (char*)mountpatharr.buff;
         char *fstype = (char*)fstypearr.buff;
-        // if(strncmp("/",mountpath,2) == 0) { //mountpoint not allowed the root
-        //     printf("not allowed\n");
-        //     return statcode::err;
-        // }
-        // if ((strncmp("vfat",FileSystem,5)!=0) && (strncmp("fat32",FileSystem,6)!=0)) {
-        //     printf("the FileSystem is not fat32\n");
-        //     return statcode::err;
-        // }
-        // // DirEnt *dev_ep = fs::entEnter(devpath);
-        // // DirEnt *ep = fs::entEnter(mountpath);
-        // shared_ptr<DEntry> dev_ep = fs::Path(devpath).pathSearch();
-        // shared_ptr<DEntry> ep = fs::Path(mountpath).pathSearch();
-        // if(dev_ep == nullptr) {
-        //     printf("dev not found file\n");
-        //     return statcode::err;
-        // }
-        // if(ep == nullptr) {
-        //     printf("mount not found file\n");
-        //     return statcode::err;
-        // }
-        // if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)) {
-        //     printf("mountpoint is not a dir\n");
-        //     return statcode::err;
-        // }
-        // return ep->entMount(dev_ep);
-        return fs::Path(mountpath).pathMount(devpath, fstype);
+        return Path(mountpath).pathMount(devpath, fstype);
     }
     xlen_t chDir(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -284,7 +244,7 @@ namespace syscall {
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
         // DirEnt *ep = fs::entEnter(path);
-        shared_ptr<DEntry> ep = fs::Path(path).pathSearch();
+        shared_ptr<DEntry> ep = Path(path).pathSearch();
         if(ep == nullptr) { return statcode::err; }
         if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)){ return statcode::err; }
 
@@ -312,12 +272,12 @@ namespace syscall {
 
         if(a_flags & O_CREATE) {
             // ep = fs::pathCreateAt(path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
-            ep = fs::Path(path).pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
+            ep = Path(path, f2).pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags);
             if(ep == nullptr) { return statcode::err; }
         }
         else {
             // if((ep = fs::entEnterFrom(path, f2)) == nullptr) { return statcode::err; }
-            if((ep = fs::Path(path).pathSearch(f2)) == nullptr) { return statcode::err; }
+            if((ep = Path(path, f2).pathSearch()) == nullptr) { return statcode::err; }
             if((ep->getINode()->rAttr()&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
                 printf("dir can't write\n");
                 return statcode::err;
@@ -651,7 +611,7 @@ namespace syscall {
 
         Log(debug,"execve(path=%s,)",path);
         // auto Ent=fs::entEnter(path);
-        shared_ptr<DEntry> Ent=fs::Path(path).pathSearch();
+        shared_ptr<DEntry> Ent=Path(path).pathSearch();
         auto file=make_shared<File>(Ent,fs::FileOp::read);
         auto buf=file->read(Ent->getINode()->rFileSize());
         // auto buf=klib::ByteArray{0};
