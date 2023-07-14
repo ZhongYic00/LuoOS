@@ -235,14 +235,15 @@ namespace vm
         inline klib::ByteArray copyinstr(xlen_t addr, size_t len) {
             // @todo 检查用户源是否越界（addr+len来自用户进程大小之外的空间）
             xlen_t paddr = pagetable.transaddr(addr);
-            char buff[len];
-            strncpy(buff, (char*)paddr, len);
-            return klib::ByteArray((uint8_t*)buff, strlen(buff)+1);
+            auto buf=klib::ByteArray(len+1);
+            strncpy((char*)buf.buff, (char*)paddr, len);
+            buf.buff[len]='\0';
+            return buf;
         }
         inline klib::ByteArray copyin(xlen_t addr,size_t len){
             // @todo 检查用户源是否越界（addr+len来自用户进程大小之外的空间）
             xlen_t paddr=pagetable.transaddr(addr);
-            klib::ByteArray buff((uint8_t*)paddr,len);
+            auto buff=klib::ByteArray::from(paddr,len);
             return buff;
         }
         inline void copyout(xlen_t addr,const klib::ByteArray &buff){

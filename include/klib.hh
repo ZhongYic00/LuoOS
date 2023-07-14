@@ -106,12 +106,22 @@ namespace klib
     T *buff;
     // @todo @bug lacks destructor
     ArrayBuff(size_t len):len(len){buff=new T[len];}
-    ArrayBuff(T* addr,size_t len):ArrayBuff(len){
-      memcpy(buff,addr,len*sizeof(T));
+    // ArrayBuff(ArrayBuff& other):buff(other.buff){}
+    /// @bug mem leak!
+    // ~ArrayBuff(){
+    //   if(buff)delete[] buff;
+    // }
+    ArrayBuff(T* addr,size_t len):buff(addr),len(len){}
+    inline static ArrayBuff<T> from(xlen_t addr,size_t len){
+      ArrayBuff<T> rt(len);
+      memcpy(rt.buff,(ptr_t)addr,len*sizeof(T));
+      return rt;
     }
     template<typename T1>
     ArrayBuff<T1> toArrayBuff(){
-      return ArrayBuff<T1>{reinterpret_cast<T1*>(buff),len*(sizeof(T)/sizeof(T1))};
+      auto rt=ArrayBuff<T1>{reinterpret_cast<T1*>(buff),len*(sizeof(T)/sizeof(T1))};
+      buff=nullptr;
+      return rt;
     }
     class iterator{
       T* ptr;

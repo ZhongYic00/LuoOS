@@ -62,7 +62,7 @@ klib::ByteArray File::read(size_t len, long a_off, bool a_update){
             if((rdbytes = obj.ep->getINode()->nodRead(false, (uint64)buf.buff, a_off, len)) > 0) {
                 if(a_update) { off = a_off + rdbytes; }
             }
-            return klib::ByteArray(buf.buff, rdbytes);
+            return klib::ByteArray::from((xlen_t)buf.buff, rdbytes);
             break;
         }
         default:
