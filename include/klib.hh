@@ -15,10 +15,10 @@
 namespace klib
 {
   using eastl::string;
-  template<typename T>
-  inline T min(T a,T b){ return a<b?a:b; }
-  template<typename T>
-  inline T max(T a,T b){ return (a>b?a:b); }
+  template<typename T1,typename T2>
+  inline auto min(T1 a,T2 b){ return a<b?a:b; }
+  template<typename T1,typename T2>
+  inline auto max(T1 a,T2 b){ return (a>b?a:b); }
   inline int log2up(xlen_t a){
     int i=0,r=0;
     for(i=0;a>1;a>>=1,i++)r|=a&1;
