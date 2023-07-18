@@ -13,7 +13,7 @@
 using namespace fs;
 
 constexpr uint8 MAX_DEV = 8;
-shared_ptr<FileSystem> dev_table[MAX_DEV];
+MntTable mnt_table;
 static uint8 mount_num = 0;
 
 xlen_t File::write(xlen_t addr,size_t len){
@@ -99,6 +99,7 @@ File::~File() {
     }
 }
 void Path::pathBuild() {
+    if(base == nullptr) { base = kHartObj().curtask->getProcess()->cwd; }
     size_t len = pathname.length();
     if(len > 0) {  // 保证数组长度不为0
         auto ind = new size_t[len][2] { { 0, 0 } };
@@ -126,30 +127,58 @@ void Path::pathBuild() {
     }
     return;
 }
-shared_ptr<DEntry> Path::pathSearch(shared_ptr<File> a_file, bool a_parent) const {  // @todo 改成返回File
+string Path::pathAbsolute() const {
+    vector<string> name_abs = dirname;
+    for(shared_ptr<DEntry> entry = base; (!entry->isRoot())||(!entry->getINode()->getSpBlk()->getFS()->isRootFS()); entry = entry->getParent()) { name_abs.emplace(name_abs.begin(), entry->rName()); }
+    string path_abs = "";
+    for(string name : name_abs) { path_abs = path_abs + "/" + name; }
+    return path_abs;
+}
+shared_ptr<DEntry> Path::pathHitTable() {
+    string path_abs = pathAbsolute();
+    size_t len = path_abs.size();
+    size_t longest = 0;
+    string longest_prefix = "";
+    for(auto tbl : mnt_table.getTable()) {
+        string prefix = tbl.first;
+        size_t len_prefix = prefix.size();
+        if(len>=len_prefix && len_prefix>longest && path_abs.compare(0, len_prefix, prefix)==0) {
+            longest = len_prefix;
+            longest_prefix = prefix;
+        }
+    }
+    if(longest > 0) {  // 最长前缀
+        shared_ptr<DEntry> entry = mnt_table[longest_prefix]->getSpBlk()->getRoot();
+        base = entry;
+        pathname = path_abs.substr(longest);
+        pathBuild();
+        return entry;
+    }
+    else { return nullptr; }
+}
+shared_ptr<DEntry> Path::pathSearch(bool a_parent) {
+    if(pathname == "/") { return mnt_table["/"]->getSpBlk()->getRoot(); }  // 防止初始化进程时循环依赖cwd
     shared_ptr<DEntry> entry, next;
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
-    else if(pathname[0] == '/') { entry = dev_table[0]->getSpBlk()->getRoot(); }  // 绝对路径
-    else if(a_file != nullptr) { entry = a_file->obj.ep; }  // 相对路径（指定目录）
-    else { entry = kHartObj().curtask->getProcess()->cwd; }  // 相对路径（工作目录）
+    else if((entry=pathHitTable()) != nullptr) {}  // 查挂载表，若查到则起始目录存到entry中
+    else if(pathname[0] == '/') { entry = mnt_table["/"]->getSpBlk()->getRoot(); }  // 绝对路径
+    else if(base != nullptr) { entry = base; }  // 相对路径（指定目录）
+    // else { entry = kHartObj().curtask->getProcess()->cwd; }  // 相对路径（工作目录）
     for(int i = 0; i < dirnum; ++i) {
         while(entry->isMntPoint()) { entry = entry->getINode()->getSpBlk()->getRoot(); }
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
         if (a_parent && i == dirnum-1) { return entry; }
         if(dirname[i] == ".") { next = entry; }
-        else if(dirname[i] == "..") {
-            if(entry->isRoot()) { next = entry->getINode()->getSpBlk()->getMntPoint(); }
-            else { next = entry->getParent(); }
-        }
+        else if(dirname[i] == "..") { next = entry->getParent(); }
         else { next = entry->entSearch(dirname[i]); }
         if (next == nullptr) { return nullptr; }
         entry = next;
     }
     return entry;
 }
-shared_ptr<DEntry> Path::pathCreate(short a_type, int a_mode, shared_ptr<File> a_file) const {  // @todo 改成返回File
-    shared_ptr<DEntry> dp = pathSearch(a_file, true);
+shared_ptr<DEntry> Path::pathCreate(short a_type, int a_mode) {  // @todo 改成返回File
+    shared_ptr<DEntry> dp = pathSearch(true);
     if(dp == nullptr){
         printf("can't find dir\n");
         return nullptr;
@@ -162,16 +191,16 @@ shared_ptr<DEntry> Path::pathCreate(short a_type, int a_mode, shared_ptr<File> a
     if ((a_type==T_DIR && !(ep->getINode()->rAttr()&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->getINode()->rAttr()&ATTR_DIRECTORY))) { return nullptr; }
     return ep;
 }
-int Path::pathRemove(shared_ptr<File> a_file) const {
-    shared_ptr<DEntry> ep = pathSearch(a_file);
+int Path::pathRemove() {
+    shared_ptr<DEntry> ep = pathSearch();
     if(ep == nullptr) { return -1; }
     if((ep->getINode()->rAttr() & ATTR_DIRECTORY) && !ep->isEmpty()) { return -1; }
     ep->getINode()->nodRemove();
     return 0;
 }
-int Path::pathHardLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<File> a_f2) const {
-    shared_ptr<INode> ino1 = pathSearch(a_f1)->getINode();
-    shared_ptr<INode> ino2 = a_newpath.pathSearch(a_f2)->getINode();
+int Path::pathHardLink(Path a_newpath) {
+    shared_ptr<INode> ino1 = pathSearch()->getINode();
+    shared_ptr<INode> ino2 = a_newpath.pathSearch()->getINode();
     if(ino1==nullptr || ino2==nullptr) {
         printf("can't find dir\n");
         return -1;
@@ -196,13 +225,13 @@ int Path::pathHardLink(shared_ptr<File> a_f1, const Path& a_newpath, shared_ptr<
     }
     return 0;
 }
-int Path::pathHardUnlink(shared_ptr<File> a_file) const {
-    shared_ptr<DEntry> dp = pathSearch(a_file);
+int Path::pathHardUnlink() {
+    shared_ptr<DEntry> dp = pathSearch();
     if(dp == nullptr) { return -1; }
     if(dp->getINode()->nodHardUnlink() == -1) { return -1; }
-    return pathRemove(a_file);
+    return pathRemove();
 }
-int Path::pathMount(const Path& a_devpath, string a_fstype) const {
+int Path::pathMount(Path a_devpath, string a_fstype) {
     shared_ptr<DEntry> ep = pathSearch();
     shared_ptr<DEntry> dev_ep = a_devpath.pathSearch();
     if(ep==nullptr || dev_ep==nullptr) {
@@ -217,11 +246,12 @@ int Path::pathMount(const Path& a_devpath, string a_fstype) const {
         printf("mountpoint is not a dir\n");
         return -1;
     }
-    if(mount_num >= MAX_DEV || mount_num < 0) { return -1; }
     if(a_fstype=="fat32" || a_fstype=="vfat") {
-        dev_table[mount_num] = make_shared<fat::FileSystem>(false, mount_num);
-        if(dev_table[mount_num]->ldSpBlk(dev_ep->getINode()->rDev(), ep) == -1) {
-            dev_table[mount_num].reset();
+        string path_abs = pathAbsolute();
+        shared_ptr<fat::FileSystem> fatfs = make_shared<fat::FileSystem>(false, path_abs);
+        mnt_table.emplace(path_abs, fatfs);
+        if(fatfs->ldSpBlk(dev_ep->getINode()->rDev(), ep) == -1) {
+            mnt_table[path_abs].reset();
             return -1;
         }
     }
@@ -230,30 +260,20 @@ int Path::pathMount(const Path& a_devpath, string a_fstype) const {
         printf("unsupported filesystem type\n");
         return -1;
     }
-    ++mount_num;
     return 0;
 }
 int Path::pathUnmount() const {
-    shared_ptr<DEntry> ep = pathSearch();
-    if(ep == nullptr) {
-        printf("not found file\n");
-        return -1;
-    }
-    if(ep->isRoot() || !ep->isMntPoint()) {
-        printf("not allowed\n");
-        return -1;
-    }
-    uint8 key = ep->getINode()->getSpBlk()->getFS()->rKey();
-    shared_ptr<FileSystem> umnt = dev_table[key];
+    string path_abs = pathAbsolute();
+    shared_ptr<FileSystem> umnt = mnt_table[path_abs];
     if(umnt->isRootFS()) {
         printf("not allowed\n");
         return -1;
     }
+    shared_ptr<DEntry> mnt_point = umnt->getSpBlk()->getMntPoint();
     umnt->unInstall();
-    // dev_table.erase(dev_table.begin() + key);
-    dev_table[key].reset();
-    ep->clearMnt();
-    --mount_num;
+    mnt_table[path_abs].reset();
+    mnt_table.erase(path_abs);
+    // mnt_point->clearMnt();
     return 0;
 }
 // shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
@@ -272,13 +292,13 @@ int Path::pathUnmount() const {
 //     return make_shared<File>(ep, a_flags);
 // }
 int fs::rootFSInit() {
-    shared_ptr<FileSystem> tmp = make_shared<fat::FileSystem>(true, 0);
-    dev_table[0] = tmp;
-    if(dev_table[0]->ldSpBlk(0, nullptr) == -1) {
-        dev_table[0].reset();
+    new ((void*)&mnt_table) MntTable();
+    shared_ptr<FileSystem> rootfs = make_shared<fat::FileSystem>(true, "/");
+    mnt_table.emplace("/", rootfs);
+    if(rootfs->ldSpBlk(0, nullptr) == -1) {
+        mnt_table["/"].reset();
         return -1;
     }
-    ++mount_num;
     return 0;
 }
 

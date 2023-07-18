@@ -10,8 +10,7 @@ namespace fat {
     using eastl::string;
     using eastl::shared_ptr;
     using eastl::make_shared;
-    
-    extern shared_ptr<fs::FileSystem> dev_table[8];
+    extern fs::MntTable mnt_table;
     class FileSystem;
     class DirEnt;
     class DEntry;
@@ -82,27 +81,27 @@ namespace fat {
             inline fs::FileSystem *getFS() const;
             inline DirEnt *getFATRoot() const;
             inline bool isValid() const { return valid; }
-            inline void unInstall() { valid = false; }
+            void unInstall();
     };
     class FileSystem:public fs::FileSystem {
         private:
             string fstype;  // 文件系统类型
             shared_ptr<SuperBlock> spblk;  // 超级块
             bool isroot;  //是否是根文件系统
-            uint8 key;
+            string key;
         public:
             FileSystem() = default;
             FileSystem(const FileSystem& a_fs) = default;
             // FileSystem(shared_ptr<SuperBlock> a_spblk, bool a_isroot, uint8 a_key):fs::FileSystem(), fstype("fat32"), spblk(a_spblk), isroot(a_isroot), key(a_key) {}
-            FileSystem(bool a_isroot, uint8 a_key):fs::FileSystem(), fstype("fat32"), spblk(nullptr), isroot(a_isroot), key(a_key) {}
+            FileSystem(bool a_isroot, string a_key):fs::FileSystem(), fstype("fat32"), spblk(nullptr), isroot(a_isroot), key(a_key) {}
             ~FileSystem() = default;
             FileSystem& operator=(const FileSystem& a_fs) = default;
             inline string rFSType() const { return fstype; }
-            inline uint8 rKey() const { return key; }
+            inline string rKey() const { return key; }
             inline bool isRootFS() const { return isroot; }
             inline shared_ptr<fs::SuperBlock> getSpBlk() const { return spblk; }
             int ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt);
-            inline void unInstall() { spblk->unInstall(); }
+            void unInstall();
     };
     typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）
@@ -208,6 +207,7 @@ namespace fat {
             inline int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) { nodPanic(); return entry->entRead(a_usrdst, a_dst, a_off, a_len); }
             inline int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) { nodPanic(); return entry->entWrite(a_usrsrc, a_src, a_off, a_len); }
             inline void setMntBlk(shared_ptr<fs::SuperBlock> a_spblk) { nodPanic(); entry->mntblk = a_spblk; }
+            inline void unInstall() { nodPanic(); entry->entRelse(); entry->spblk.reset(); entry->mntblk.reset(); entry = nullptr; }
             inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
             inline uint8 rDev() const { nodPanic(); return entry->spblk->rDev(); }
             inline uint32 rFileSize() const { nodPanic(); return entry->file_size; }
@@ -234,8 +234,9 @@ namespace fat {
             inline shared_ptr<fs::DEntry> entCreate(string a_name, int a_attr) { dEPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
             inline void setMntPoint(const fs::FileSystem *a_fs) { dEPanic(); entry->mount_flag = true; inode->setMntBlk(a_fs->getSpBlk()); }
             inline void clearMnt() { dEPanic(); entry->mount_flag = false; inode->setMntBlk(inode->rawPtr()->spblk); }
+            inline void unInstall() { dEPanic(); entry->entRelse(); entry = nullptr; inode->unInstall(); inode.reset(); }
             inline const char *rName() const { dEPanic(); return entry->filename; }
-            inline shared_ptr<fs::DEntry> getParent() const { dEPanic(); return entry->parent==nullptr ? nullptr : make_shared<DEntry>(entry->parent); }
+            inline shared_ptr<fs::DEntry> getParent() const { dEPanic(); return entry->parent==nullptr ? inode->getSpBlk()->getMntPoint() : make_shared<DEntry>(entry->parent); }
             inline shared_ptr<fs::INode> getINode() const { return inode; }
             inline bool isMntPoint() const { dEPanic(); return entry->mount_flag; }
             inline bool isRoot() const { dEPanic(); return inode->rawPtr()->parent == nullptr; }

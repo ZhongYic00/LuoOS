@@ -170,14 +170,14 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         attribute = li.de.sne.attr;
     }
-    // @todo 判断移到Path中
-    // '.'表示当前目录，则增加当前目录引用计数并返回当前目录
-    if (a_dirname == ".") { return entDup(); }
-    // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
-    else if (a_dirname == "..") {
-        if (this == spblk->getFATRoot()) { return this; }
-        else { return parent->entDup(); }
-    }
+    // // @todo 判断移到Path中
+    // // '.'表示当前目录，则增加当前目录引用计数并返回当前目录
+    // if (a_dirname == ".") { return entDup(); }
+    // // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
+    // else if (a_dirname == "..") {
+    //     if (this == spblk->getFATRoot()) { return this; }
+    //     else { return parent->entDup(); }
+    // }
     // 当前目录无效
     if (valid != 1) {
         printf("valid is not 1\n");
@@ -651,6 +651,14 @@ int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
 inline fs::FileSystem *SuperBlock::getFS() const { return fsclass; }
 inline shared_ptr<fs::DEntry> SuperBlock::getRoot() const { return root; }
 inline DirEnt *SuperBlock::getFATRoot() const { return root->rawPtr(); }
+void SuperBlock::unInstall() {
+    valid = false;
+    root->unInstall();
+    root.reset();
+    mnt_point->clearMnt();
+    mnt_point.reset();
+    return;
+}
 int FileSystem::ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) {
     static bool ecacheinit = true;
     if(ecacheinit) {
@@ -668,4 +676,9 @@ int FileSystem::ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) {
     fatroot->first_clus = fatroot->cur_clus = spblk->rRC();
     if(a_mnt != nullptr) { a_mnt->setMntPoint(this); }
     return 0;
+}
+void FileSystem::unInstall() {
+    spblk->unInstall();
+    spblk.reset();
+    return;
 }
