@@ -32,6 +32,7 @@ namespace vm
         inline Arc<VMO> clone() const override{
             auto rt=make_shared<VMOPaged>(*this);
             rt->pager=make_shared<SwapPager>(pager);
+            return rt;
         }
     };
 
@@ -53,6 +54,7 @@ namespace vm
             /// @bug alloc alligned but free unaligend
             auto rt=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(pages_),pages_);
             copyframes(ppn_,rt->ppn(),rt->len());
+            return rt;
         }
     };
 

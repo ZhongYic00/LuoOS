@@ -178,7 +178,7 @@ namespace vm
         inline klib::string toString(){return toString(root,0l,1l<<18);}
         inline void print(){
             Log(debug,"PageTable::print(root=%p)\n",root);
-            Log(trace,"%s",toString().c_str());
+            Log(info,"%s",toString().c_str());
         }
         static xlen_t toSATP(PageTable &table);
     };
@@ -243,6 +243,7 @@ namespace vm
                 } else it++;
             }
             Log(debug,"after reset, VMAR:%s",klib::toString(mappings).c_str());
+            TRACE(print();)
         }
         inline xlen_t satp(){return PageTable::toSATP(pagetable);}
         // @todo @bug what if region is on border?
@@ -300,8 +301,8 @@ namespace vm
         };
         inline Writer operator[](xlen_t vaddr){return Writer(vaddr,*this);}
         inline void print(){
-            Log(trace,"Mappings:\t%s",klib::toString(mappings).c_str());
-            TRACE(pagetable.print();)
+            Log(info,"Mappings:\t%s",klib::toString(mappings).c_str());
+            pagetable.print();
         }
     private:
         // klib::list<VMAR> children;

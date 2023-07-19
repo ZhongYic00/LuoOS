@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.hh"
 
-#define moduleLevel LogLevel::info
+// #define moduleLevel LogLevel::debug
 
 static hook_t hooks[]={schedule};
 
@@ -187,9 +187,9 @@ void _strapexit(){
         csrClear(sstatus,1l<<csr::mstatus::spp);
         csrSet(sstatus,BIT(csr::mstatus::spie));
         csrWrite(stvec,strapwrapper);
-        // if(cur->ctx.pc<0x100000)
-        //     prevs0--;
         csrWrite(satp,kHartObj().curtask->kctx.satp);
+        if(cur->ctx.pc<0x100000)
+            prevs0--;
         ExecInst(sfence.vma);
         register xlen_t t6 asm("t6");
         csrRead(sscratch,t6);

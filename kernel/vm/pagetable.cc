@@ -148,6 +148,7 @@ namespace vm
         // return reinterpret_cast<pgtbl_t>(aligned_alloc(pageSize,pageSize));
         // auto rt=reinterpret_cast<pgtbl_t>(new PageTableNode);
         auto rt=reinterpret_cast<pgtbl_t>(vm::pn2addr(kGlobObjs->pageMgr->alloc(1)));
+        memset(rt,0,sizeof(PageTableNode));
         Log(debug,"createPTNode=0x%lx",rt);
         return rt;
     }
