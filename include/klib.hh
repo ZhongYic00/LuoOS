@@ -100,6 +100,14 @@ namespace klib
     s+="\t]\n";
     return s;
   }
+  template<typename Container>
+  string toString(const Container &l){
+    string s="<container>[";
+    for(auto &item:l)
+      s+=item.toString()+",";
+    s+="\t]\n";
+    return s;
+  }
   template<typename T>
   struct ArrayBuff{
     size_t len;
@@ -182,12 +190,26 @@ namespace klib
   typedef ArrayBuff<uint8_t> ByteArray;
 
   template<typename T>
-  using SharedPtr=::eastl::shared_ptr<T>;
+  struct Segment{
+    T l,r;
+    Segment operator&(const Segment &other){
+      return Segment{max(l,other.l),min(r,other.r)};
+    }
+    constexpr explicit operator bool() const noexcept{l<=r;}
+    inline constexpr T length() const{return r-l+1;}
+  };
   /*
     SharedPtr, by Ct_Unvs
     SharedPtr只能用于动态对象，且SharedPtr本身不应使用new创建
   */
 } // namespace klib
+
+using eastl::shared_ptr;
+using eastl::make_shared;
+using eastl::unique_ptr;
+using eastl::make_unique;
+template<typename T>
+using Arc=eastl::shared_ptr<T>;
 
 static klib::ringbuf<char> buf;
 

@@ -80,40 +80,24 @@ PageMgr::PageMgr(PageNum start,PageNum end):start(start),end(end){
         Log(debug,"PageMgr(start=%lx,end=%lx)\n",start,end);
     )
     xlen_t pages=end-start;
-/* freelist+pageheap version, not accomplished
-    for(int k=0;k<maxOrder && pages;pages>>=1,k++){
-        DBG(Log(debug,"k=%d,pages=0x%lx\n",k,pages);)
-        if(pages&1){
-            auto node=reinterpret_cast<klib::ListNode<Span>*>(vm::pn2addr(start));
-            DBG(Log(debug,"node@0x%lx\n",start);)
-            node->data=(Span){start,1l<<k};
-            freelist[k].push_back(node);
-            start+=1l<<k;
-        }
-    }
-    DBG(
-    for(int k=0;k<maxOrder;k++){
-        Log(debug,"freelist[%d]:\n",k);
-        freelist[k].print(printSpan);
-    })
-    assert(start==end);
-*/
     rootOrder=klib::log2up(pages);
     buddyTreeSize=(1l<<rootOrder)*2-1;
     // DBG(Log(debug,"pages=%d order=%d rootOrder=%ld buddyTreeSize=%ld\n",pages,rootOrder,rootOrder,buddyTreeSize);)
     buddyNodes=new uint8_t[buddyTreeSize];
     for(xlen_t i=1;i<buddyTreeSize;i++)buddyNodes[i]=0;
-    {xlen_t base=start;
-    for(int i=rootOrder;i>=0;i--){
-        if((pages>>i)&1){
-            free(base,i);
-            base+=(1l<<i);
-        }
-    }}
+    freeUnaligned(start,pages);
     DBG(
         // this->print();
         Log(debug,"PageMgr::PageMgr() over\n");
     )
+}
+void PageMgr::freeUnaligned(PageNum ppn,PageNum pages){
+    for(int i=rootOrder;i>=0;i--){
+        if((pages>>i)&1){
+            free(ppn,i);
+            ppn+=(1l<<i);
+        }
+    }
 }
 PageMgr::~PageMgr(){ delete[] buddyNodes; }
 

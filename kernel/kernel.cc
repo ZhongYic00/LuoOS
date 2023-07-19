@@ -10,17 +10,29 @@
 #include "virtio.hh"
 #include "fs.hh"
 #include "fs/ramfs.hh"
+#include "vm/vmo.hh"
 
 #define moduleLevel LogLevel::info
 
 extern char _kstack_end;
 xlen_t kstack_end=(xlen_t)&_kstack_end;
 kernel::KernelHartObjs kHartObjs[8];
+extern char _text_start,_text_end;
+extern char _rodata_start,_rodata_end;
+extern char _data_start,_data_end;
+extern char _bss_start,_bss_end;
+extern char _frames_start,_frames_end;
 extern char _kstack_start,_kstack_end;
 kernel::KernelInfo kInfo={
     .segments={
         .dev=(vm::segment_t){0x0,0x40000000},
-        .kstack=vm::segment_t{(xlen_t)&_kstack_start,(xlen_t)&_kstack_end}
+        .text={(xlen_t)&_text_start,(xlen_t)&_text_end},
+        .rodata={(xlen_t)&_rodata_start,(xlen_t)&_rodata_end},
+        .data={(xlen_t)&_data_start,(xlen_t)&_data_end},
+        .kstack=vm::segment_t{(xlen_t)&_kstack_start,(xlen_t)&_kstack_end},
+        .bss={(xlen_t)&_bss_start,(xlen_t)&_bss_end},
+        .frames={(xlen_t)&_frames_start,(xlen_t)&_frames_end},
+        .ramdisk={0x84000000,0x84200000}
     }
 };
 using vm::pgtbl_t,vm::PageTable;
@@ -79,13 +91,15 @@ static void plicInit(){
 
 // __attribute__((section("init")))
 void kernel::createKernelMapping( vm::VMAR &vmar){
-    using perm=vm::PageTableEntry::fieldMasks;
-    { auto &seg=kInfo.segments.text;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::x,vm::VMO::CloneType::shared);}
-    DBG(vmar.print();)
-    { auto &seg=kInfo.segments.rodata;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r,vm::VMO::CloneType::shared);}
-    { auto &seg=kInfo.segments.kstack;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w,vm::VMO::CloneType::shared);}
-    { auto &seg=kInfo.segments.data;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w,vm::VMO::CloneType::shared);}
-    { auto &seg=kInfo.segments.bss;vmar.map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,perm::v|perm::r|perm::w,vm::VMO::CloneType::shared);}
+    using namespace vm;
+    using perm=PageTableEntry::fieldMasks;
+    using mapping=PageMapping::MappingType;
+    using sharing=PageMapping::SharingType;
+    { auto &seg=kInfo.segments.text;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.text,perm::v|perm::r|perm::x,mapping::system,sharing::shared});}
+    { auto &seg=kInfo.segments.rodata;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.rodata,perm::v|perm::r,mapping::system,sharing::shared});}
+    { auto &seg=kInfo.segments.kstack;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.kstack,perm::v|perm::r|perm::w,mapping::system,sharing::shared});}
+    { auto &seg=kInfo.segments.data;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.data,perm::v|perm::r|perm::w,mapping::system,sharing::shared});}
+    { auto &seg=kInfo.segments.bss;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.bss,perm::v|perm::r|perm::w,mapping::system,sharing::shared});}
 }
 kernel::KernelGlobalObjs::KernelGlobalObjs():
     heapMgr(pool,sizeof(pool),pageMgr),
@@ -99,23 +113,27 @@ static void memInit(){
     satp.asid=0;
     satp.ppn=vm::addr2pn((xlen_t)kernelPageTableRoot);
     auto kGlobObjsInternal=new ((void*)kObjsBuf.kGlobObjsBuf) kernel::KernelGlobalObjs();
-    // new ((void*)&kGlobObjs) kernel::KernelGlobalObjsRef(*kGlobObjsInternal);
-    // kGlobObjs.pageMgr=(alloc::PageMgr*)kObjsBuf.kPageMgrBuf;
-    // kGlobObjs.heapMgr=(alloc::HeapMgr*)kObjsBuf.kHeapMgrBuf;
-    // kGlobObjs.vmar=(vm::VMAR*)kObjsBuf.kVMARBuf;
-    // new ((void*)&kObjsBuf.kHeapMgrBuf) alloc::HeapMgr(pool,sizeof(pool));
-    // new ((void*)&kObjsBuf.kPageMgrBuf) alloc::PageMgr(vm::addr2pn(kInfo.segments.frames.first),vm::addr2pn(kInfo.segments.frames.second));
-    // kGlobObjs.heapMgr=new alloc::HeapMgrGrowable(*kGlobObjs.heapMgr,*kGlobObjs.pageMgr);
-    // new ((void*)&kObjsBuf.kVMARBuf) vm::VMAR({},kernelPageTableRoot);
-    // kGlobObjs.vmar->map(0,vm::addr2pn(0x00000000),3*0x40000,0xcf); // naive direct mapping
-    using perm=vm::PageTableEntry::fieldMasks;
+    using namespace vm;
+    using perm=PageTableEntry::fieldMasks;
+    using mapping=PageMapping::MappingType;
+    using sharing=PageMapping::SharingType;
+    using namespace vm;
+    { auto &seg=kInfo.segments.text;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.text=make_shared<VMOContiguous>(st,pages);}
+    { auto &seg=kInfo.segments.rodata;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.rodata=make_shared<VMOContiguous>(st,pages);}
+    { auto &seg=kInfo.segments.kstack;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.kstack=make_shared<VMOContiguous>(st,pages);}
+    { auto &seg=kInfo.segments.data;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.data=make_shared<VMOContiguous>(st,pages);}
+    { auto &seg=kInfo.segments.bss;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.bss=make_shared<VMOContiguous>(st,pages);}
     kernel::createKernelMapping(*(kGlobObjs->vmar.get()));
-    { auto &seg=kInfo.segments.dev; kGlobObjs->vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
-    { auto &seg=kInfo.segments.frames; kGlobObjs->vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
-    { auto seg=(vm::segment_t){0x84000000,0x84200000}; kGlobObjs->vmar->map(vm::addr2pn(seg.first),vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first),perm::v|perm::r|perm::w);}
+    { auto &seg=kInfo.segments.dev;
+        kInfo.vmos.dev=make_shared<VMOContiguous>(addr2pn(seg.first),addr2pn(seg.second-seg.first+1));
+        kGlobObjs->vmar->map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first+1),0,kInfo.vmos.dev,perm::v|perm::r|perm::w, mapping::anon,sharing::privt });}
+    { auto &seg=kInfo.segments.frames;
+        kInfo.vmos.frames=make_shared<VMOContiguous>(addr2pn(seg.first),addr2pn(seg.second-seg.first+1));
+        kGlobObjs->vmar->map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first+1),0,kInfo.vmos.frames,perm::v|perm::r|perm::w,mapping::anon,sharing::privt });}
+    { auto &seg=kInfo.segments.ramdisk;
+        kInfo.vmos.ramdisk=make_shared<VMOContiguous>(addr2pn(seg.first),addr2pn(seg.second-seg.first+1));
+        kGlobObjs->vmar->map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first+1),0,kInfo.vmos.ramdisk,perm::v|perm::r|perm::w,mapping::anon,sharing::privt });}
 
-    // kernel::KernelGlobalObjsRef ref(kGlobObjs);
-    // ref->ksatp=1;
     kGlobObjs->vmar->print();
     Log(info,"is about to enable kernel vm");
     csrWrite(satp,kGlobObjs->ksatp=satp.value());
@@ -123,18 +141,6 @@ static void memInit(){
     Log(info,"kernel vm enabled, memInit success");
 }
 static void infoInit(){
-    extern char _text_start,_text_end;
-    extern char _rodata_start,_rodata_end;
-    extern char _data_start,_data_end;
-    extern char _bss_start,_bss_end;
-    extern char _frames_start,_frames_end;
-    extern char _kstack_start,_kstack_end;
-    kInfo.segments.text={(xlen_t)&_text_start,(xlen_t)&_text_end};
-    kInfo.segments.rodata={(xlen_t)&_rodata_start,(xlen_t)&_rodata_end};
-    kInfo.segments.data={(xlen_t)&_data_start,(xlen_t)&_data_end};
-    kInfo.segments.kstack={(xlen_t)&_kstack_start,(xlen_t)&_kstack_end};
-    kInfo.segments.bss={(xlen_t)&_bss_start,(xlen_t)&_bss_end};
-    kInfo.segments.frames={(xlen_t)&_frames_start,(xlen_t)&_frames_end};
     for(int i=0;i<sizeof(kInfo.segments)/sizeof(kInfo.segments.bss);i++){
         Log(info,"{0x%lx 0x%lx}",*(((vm::segment_t*)&kInfo.segments)+i));
     }

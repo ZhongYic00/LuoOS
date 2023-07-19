@@ -4,6 +4,7 @@
 #include "common.h"
 #include "rvcsr.hh"
 #include "vm.hh"
+#include "vm/pcache.hh"
 #include "alloc.hh"
 #include "sched.hh"
 #include "proc.hh"
@@ -102,14 +103,11 @@ namespace kernel {
     struct KernelInfo{
         using segment_t=vm::segment_t;
         struct KSegments{
-            segment_t dev;
-            segment_t text;
-            segment_t rodata;
-            segment_t data;
-            segment_t kstack;
-            segment_t bss;
-            segment_t frames;
+            segment_t dev,text,rodata,data,kstack,bss,frames,ramdisk;
         }segments;
+        struct KVMOs{
+            Arc<vm::VMO> dev,text,rodata,data,kstack,bss,frames,ramdisk;
+        }vmos;
     };
     struct KernelGlobalObjs{
         mutex::LockedObject<alloc::HeapMgrGrowable,spinlock<false>> heapMgr;
@@ -118,6 +116,7 @@ namespace kernel {
         mutex::LockedObject<sched::Scheduler,spinlock<false>> scheduler;
         mutex::LockedObject<proc::TaskManager,spinlock<false>> taskMgr;
         mutex::LockedObject<proc::ProcManager,spinlock<false>> procMgr;
+        vm::PageCacheMgr pageCache;
         xlen_t ksatp;
         xlen_t prevsatp;
         KernelGlobalObjs();

@@ -1,6 +1,7 @@
 #include "proc.hh"
 #include "rvcsr.hh"
 #include "kernel.hh"
+#include "vm/vmo.hh"
 
 using namespace proc;
 // #define moduleLevel LogLevel::info
@@ -11,7 +12,9 @@ Process::Process(prior_t prior,tid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
     auto ustack=UserStackDefault;
     using perm=vm::PageTableEntry::fieldMasks;
-    vmar.map(vm::addr2pn(ustack),kGlobObjs->pageMgr->alloc(1),1,perm::r|perm::w|perm::u|perm::v);
+    using namespace vm;
+    auto vmo=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(1),1);
+    vmar.map(PageMapping{vm::addr2pn(ustack),1,0,vmo,perm::r|perm::w|perm::u|perm::v,PageMapping::MappingType::system,PageMapping::SharingType::privt});
     return ustack;
 }
 auto Process::newTrapframe(){
@@ -19,8 +22,10 @@ auto Process::newTrapframe(){
     xlen_t ppn=kGlobObjs->pageMgr->alloc(TrapframePages);
     auto vaddr=vm::pn2addr(ppn);
     using perm=vm::PageTableEntry::fieldMasks;
+    using namespace vm;
     /// @todo vaddr should be in specific region?
-    vmar.map(vm::addr2pn(vaddr),ppn,1,perm::r|perm::w|perm::u|perm::v,vm::VMO::CloneType::alloc);
+    auto vmo=make_shared<VMOContiguous>(ppn,TrapframePages);
+    vmar.map(PageMapping{vm::addr2pn(vaddr),TrapframePages,0,vmo,perm::r|perm::w|perm::u|perm::v,PageMapping::MappingType::system,PageMapping::SharingType::privt});
     return eastl::make_tuple(vaddr,vm::pn2addr(ppn));
 }
 
@@ -53,6 +58,24 @@ Task* Process::newTask(const Task &other,bool allocStack){
     addTask(thrd);
     kGlobObjs->scheduler->add(thrd);
     return thrd;
+}
+xlen_t Process::brk(xlen_t addr){
+    Log(info,"brk %lx",addr);
+    if(addr>=UserHeapTop||addr<=UserHeapBottom)return heapTop;
+    if(vmar.contains(addr))return heapTop=addr;
+    else {
+        /// @todo free redundant vmar
+        /// @brief alloc new vmar
+        using namespace vm;
+        xlen_t curtop=bytes2pages(heapTop),
+            destop=bytes2pages(addr),
+            pages=destop-curtop;
+        Log(info,"curtop=%x,destop=%x, needs to alloc %d pages",curtop,destop,pages);
+        auto vmo=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(pages),pages);
+        using perm=PageTableEntry::fieldMasks;
+        vmar.map(PageMapping{curtop,pages,0,vmo,perm::r|perm::w|perm::x|perm::u|perm::v,PageMapping::MappingType::anon,PageMapping::SharingType::privt});
+        return heapTop=addr;
+    }
 }
 
 template<typename ...Ts>

@@ -103,24 +103,7 @@ namespace proc
         void print();
         int fdAlloc(shared_ptr<File> a_file, int a_fd=-1);
         /// @todo rtval
-        inline xlen_t brk(xlen_t addr){
-            Log(info,"brk %lx",addr);
-            if(addr>=UserHeapTop||addr<=UserHeapBottom)return heapTop;
-            if(vmar.contains(addr))return heapTop=addr;
-            else {
-                /// @todo free redundant vmar
-                /// @brief alloc new vmar
-                using namespace vm;
-                xlen_t curtop=bytes2pages(heapTop),
-                    destop=bytes2pages(addr),
-                    pages=destop-curtop;
-                Log(info,"curtop=%x,destop=%x, needs to alloc %d pages",curtop,destop,pages);
-                auto vmo=VMO::alloc(pages);
-                using perm=PageTableEntry::fieldMasks;
-                vmar.map(PageMapping{curtop,vmo,perm::r|perm::w|perm::x|perm::u|perm::v,PageMapping::MappingType::anon});
-                return heapTop=addr;
-            }
-        }
+        xlen_t brk(xlen_t addr);
         void exit(int status);
         void zombieExit();
     private:

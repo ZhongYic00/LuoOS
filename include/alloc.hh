@@ -20,23 +20,18 @@ namespace alloc
         inline void print(){
             Log(debug,"buddy: |"); for(xlen_t i=0;i<buddyTreeSize;i++)Log(debug,"%d | ",buddyNodes[i]-1);Log(debug,"\n");
         }
+        void freeUnaligned(PageNum ppn,PageNum pages);
     private:
-        // void split();
-        // void merge();
         inline constexpr xlen_t lsub(xlen_t x){return ((x+1)<<1)-1;}
         inline constexpr xlen_t rsub(xlen_t x){return ((x+1)<<1);}
         inline constexpr xlen_t prnt(xlen_t x){return ((x+1)>>1)-1;}
-        // inline constexpr xlen_t lsib(xlen_t x){return x-1;}
-        // inline constexpr xlen_t rsib(xlen_t x){return x+1;}
         inline xlen_t pos2node(xlen_t pos,int order){
             DBG(assert(((pos>>rootOrder)&1)==0);)
             xlen_t nd=0;
             for(int size=rootOrder-1;size>=order;size-=1){
                 if((pos>>size)&1)nd=rsub(nd);
                 else nd=lsub(nd);
-                // DBG(printf("%ld ",nd);)
             }
-            // DBG(printf("\n");)
             return nd;
         }
 

@@ -8,6 +8,7 @@
 #include "thirdparty/expected.hpp"
 #include <EASTL/chrono.h>
 #include "bio.hh"
+#include "vm/vmo.hh"
 using nonstd::expected;
 
 #define moduleLevel LogLevel::info
@@ -571,18 +572,19 @@ namespace syscall {
         else vpn=choose();
         pages = bytes2pages(len);
         // initialize vmo
-        auto vmo=VMO::alloc(pages);
+        auto vmo=make_shared<vm::VMOContiguous>(kGlobObjs->pageMgr->alloc(pages),pages);
         /// @todo register for shared mapping
         /// @todo copy content to vmo
         if(fd!=-1){
             auto file=curproc.ofile(fd);
             auto bytes=file->read(len, 0, false);
-            memmove((ptr_t)pn2addr(vmo.ppn()),bytes.buff,bytes.len);
+            memmove((ptr_t)pn2addr(vmo->ppn()),bytes.buff,bytes.len);
         }
         // actual map
+        /// @todo fix flags
         auto mappingType= fd==-1 ?PageMapping::MappingType::file : PageMapping::MappingType::anon;
         auto sharingType=(PageMapping::SharingType)(flags>>8);
-        curproc.vmar.map(PageMapping{vpn,vmo,PageMapping::prot2perm((PageMapping::Prot)prot),mappingType,sharingType});
+        curproc.vmar.map(PageMapping{vpn,pages,0,vmo,PageMapping::prot2perm((PageMapping::Prot)prot),mappingType,sharingType});
         // return val
         return pn2addr(vpn);
     }
@@ -601,7 +603,7 @@ namespace syscall {
             /// @todo addr in mapping?
             return mapping.vpn==addr;
         });
-        curproc.vmar.unmap(mapping);
+        curproc.vmar.unmap(mapping.vsegment());
     }
     // xlen_t mprotect(){}
     int execve_(klib::ByteArray buf,tinystl::vector<klib::ByteArray> &args,char **envp){
