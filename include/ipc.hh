@@ -76,8 +76,9 @@ namespace signal{
     typedef sigaction SignalAction;
     typedef sigset_t SigSet;
     typedef siginfo_t SignalInfo;
-    void send(Process &proc,int num,unique_ptr<SignalInfo>& info);
-    void send(Task &task,int num,unique_ptr<SignalInfo>& info);
+    static unique_ptr<SignalInfo> defaultInfo(nullptr);
+    void send(Process &proc,int num,unique_ptr<SignalInfo>& info = defaultInfo);
+    void send(Task &task,int num,unique_ptr<SignalInfo>& info = defaultInfo);
     inline SignalMask sigset2bitset(SigSet set){return set.sig[0];}
     xlen_t doSigAction(int a_sig, SignalAction *a_act, SignalAction *a_oact);
     xlen_t doSigProcMask(int a_how, SigSet *a_nset, SigSet *a_oset, size_t a_sigsetsize);

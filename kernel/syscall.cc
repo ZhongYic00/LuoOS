@@ -29,6 +29,7 @@ namespace syscall {
     using signal::SigSet;
     using signal::doSigAction;
     using signal::doSigProcMask;
+    using signal::send;
     // 前向引用
     void yield();
     xlen_t none() { return 0; }
@@ -408,6 +409,36 @@ namespace syscall {
         yield();
         return statcode::ok;
     }
+    xlen_t kill() {
+        auto &ctx = kHartObj().curtask->ctx;
+        pid_t pid = ctx.x(10);
+        int sig = ctx.x(11);
+
+        if(pid == 0) { pid = kHartObj().curtask->getProcess()->pid(); } // FIXME: process group
+        if(pid < -1) { pid = -pid; } // FIXME: process group
+        if(pid > 0) {
+            auto proc = (**kGlobObjs->procMgr)[pid];
+            if (proc == nullptr) { statcode::err; }
+            if (sig == 0) { statcode::ok; }
+            send(*proc, sig);
+            return statcode::ok;
+        }
+        if(pid == -1) {
+            if(sig == 0) { return statcode::ok; }
+            bool success = false;
+            auto procs = (**kGlobObjs->procMgr);
+            int procsnum = procs.getObjNum();
+            for (int i = 0; i < procsnum; ++i) {
+                auto it = procs[i];
+                if (it->pid() != 1) {
+                    success = true;
+                    send(*it, sig);
+                }
+            }
+            return success ? statcode::ok : statcode::err;
+        }
+        return statcode::ok;
+    }
     xlen_t sigAction() {
         auto &ctx = kHartObj().curtask->ctx;
         int sig = ctx.x(10);
@@ -731,6 +762,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::settidaddress,setTidAddress)
         DECLSYSCALL(scnum::nanosleep,nanoSleep);
         DECLSYSCALL(scnum::yield,sysyield);
+        DECLSYSCALL(scnum::kill,kill);
         DECLSYSCALL(scnum::sigaction,sigAction);
         DECLSYSCALL(scnum::sigprocmask,sigProcMask);
         DECLSYSCALL(scnum::times,times);
