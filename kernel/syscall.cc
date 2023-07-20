@@ -26,7 +26,9 @@ namespace syscall {
     using eastl::shared_ptr;
     using eastl::make_shared;
     using signal::SignalAction;
+    using signal::SigSet;
     using signal::doSigAction;
+    using signal::doSigProcMask;
     // 前向引用
     void yield();
     xlen_t none() { return 0; }
@@ -414,6 +416,15 @@ namespace syscall {
 
         return doSigAction(sig, act, oact);
     }
+    xlen_t sigProcMask() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int how = ctx.x(10);
+        SigSet *nset = (SigSet*)ctx.x(11);
+        SigSet *oset = (SigSet*)ctx.x(12);
+        size_t sigsetsize = ctx.x(13);
+
+        return doSigProcMask(how, nset, oset, sigsetsize);
+    }
     xlen_t times(void) {
         auto &ctx = kHartObj().curtask->ctx;
         proc::Tms *a_tms = (proc::Tms*)ctx.x(10);
@@ -721,6 +732,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::nanosleep,nanoSleep);
         DECLSYSCALL(scnum::yield,sysyield);
         DECLSYSCALL(scnum::sigaction,sigAction);
+        DECLSYSCALL(scnum::sigprocmask,sigProcMask);
         DECLSYSCALL(scnum::times,times);
         DECLSYSCALL(scnum::uname,uName);
         DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);

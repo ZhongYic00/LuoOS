@@ -70,13 +70,16 @@ namespace signal{
     using proc::Process;
     using proc::Task;
 
-    constexpr static int numSignals=32;
+    // constexpr static int numSignals=32;  // @todo: 检查一下是不是写错了
+    constexpr static int numSignals = _NSIG;
     typedef bitset<numSignals> SignalMask;
     typedef sigaction SignalAction;
+    typedef sigset_t SigSet;
     typedef siginfo_t SignalInfo;
     void send(Process &proc,int num,unique_ptr<SignalInfo>& info);
     void send(Task &task,int num,unique_ptr<SignalInfo>& info);
-    inline SignalMask sigset2bitset(sigset_t set){return set.sig[0];}
+    inline SignalMask sigset2bitset(SigSet set){return set.sig[0];}
     xlen_t doSigAction(int a_sig, SignalAction *a_act, SignalAction *a_oact);
+    xlen_t doSigProcMask(int a_how, SigSet *a_nset, SigSet *a_oset, size_t a_sigsetsize);
 }
 #endif

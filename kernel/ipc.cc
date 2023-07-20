@@ -41,4 +41,25 @@ namespace signal
         if (a_act != nullptr) { curproc->actions[a_sig-1] = *a_act; }
         return 0;
     }
+    xlen_t doSigProcMask(int a_how, SigSet *a_nset, SigSet *a_oset, size_t a_sigsetsize) {
+        if (a_sigsetsize != sizeof(SigSet)) return -EINVAL;
+        auto cur = kHartObj().curtask;
+        if (a_oset != nullptr) { a_oset->sig[0] = cur->block.to_ulong(); }
+        if (a_nset == nullptr) return 0;
+        switch (a_how) {
+            case SIG_BLOCK:
+                cur->block |= a_nset->sig[0];
+                break;
+            case SIG_UNBLOCK:
+                cur->block &= ~(a_nset->sig[0]);
+                break;
+            case SIG_SETMASK:
+                cur->block = a_nset->sig[0];
+                break;
+            default:
+                return -EINVAL;
+        }
+        cur->block &= ~((1UL << (SIGKILL - 1)) | (1UL << (SIGSTOP - 1)));
+        return 0;
+    }
 } // namespace signal
