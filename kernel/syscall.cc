@@ -23,10 +23,12 @@ namespace syscall {
     using fs::KStat;
     using fs::DStat;
     using fs::DEntry;
+    using eastl::unique_ptr;
     using eastl::shared_ptr;
     using eastl::make_shared;
     using signal::SignalAction;
     using signal::SigSet;
+    using signal::SignalInfo;
     using signal::send;
     using signal::doSigAction;
     using signal::doSigProcMask;
@@ -432,9 +434,10 @@ namespace syscall {
         if(pid < -1) { pid = -pid; } // FIXME: process group
         if(pid > 0) {
             auto proc = (**kGlobObjs->procMgr)[pid];
-            if (proc == nullptr) { statcode::err; }
-            if (sig == 0) { statcode::ok; }
-            send(*proc, sig);
+            if(proc == nullptr) { statcode::err; }
+            if(sig == 0) { statcode::ok; }
+            unique_ptr<SignalInfo> tmp(nullptr);
+            send(*proc, sig, tmp);
             return statcode::ok;
         }
         if(pid == -1) {
@@ -446,7 +449,8 @@ namespace syscall {
                 auto it = procs[i];
                 if (it->pid() != 1) {
                     success = true;
-                    send(*it, sig);
+                    unique_ptr<SignalInfo> tmp(nullptr);
+                    send(*it, sig, tmp);
                 }
             }
             return success ? statcode::ok : statcode::err;
