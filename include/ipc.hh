@@ -9,6 +9,7 @@
 namespace proc{
     struct Task;
     struct Process;
+    struct Context;
 }
 
 namespace pipe{
@@ -64,11 +65,13 @@ namespace signal{
 #define SA_RESTORER 1
     #include <asm-generic/siginfo.h>
     #include <asm/signal.h>
+    #include <asm/sigcontext.h>
 
     using eastl::bitset;
     using eastl::unique_ptr;
     using proc::Process;
     using proc::Task;
+    using proc::Context;
 
     // constexpr static int numSignals=32;  // @todo: 检查一下是不是写错了
     constexpr static int numSignals = _NSIG;
@@ -76,11 +79,14 @@ namespace signal{
     typedef sigaction SignalAction;
     typedef sigset_t SigSet;
     typedef siginfo_t SignalInfo;
+    typedef stack_t SignalStack;
+    typedef sigcontext SignalContext;
     static unique_ptr<SignalInfo> defaultInfo(nullptr);
     void send(Process &proc,int num,unique_ptr<SignalInfo>& info = defaultInfo);
     void send(Task &task,int num,unique_ptr<SignalInfo>& info = defaultInfo);
     inline SignalMask sigset2bitset(SigSet set){return set.sig[0];}
     xlen_t doSigAction(int a_sig, SignalAction *a_act, SignalAction *a_oact);
     xlen_t doSigProcMask(int a_how, SigSet *a_nset, SigSet *a_oset, size_t a_sigsetsize);
+    xlen_t doSigReturn(Task *a_proc, Context *a_ctx);
 }
 #endif

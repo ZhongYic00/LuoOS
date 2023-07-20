@@ -41,6 +41,7 @@ namespace signal
         if (a_act != nullptr) { curproc->actions[a_sig-1] = *a_act; }
         return 0;
     }
+    // @todo: block是否等价于NutOS中的sigmask？
     xlen_t doSigProcMask(int a_how, SigSet *a_nset, SigSet *a_oset, size_t a_sigsetsize) {
         if (a_sigsetsize != sizeof(SigSet)) return -EINVAL;
         auto cur = kHartObj().curtask;
@@ -60,6 +61,22 @@ namespace signal
                 return -EINVAL;
         }
         cur->block &= ~((1UL << (SIGKILL - 1)) | (1UL << (SIGSTOP - 1)));
+        return 0;
+    }
+    // @todo: stack_t是否等价于sigstack
+    xlen_t doSigReturn(Task *a_task, Context *a_ctx) {
+        uintptr_t *link = reinterpret_cast<uintptr_t *>(a_ctx->gpr[2]);  // REG_SP = 2
+        uintptr_t signal_stack = *link;
+        if (signal_stack == (uintptr_t)a_task->signal_stack.ss_sp) { a_task->signal_stack.ss_flags = 0; }
+        signal_stack -= sizeof(SignalMask);
+        SignalMask *oldmask = reinterpret_cast<SignalMask*>(signal_stack);
+        a_task->block = *oldmask;
+        signal_stack -= sizeof(SignalContext);
+        SignalContext *context = reinterpret_cast<SignalContext*>(signal_stack);
+        // NGREG = 32
+        memmove((void*)(a_ctx->gpr), (void*)&(context->sc_regs), sizeof(a_ctx->gpr));
+        // a_ctx->sepc = context->sc_regs[0];
+        csrWrite(sepc, context->sc_regs.pc);  // @todo: 不确定是否等效
         return 0;
     }
 } // namespace signal

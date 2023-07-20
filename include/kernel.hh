@@ -48,6 +48,7 @@ namespace sys
         tkill=130,
         sigaction=134,
         sigprocmask=135,
+        sigreturn=139,
         reboot=142,
         times=153,
         uname=160,

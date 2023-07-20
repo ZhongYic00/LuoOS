@@ -27,9 +27,10 @@ namespace syscall {
     using eastl::make_shared;
     using signal::SignalAction;
     using signal::SigSet;
+    using signal::send;
     using signal::doSigAction;
     using signal::doSigProcMask;
-    using signal::send;
+    using signal::doSigReturn;
     // 前向引用
     void yield();
     xlen_t none() { return 0; }
@@ -459,6 +460,12 @@ namespace syscall {
 
         return doSigProcMask(how, nset, oset, sigsetsize);
     }
+    xlen_t sigReturn() {
+        auto cur = kHartObj().curtask;
+        auto &ctx = cur->ctx;
+
+        return doSigReturn(cur, &ctx);
+    }
     xlen_t times(void) {
         auto &ctx = kHartObj().curtask->ctx;
         proc::Tms *a_tms = (proc::Tms*)ctx.x(10);
@@ -769,6 +776,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::tkill,tkill);
         DECLSYSCALL(scnum::sigaction,sigAction);
         DECLSYSCALL(scnum::sigprocmask,sigProcMask);
+        DECLSYSCALL(scnum::sigreturn,sigReturn);
         DECLSYSCALL(scnum::times,times);
         DECLSYSCALL(scnum::uname,uName);
         DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);

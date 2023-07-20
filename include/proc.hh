@@ -140,6 +140,7 @@ namespace proc
         Priv lastpriv;
         SignalMask block,pendingmask;
         eastl::unique_ptr<SignalInfo> pending[numSignals];
+        SignalStack signal_stack;
         void accept();
         Process *getProcess();
         inline Task(tid_t tid,prior_t pri,tid_t proc):IdManagable(tid),Scheduable(pri),proc(proc),lastpriv(Priv::User){
