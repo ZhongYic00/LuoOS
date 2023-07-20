@@ -439,6 +439,9 @@ namespace syscall {
         }
         return statcode::ok;
     }
+    xlen_t tkill() {
+        return kill();
+    }
     xlen_t sigAction() {
         auto &ctx = kHartObj().curtask->ctx;
         int sig = ctx.x(10);
@@ -763,6 +766,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::nanosleep,nanoSleep);
         DECLSYSCALL(scnum::yield,sysyield);
         DECLSYSCALL(scnum::kill,kill);
+        DECLSYSCALL(scnum::tkill,tkill);
         DECLSYSCALL(scnum::sigaction,sigAction);
         DECLSYSCALL(scnum::sigprocmask,sigProcMask);
         DECLSYSCALL(scnum::times,times);

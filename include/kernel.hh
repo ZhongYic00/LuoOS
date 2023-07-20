@@ -45,6 +45,7 @@ namespace sys
         nanosleep=101,
         yield=124,
         kill=129,
+        tkill=130,
         sigaction=134,
         sigprocmask=135,
         reboot=142,
