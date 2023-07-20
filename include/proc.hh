@@ -7,7 +7,7 @@
 #include "TINYSTL/unordered_set.h"
 #include "TINYSTL/string.h"
 #include "TINYSTL/vector.h"
-#include "fat.hh"
+#include "fs.hh"
 
 namespace proc
 {
@@ -15,7 +15,11 @@ namespace proc
     using sched::Scheduable;
     using sched::prior_t;
     using vm::VMAR;
-    using klib::SharedPtr;
+    using eastl::shared_ptr;
+    using eastl::make_shared;
+    using fs::File;
+    // using fs::DirEnt;
+    using fs::DEntry;
     using namespace signal;
 
     struct Context
@@ -72,16 +76,14 @@ namespace proc
 
     typedef tid_t pid_t;
     struct Process:public IdManagable,public Scheduable{
-        using File=fs::File;
-        using DirEnt=fs::DirEnt;
         tid_t parent;
         VMAR vmar;
         xlen_t heapTop=UserHeapBottom;
         tinystl::unordered_set<Task*> tasks;
-        SharedPtr<File> files[MaxOpenFile];
+        shared_ptr<File> files[MaxOpenFile];
         tinystl::string name;
         Tms ti;
-        DirEnt *cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
+        shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
         SignalAction actions[numSignals];
 
@@ -96,12 +98,12 @@ namespace proc
         inline tid_t pid(){return id;}
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
-        inline SharedPtr<File> ofile(int fd){return files[fd];}
+        inline shared_ptr<File> ofile(int fd){return files[fd];}
         Task* newTask();
         Task* newTask(const Task &other,bool allocStack=true);
         Task* newKTask(prior_t prior=0);
         void print();
-        int fdAlloc(SharedPtr<File> a_file, int a_fd=-1);
+        int fdAlloc(shared_ptr<File> a_file, int a_fd=-1);
         /// @todo rtval
         inline xlen_t brk(xlen_t addr){
             Log(info,"brk %lx",addr);

@@ -102,6 +102,7 @@ SECTIONS
 		. = ALIGN(4k);
 		PROVIDE(_rodata_start = .);
 		*(.rodata .rodata.*)
+		*(.srodata .srodata.*)
 		PROVIDE(_rodata_end = .);
 	} >ram
 
