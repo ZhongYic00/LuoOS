@@ -195,7 +195,7 @@ namespace klib
     Segment operator&(const Segment &other){
       return Segment{max(l,other.l),min(r,other.r)};
     }
-    constexpr explicit operator bool() const noexcept{l<=r;}
+    constexpr explicit operator bool() const noexcept{return l<=r;}
     inline constexpr T length() const{return r-l+1;}
   };
   /*
