@@ -44,6 +44,7 @@ namespace sys
         settidaddress=96,
         nanosleep=101,
         yield=124,
+        sigaction=134,
         reboot=142,
         times=153,
         uname=160,

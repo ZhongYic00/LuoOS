@@ -1,6 +1,6 @@
 #include "kernel.hh"
 #include "sched.hh"
-#include "fat.hh"
+#include "fs.hh"
 #include "ld.hh"
 #include "sbi.hh"
 #include "TINYSTL/vector.h"
@@ -22,6 +22,8 @@ namespace syscall {
     using fs::KStat;
     using fs::DStat;
     using fs::DirEnt;
+    using signal::SignalAction;
+    using signal::doSigAction;
     // 前向引用
     void yield();
     xlen_t none() { return 0; }
@@ -455,6 +457,14 @@ namespace syscall {
         yield();
         return statcode::ok;
     }
+    xlen_t sigAction() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int sig = ctx.x(10);
+        SignalAction *act = (SignalAction*)ctx.x(11);
+        SignalAction *oact = (SignalAction*)ctx.x(12);
+
+        return doSigAction(sig, act, oact);
+    }
     xlen_t times(void) {
         auto &ctx = kHartObj().curtask->ctx;
         proc::Tms *a_tms = (proc::Tms*)ctx.x(10);
@@ -767,6 +777,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::settidaddress,setTidAddress)
         DECLSYSCALL(scnum::nanosleep,nanoSleep);
         DECLSYSCALL(scnum::yield,sysyield);
+        DECLSYSCALL(scnum::sigaction,sigAction);
         DECLSYSCALL(scnum::times,times);
         DECLSYSCALL(scnum::uname,uName);
         DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);

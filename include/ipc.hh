@@ -77,5 +77,6 @@ namespace signal{
     void send(Process &proc,int num,unique_ptr<SignalInfo>& info);
     void send(Task &task,int num,unique_ptr<SignalInfo>& info);
     inline SignalMask sigset2bitset(sigset_t set){return set.sig[0];}
+    xlen_t doSigAction(int a_sig, SignalAction *a_act, SignalAction *a_oact);
 }
 #endif
