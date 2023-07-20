@@ -241,7 +241,7 @@ namespace syscall {
         char *fstype = (char*)fstypearr.buff;
         return Path(mountpath).pathMount(devpath, fstype);
     }
-    xlen_t chDir(void) {
+    xlen_t chDir() {
         auto &ctx = kHartObj().curtask->ctx;
         const char *a_path = (const char*)ctx.x(10);
         if(a_path == nullptr) { return statcode::err; }
@@ -256,6 +256,19 @@ namespace syscall {
 
         curproc->cwd = ep;
         curproc->files[3] = make_shared<File>(curproc->cwd, O_RDWR);
+
+        return statcode::ok;
+    }
+    xlen_t fChDir() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_fd = ctx.x(10);
+        if(fdOutRange(a_fd)) { return statcode::err; }
+
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> nwd = curproc->files[a_fd];
+        if(nwd == nullptr) { return statcode::err; }
+        curproc->cwd = nwd->obj.ep;
+        curproc->files[a_fd] = nwd;
 
         return statcode::ok;
     }
@@ -761,6 +774,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::umount2,umount2);
         DECLSYSCALL(scnum::mount,mount);
         DECLSYSCALL(scnum::chdir,chDir);
+        DECLSYSCALL(scnum::fchdir,fChDir);
         DECLSYSCALL(scnum::openat,openAt);
         DECLSYSCALL(scnum::close,close);
         DECLSYSCALL(scnum::pipe2,pipe2);

@@ -33,6 +33,7 @@ namespace sys
         umount2=39,
         mount=40,
         chdir=49,
+        fchdir=50,
         openat=56,
         close=57,
         pipe2=59,
