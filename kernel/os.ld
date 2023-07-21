@@ -123,10 +123,6 @@ SECTIONS
 		*(.data .data.*)
 		PROVIDE(_data_end = .);
 	} >ram
-	.pagetable :{
-		. = ALIGN(4k);
-		*(pagetable)
-	} >ram
 
 	.kstack :{
 		. = ALIGN(4k);
@@ -148,6 +144,10 @@ SECTIONS
 		*(.sbss .sbss.*)
 		*(.bss .bss.*)
 		*(COMMON)
+		
+		. = ALIGN(4k);
+		*(pagetable)
+
 		. = ALIGN(4k);
 		PROVIDE(_uimg_start = .);
 		*(uimg.data)
