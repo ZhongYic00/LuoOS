@@ -120,6 +120,7 @@ namespace fs{
         xlen_t write(xlen_t addr, size_t len);
         klib::ByteArray read(size_t len, long a_off = -1, bool a_update = true);
         klib::ByteArray readAll();
+        off_t lSeek(off_t a_offset, int a_whence);
     };
     class Path {
         private:

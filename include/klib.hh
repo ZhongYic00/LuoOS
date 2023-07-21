@@ -7,6 +7,7 @@
 #include "safestl.hh"
 // #include "TINYSTL/string.h"
 #include "new.hh"
+#include <asm/errno.h>
 #include "EASTL/shared_ptr.h"
 #include "EASTL/string.h"
 #include "EASTL/vector.h"

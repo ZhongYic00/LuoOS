@@ -1,6 +1,5 @@
 #include "ipc.hh"
 #include "kernel.hh"
-#include <asm/errno.h>
 // #define moduleLevel LogLevel::debug
 
 namespace pipe

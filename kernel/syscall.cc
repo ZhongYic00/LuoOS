@@ -8,7 +8,6 @@
 #include "thirdparty/expected.hpp"
 #include <EASTL/chrono.h>
 #include "bio.hh"
-#include <asm/errno.h>
 using nonstd::expected;
 
 #define moduleLevel LogLevel::info
@@ -131,14 +130,14 @@ namespace syscall {
         return (xlen_t)a_buf;
     }
     xlen_t dupArgsIn(int a_fd, int a_newfd=-1) {
-        if(fdOutRange(a_fd)) { return statcode::err; }
+        if(fdOutRange(a_fd)) { return -EBADF; }
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> f = curproc->files[a_fd];
-        if(f == nullptr) { return statcode::err; }
+        if(f == nullptr) { return -EBADF; }
         // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
         int newfd = curproc->fdAlloc(f, a_newfd);
-        if(fdOutRange(newfd)) { return statcode::err; }
+        if(fdOutRange(newfd)) { return -ENOMEM; }
 
         return newfd;
     }
@@ -152,7 +151,7 @@ namespace syscall {
         auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
         int a_newfd = ctx.x(11);
-        if(fdOutRange(a_newfd)) { return statcode::err; }
+        if(fdOutRange(a_newfd)) { return -EBADF; }
 
         return dupArgsIn(a_fd, a_newfd);
     }
@@ -161,7 +160,7 @@ namespace syscall {
         int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         mode_t a_mode = ctx.x(12); // @todo 还没用上
-        if(fdOutRange(a_dirfd) || a_path == nullptr) { return statcode::err; }
+        if(fdOutRange(a_dirfd) || a_path == nullptr) { return -EBADF; }
 
         auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
@@ -181,7 +180,7 @@ namespace syscall {
         int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12); // 这玩意有什么用？
-        if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
+        if(fdOutRange(a_dirfd) || a_path==nullptr) { return -EBADF; }
 
         auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
@@ -198,7 +197,7 @@ namespace syscall {
         int a_newdirfd = ctx.x(12);
         const char *a_newpath = (const char*)ctx.x(13);
         int a_flags = ctx.x(14);
-        if(fdOutRange(a_olddirfd) || fdOutRange(a_newdirfd) || a_oldpath==nullptr || a_newpath==nullptr) { return statcode::err; }
+        if(fdOutRange(a_olddirfd) || fdOutRange(a_newdirfd) || a_oldpath==nullptr || a_newpath==nullptr) { return -EBADF; }
 
         auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray oldpatharr = curproc->vmar.copyinstr((xlen_t)a_oldpath, FAT32_MAX_PATH);
@@ -262,7 +261,7 @@ namespace syscall {
     xlen_t fChDir() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
-        if(fdOutRange(a_fd)) { return statcode::err; }
+        if(fdOutRange(a_fd)) { return -EBADF; }
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> nwd = curproc->files[a_fd];
@@ -279,7 +278,7 @@ namespace syscall {
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12);
         mode_t a_mode = ctx.x(13);
-        if(fdOutRange(a_basefd) || a_path==nullptr) { return statcode::err; }
+        if(fdOutRange(a_basefd) || a_path==nullptr) { return -EBADF; }
 
         auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
@@ -292,10 +291,10 @@ namespace syscall {
     xlen_t close() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
-        if(fdOutRange(a_fd)) { return statcode::err; }
+        if(fdOutRange(a_fd)) { return -EBADF; }
 
         auto curproc = kHartObj().curtask->getProcess();
-        if(curproc->files[a_fd] == nullptr) { return statcode::err; } // 不能关闭一个已关闭的文件
+        if(curproc->files[a_fd] == nullptr) { return -EBADF; } // 不能关闭一个已关闭的文件
         // 不能用新的局部变量代替，局部变量和files[a_fd]是两个不同的SharedPtr
         curproc->files[a_fd].reset();
 
@@ -317,17 +316,30 @@ namespace syscall {
         int a_fd = ctx.x(10);
         DStat *a_buf = (DStat*)ctx.x(11);
         size_t a_len = ctx.x(12);
-        if(fdOutRange(a_fd) || a_buf==nullptr || a_len<sizeof(DStat)) { return statcode::err; }
+        if(fdOutRange(a_fd) || a_buf==nullptr || a_len<sizeof(DStat)) { return -EBADF; }
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> f = curproc->files[a_fd];
-        if(f == nullptr) { return statcode::err; }
+        if(f == nullptr) { return -EBADF; }
         // DStat ds;
         // getDStat(f->obj.ep, &ds);
         DStat ds = f->obj.ep;
         curproc->vmar.copyout((xlen_t)a_buf, klib::ByteArray((uint8_t*)&ds,sizeof(ds)));
 
         return sizeof(ds);
+    }
+    xlen_t lSeek() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_fd = ctx.x(10);
+        off_t a_offset = ctx.x(11);
+        int a_whence = ctx.x(12);
+        if(fdOutRange(a_fd)) { return -EBADF; }
+
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> file = curproc->files[a_fd];
+        if(file = nullptr) { return -EBADF; }
+
+        return file->lSeek(a_offset, a_whence);
     }
     xlen_t read(){
         auto &ctx=kHartObj().curtask->ctx;
@@ -354,11 +366,11 @@ namespace syscall {
         auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
         KStat *a_kst = (KStat*)ctx.x(11);
-        if(fdOutRange(a_fd) || a_kst==nullptr) { return statcode::err; }
+        if(fdOutRange(a_fd) || a_kst==nullptr) { return -EBADF; }
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> f = curproc->files[a_fd];
-        if(f == nullptr) { return statcode::err; }
+        if(f == nullptr) { return -EBADF; }
         // KStat kst;
         // fs::getKStat(f->obj.ep, &kst);
         KStat kst = f->obj.ep;
@@ -753,6 +765,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::close,close);
         DECLSYSCALL(scnum::pipe2,pipe2);
         DECLSYSCALL(scnum::getdents64,getDents64);
+        DECLSYSCALL(scnum::lseek,lSeek);
         DECLSYSCALL(scnum::read,read);
         DECLSYSCALL(scnum::write,write);
         DECLSYSCALL(scnum::fstat,fStat);

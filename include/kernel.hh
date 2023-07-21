@@ -38,6 +38,7 @@ namespace sys
         close=57,
         pipe2=59,
         getdents64=61,
+        lseek=62,
         read=63,
         write=64,
         fstat=80,
