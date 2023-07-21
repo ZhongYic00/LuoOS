@@ -42,6 +42,7 @@ namespace sys
         lseek=62,
         read=63,
         write=64,
+        fstatat=79,
         fstat=80,
         exit=93,
         settidaddress=96,

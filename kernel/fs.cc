@@ -86,23 +86,23 @@ off_t File::lSeek(off_t a_offset, int a_whence) {
     static constexpr int SEEK_SET = 0;
     static constexpr int SEEK_CUR = 1;
     static constexpr int SEEK_END = 2;
-    KStat kstat = obj.ep;
-    if ((kstat.st_mode&S_IFMT)==S_IFCHR || (kstat.st_mode&S_IFMT)==S_IFIFO) { return 0; }
+    KStat kst = obj.ep;
+    if ((kst.st_mode&S_IFMT)==S_IFCHR || (kst.st_mode&S_IFMT)==S_IFIFO) { return 0; }
     switch (a_whence) {  // @todo: st_size处是否越界？
         case SEEK_SET: {
-            if(a_offset<0 || a_offset>kstat.st_size) { return -EINVAL; }
+            if(a_offset<0 || a_offset>kst.st_size) { return -EINVAL; }
             off = a_offset;
             break;
         }
         case SEEK_CUR: {
             off_t noff = off + a_offset;
-            if(noff<0 || noff>kstat.st_size) { return -EINVAL; }
+            if(noff<0 || noff>kst.st_size) { return -EINVAL; }
             off = noff;
             break;
         }
         case SEEK_END: {
-            off_t noff = kstat.st_size + a_offset;
-            if(noff<0 || noff>kstat.st_size) { return -EINVAL; }
+            off_t noff = kst.st_size + a_offset;
+            if(noff<0 || noff>kst.st_size) { return -EINVAL; }
             off = noff;
             break;
         }
