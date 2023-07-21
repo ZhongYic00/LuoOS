@@ -202,24 +202,6 @@ namespace fs{
             ~KStat() = default;
 
 	};
-    class MntTable {
-        private:
-            unordered_map<string, shared_ptr<FileSystem>> mnt_table;
-        public:
-            MntTable() = default;
-            MntTable(const MntTable& a_table) = default;
-            ~MntTable() = default;
-            MntTable& operator=(const MntTable& a_table) = default;
-            auto operator[](string a_str) { return mnt_table[a_str]; }
-            auto find(string a_str) { return mnt_table.find(a_str); }
-            auto emplace(string a_str, shared_ptr<FileSystem> a_fs) { return mnt_table.emplace(a_str, a_fs); }
-            auto erase(string a_str) { return mnt_table.erase(a_str); }
-            auto empty() { return mnt_table.empty(); }
-            auto size() { return mnt_table.size(); }
-            auto clear() { return mnt_table.clear(); }
-            auto end() { return mnt_table.end(); }
-            unordered_map<string, shared_ptr<FileSystem>>& getTable() { return mnt_table; }
-    };
     int rootFSInit();
 
     // namespace internal{

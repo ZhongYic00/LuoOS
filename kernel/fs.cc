@@ -13,7 +13,7 @@
 using namespace fs;
 
 constexpr uint8 MAX_DEV = 8;
-MntTable mnt_table;
+static unordered_map<string, shared_ptr<FileSystem>> mnt_table;
 static uint8 mount_num = 0;
 
 xlen_t File::write(xlen_t addr,size_t len){
@@ -139,7 +139,7 @@ shared_ptr<DEntry> Path::pathHitTable() {
     size_t len = path_abs.size();
     size_t longest = 0;
     string longest_prefix = "";
-    for(auto tbl : mnt_table.getTable()) {
+    for(auto tbl : mnt_table) {
         string prefix = tbl.first;
         size_t len_prefix = prefix.size();
         if(len>=len_prefix && len_prefix>longest && path_abs.compare(0, len_prefix, prefix)==0) {
@@ -292,7 +292,7 @@ int Path::pathUnmount() const {
 //     return make_shared<File>(ep, a_flags);
 // }
 int fs::rootFSInit() {
-    new ((void*)&mnt_table) MntTable();
+    new ((void*)&mnt_table) unordered_map<string, shared_ptr<FileSystem>>();
     shared_ptr<FileSystem> rootfs = make_shared<fat::FileSystem>(true, "/");
     mnt_table.emplace("/", rootfs);
     if(rootfs->ldSpBlk(0, nullptr) == -1) {
