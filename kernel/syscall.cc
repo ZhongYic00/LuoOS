@@ -608,6 +608,10 @@ namespace syscall {
         xlen_t wstatus=ctx.x(11);
         return waitpid(pid,wstatus,0);
     }
+    xlen_t syncFS() {
+        // 同sync()
+        return statcode::ok;
+    }
     xlen_t brk(){
         auto &ctx=kHartObj().curtask->ctx;
         auto &curproc=*kHartObj().curtask->getProcess();
@@ -833,5 +837,6 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::execve,execve);
         DECLSYSCALL(scnum::mmap,mmap);
         DECLSYSCALL(scnum::wait,wait);
+        DECLSYSCALL(scnum::syncfs,syncFS);
     }
 } // namespace syscall

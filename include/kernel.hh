@@ -66,6 +66,7 @@ namespace sys
         execve=221,
         mmap=222,
         wait=260,
+        syncfs=267,
         nSyscalls,
     };
     enum statcode{
