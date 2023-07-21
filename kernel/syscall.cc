@@ -380,21 +380,6 @@ namespace syscall {
         cur->getProcess()->exit(status);
         yield();
     }
-    xlen_t fStat() {
-        auto &ctx = kHartObj().curtask->ctx;
-        int a_fd = ctx.x(10);
-        KStat *a_kst = (KStat*)ctx.x(11);
-        if(fdOutRange(a_fd) || a_kst==nullptr) { return -EBADF; }
-
-        auto curproc = kHartObj().curtask->getProcess();
-        shared_ptr<File> f = curproc->files[a_fd];
-        if(f == nullptr) { return -EBADF; }
-        KStat kst = f->obj.ep;
-        curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst,sizeof(kst)));
-        // @bug 用户态读到的数据混乱
-        return statcode::ok;
-    }
-    // __attribute__((naked))
     xlen_t fStatAt() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
@@ -414,6 +399,25 @@ namespace syscall {
         KStat kst = entry;
         curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst, sizeof(kst)));
 
+        return statcode::ok;
+    }
+    xlen_t fStat() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_fd = ctx.x(10);
+        KStat *a_kst = (KStat*)ctx.x(11);
+        if(fdOutRange(a_fd) || a_kst==nullptr) { return -EBADF; }
+
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> f = curproc->files[a_fd];
+        if(f == nullptr) { return -EBADF; }
+        KStat kst = f->obj.ep;
+        curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst,sizeof(kst)));
+        // @bug 用户态读到的数据混乱
+        return statcode::ok;
+    }
+    // __attribute__((naked))
+    xlen_t sync() {
+        // 现阶段实现为write-through缓存，自动同步
         return statcode::ok;
     }
     void sleepSave(ptr_t gpr){
@@ -808,6 +812,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::write,write);
         DECLSYSCALL(scnum::fstatat,fStatAt);
         DECLSYSCALL(scnum::fstat,fStat);
+        DECLSYSCALL(scnum::sync,sync);
         DECLSYSCALL(scnum::exit,exit);
         DECLSYSCALL(scnum::settidaddress,setTidAddress)
         DECLSYSCALL(scnum::nanosleep,nanoSleep);
