@@ -74,7 +74,6 @@ namespace fat {
             inline uint32 rFS() const { return bpb.fat_sz; }
             inline uint32 rRC() const { return bpb.root_clus; }
             inline uint8 rDev() const { return dev; }
-            inline uint32 rBlkSize() const { return rBPC(); }
             inline shared_ptr<fs::DEntry> getRoot() const;
             inline shared_ptr<fs::DEntry> getMntPoint() const { return mnt_point; }
             inline fs::FileSystem *getFS() const;
@@ -101,6 +100,13 @@ namespace fat {
             inline shared_ptr<fs::SuperBlock> getSpBlk() const { return spblk; }
             int ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt);
             void unInstall();
+            inline long rMagic() const { return MSDOS_SUPER_MAGIC; }
+            inline long rBlkSiz() const { return spblk->rBPS(); }
+            inline long rBlkNum() const { return spblk->rTS(); }
+            inline long rBlkFree() const { return rBlkNum(); }  // @todo: 未实现
+            inline long rMaxFile() const { return rBlkNum()/spblk->rSPC(); }
+            inline long rFreeFile() const { return rBlkFree()/spblk->rSPC(); }
+            virtual long rNameLen() const { return FAT32_MAX_FILENAME; }
     };
     typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）

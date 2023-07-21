@@ -7,6 +7,9 @@
 #include "error.hh"
 #include "EASTL/unordered_map.h"
 
+// FAT32
+#define MSDOS_SUPER_MAGIC     0x4d44
+
 namespace fs{
     using pipe::Pipe;
     using eastl::vector;
@@ -24,7 +27,6 @@ namespace fs{
             SuperBlock(const SuperBlock& a_spblk) = default;
             virtual ~SuperBlock() = default;
             SuperBlock& operator=(const SuperBlock& a_spblk);
-            virtual uint32 rBlkSize() const = 0;  // 返回块大小
             virtual shared_ptr<DEntry> getRoot() const = 0;  // 返回指向该超级块的根目录项的共享指针
             virtual shared_ptr<DEntry> getMntPoint() const = 0;  // 返回文件系统在父文件系统上的挂载点，如果是根文件系统则返回根目录
             virtual FileSystem *getFS() const = 0;  // 返回指向该文件系统对象的共享指针
@@ -42,6 +44,13 @@ namespace fs{
             virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该文件系统超级块的共享指针
             virtual int ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) = 0;  // 从设备号为a_dev的物理设备上装载该文件系统的超级块，并设挂载点为a_mnt，若a_mnt为nullptr则作为根文件系统装载，返回错误码
             virtual void unInstall() = 0;  // 卸载该文件系统的超级块
+            virtual long rMagic() const = 0;  // 读魔数
+            virtual long rBlkSiz() const = 0;  // 读块大小
+            virtual long rBlkNum() const = 0;  // 读块总数
+            virtual long rBlkFree() const = 0;  // 读空闲块数量
+            virtual long rMaxFile() const = 0;  // 读最大文件数量
+            virtual long rFreeFile() const = 0;  // 读空闲块允许的最大文件数量
+            virtual long rNameLen() const = 0;  // 读最大文件名长度
     };
     class INode {
         public:
@@ -199,10 +208,27 @@ namespace fs{
         // public:
             KStat() = default;
             KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
-            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->rBlkSize()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
+            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->getFS()->rBlkSiz()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
             ~KStat() = default;
 
 	};
+    class StatFS {
+        private:
+            long f_type;
+            long f_bsize;
+            long f_blocks;
+            long f_bfree;
+            long f_bavail;
+            long f_files;
+            long f_ffree;
+            long f_fsid;
+            long f_namelen;
+        public:
+            StatFS() = default;
+            StatFS(const StatFS& a_statfs) = default;
+            StatFS(const FileSystem& a_fs):f_type(a_fs.rMagic()), f_bsize(a_fs.rBlkSiz()), f_blocks(a_fs.rBlkNum()), f_bfree(a_fs.rBlkFree()), f_bavail(a_fs.rBlkFree()), f_files(a_fs.rMaxFile()), f_ffree(a_fs.rFreeFile()), f_fsid(), f_namelen(a_fs.rNameLen()) {}
+            ~StatFS() = default;
+    };
     int rootFSInit();
     bool fdOutRange(int &a_fd);
 

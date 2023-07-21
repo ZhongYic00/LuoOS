@@ -32,6 +32,7 @@ namespace sys
         linkat=37,
         umount2=39,
         mount=40,
+        statfs=43,
         chdir=49,
         fchdir=50,
         openat=56,
