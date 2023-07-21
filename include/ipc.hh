@@ -86,6 +86,6 @@ namespace signal{
     inline SignalMask sigset2bitset(SigSet set){return set.sig[0];}
     xlen_t doSigAction(int a_sig, SignalAction *a_act, SignalAction *a_oact);
     xlen_t doSigProcMask(int a_how, SigSet *a_nset, SigSet *a_oset, size_t a_sigsetsize);
-    xlen_t doSigReturn(Task *a_proc, Context *a_ctx);
+    xlen_t doSigReturn();
 }
 #endif

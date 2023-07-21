@@ -8,6 +8,7 @@
 #include "thirdparty/expected.hpp"
 #include <EASTL/chrono.h>
 #include "bio.hh"
+#include <asm/errno.h>
 using nonstd::expected;
 
 #define moduleLevel LogLevel::info
@@ -24,6 +25,7 @@ namespace syscall {
     using fs::DStat;
     using fs::DEntry;
     using fs::fdOutRange;
+    using proc::FdCwd;
     using eastl::unique_ptr;
     using eastl::shared_ptr;
     using eastl::make_shared;
@@ -83,7 +85,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         // curproc->cwd = fs::entEnter("/");
         curproc->cwd = Path("/").pathSearch();
-        curproc->files[3] = make_shared<File>(curproc->cwd,0);
+        curproc->files[FdCwd] = make_shared<File>(curproc->cwd,0);
         // DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
         shared_ptr<DEntry> ep = Path("/dev").pathCreate(T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
@@ -253,7 +255,7 @@ namespace syscall {
         if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)){ return statcode::err; }
 
         curproc->cwd = ep;
-        curproc->files[3] = make_shared<File>(curproc->cwd, O_RDWR);
+        curproc->files[FdCwd] = make_shared<File>(curproc->cwd, O_RDWR);
 
         return statcode::ok;
     }
@@ -264,9 +266,10 @@ namespace syscall {
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> nwd = curproc->files[a_fd];
-        if(nwd == nullptr) { return statcode::err; }
+        if(nwd == nullptr) { return -EBADF; }
+        if(!(nwd->obj.ep->getINode()->rAttr() & ATTR_DIRECTORY)) { return -ENOTDIR; }
         curproc->cwd = nwd->obj.ep;
-        curproc->files[a_fd] = nwd;
+        curproc->files[FdCwd] = nwd;
 
         return statcode::ok;
     }
@@ -397,21 +400,21 @@ namespace syscall {
     }
     xlen_t kill() {
         auto &ctx = kHartObj().curtask->ctx;
-        pid_t pid = ctx.x(10);
-        int sig = ctx.x(11);
+        pid_t a_pid = ctx.x(10);
+        int a_sig = ctx.x(11);
 
-        if(pid == 0) { pid = kHartObj().curtask->getProcess()->pid(); } // FIXME: process group
-        if(pid < -1) { pid = -pid; } // FIXME: process group
-        if(pid > 0) {
-            auto proc = (**kGlobObjs->procMgr)[pid];
+        if(a_pid == 0) { a_pid = kHartObj().curtask->getProcess()->pid(); } // FIXME: process group
+        if(a_pid < -1) { a_pid = -a_pid; } // FIXME: process group
+        if(a_pid > 0) {
+            auto proc = (**kGlobObjs->procMgr)[a_pid];
             if(proc == nullptr) { statcode::err; }
-            if(sig == 0) { statcode::ok; }
+            if(a_sig == 0) { statcode::ok; }
             unique_ptr<SignalInfo> tmp(nullptr);
-            send(*proc, sig, tmp);
+            send(*proc, a_sig, tmp);
             return statcode::ok;
         }
-        if(pid == -1) {
-            if(sig == 0) { return statcode::ok; }
+        if(a_pid == -1) {
+            if(a_sig == 0) { return statcode::ok; }
             bool success = false;
             auto procs = (**kGlobObjs->procMgr);
             int procsnum = procs.getObjNum();
@@ -420,7 +423,7 @@ namespace syscall {
                 if (it->pid() != 1) {
                     success = true;
                     unique_ptr<SignalInfo> tmp(nullptr);
-                    send(*it, sig, tmp);
+                    send(*it, a_sig, tmp);
                 }
             }
             return success ? statcode::ok : statcode::err;
@@ -432,26 +435,23 @@ namespace syscall {
     }
     xlen_t sigAction() {
         auto &ctx = kHartObj().curtask->ctx;
-        int sig = ctx.x(10);
-        SignalAction *act = (SignalAction*)ctx.x(11);
-        SignalAction *oact = (SignalAction*)ctx.x(12);
+        int a_sig = ctx.x(10);
+        SignalAction *a_act = (SignalAction*)ctx.x(11);
+        SignalAction *a_oact = (SignalAction*)ctx.x(12);
 
-        return doSigAction(sig, act, oact);
+        return doSigAction(a_sig, a_act, a_oact);
     }
     xlen_t sigProcMask() {
         auto &ctx = kHartObj().curtask->ctx;
-        int how = ctx.x(10);
-        SigSet *nset = (SigSet*)ctx.x(11);
-        SigSet *oset = (SigSet*)ctx.x(12);
-        size_t sigsetsize = ctx.x(13);
+        int a_how = ctx.x(10);
+        SigSet *a_nset = (SigSet*)ctx.x(11);
+        SigSet *a_oset = (SigSet*)ctx.x(12);
+        size_t a_sigsetsize = ctx.x(13);
 
-        return doSigProcMask(how, nset, oset, sigsetsize);
+        return doSigProcMask(a_how, a_nset, a_oset, a_sigsetsize);
     }
     xlen_t sigReturn() {
-        auto cur = kHartObj().curtask;
-        auto &ctx = cur->ctx;
-
-        return doSigReturn(cur, &ctx);
+        return doSigReturn();
     }
     xlen_t times(void) {
         auto &ctx = kHartObj().curtask->ctx;

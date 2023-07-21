@@ -1,6 +1,6 @@
 #include "ipc.hh"
 #include "kernel.hh"
-#include "errno.h"
+#include <asm/errno.h>
 // #define moduleLevel LogLevel::debug
 
 namespace pipe
@@ -64,18 +64,20 @@ namespace signal
         return 0;
     }
     // @todo: stack_t是否等价于sigstack
-    xlen_t doSigReturn(Task *a_task, Context *a_ctx) {
-        uintptr_t *link = reinterpret_cast<uintptr_t *>(a_ctx->gpr[2]);  // REG_SP = 2
+    xlen_t doSigReturn() {
+        auto cur = kHartObj().curtask;
+        auto &ctx = cur->ctx;
+        uintptr_t *link = reinterpret_cast<uintptr_t *>(ctx.gpr[2]);  // REG_SP = 2
         uintptr_t signal_stack = *link;
-        if (signal_stack == (uintptr_t)a_task->signal_stack.ss_sp) { a_task->signal_stack.ss_flags = 0; }
+        if (signal_stack == (uintptr_t)cur->signal_stack.ss_sp) { cur->signal_stack.ss_flags = 0; }
         signal_stack -= sizeof(SignalMask);
         SignalMask *oldmask = reinterpret_cast<SignalMask*>(signal_stack);
-        a_task->block = *oldmask;
+        cur->block = *oldmask;
         signal_stack -= sizeof(SignalContext);
         SignalContext *context = reinterpret_cast<SignalContext*>(signal_stack);
         // NGREG = 32
-        memmove((void*)(a_ctx->gpr), (void*)&(context->sc_regs), sizeof(a_ctx->gpr));
-        // a_ctx->sepc = context->sc_regs[0];
+        memmove((void*)(ctx.gpr), (void*)&(context->sc_regs), sizeof(ctx.gpr));
+        // ctx->sepc = context->sc_regs[0];
         csrWrite(sepc, context->sc_regs.pc);  // @todo: 不确定是否等效
         return 0;
     }
