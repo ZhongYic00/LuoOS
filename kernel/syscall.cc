@@ -553,6 +553,9 @@ namespace syscall {
         yield();
         return statcode::ok;
     }
+    xlen_t getTid() {
+        return kHartObj().curtask->tid();
+    }
     xlen_t clone(){
         auto &ctx=kHartObj().curtask->ctx;
         xlen_t func=ctx.x(10),childStack=ctx.x(11);
@@ -831,6 +834,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);
         DECLSYSCALL(scnum::getpid,getPid);
         DECLSYSCALL(scnum::getppid,getPPid);
+        DECLSYSCALL(scnum::gettid,getTid);
         DECLSYSCALL(scnum::brk,brk);
         DECLSYSCALL(scnum::munmap,munmap);
         DECLSYSCALL(scnum::clone,clone);

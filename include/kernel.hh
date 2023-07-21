@@ -60,6 +60,7 @@ namespace sys
         gettimeofday=169,
         getpid=172,
         getppid=173,
+        gettid=178,
         brk=214,
         munmap=215,
         clone=220,

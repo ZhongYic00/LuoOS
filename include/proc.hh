@@ -144,6 +144,7 @@ namespace proc
         SignalStack signal_stack;
         void accept();
         Process *getProcess();
+        inline tid_t tid() { return id; }
         inline Task(tid_t tid,prior_t pri,tid_t proc):IdManagable(tid),Scheduable(pri),proc(proc),lastpriv(Priv::User){
             ctx.x(2)=UserStackDefault; //x2, sp
             kctx.satp=getProcess()->satp();
