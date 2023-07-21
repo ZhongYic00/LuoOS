@@ -1,6 +1,7 @@
-#include "fs.hh"
+// #include "fs.hh"
 #include "fat.hh"
-#include "vm.hh"
+// #include "vm.hh"
+#include "proc.hh"
 #include "kernel.hh"
 // #include "klib.h"
 
@@ -276,21 +277,31 @@ int Path::pathUnmount() const {
     // mnt_point->clearMnt();
     return 0;
 }
-// shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
-//     DirEnt *ep = pathSearch(a_file);
-//     if(ep == nullptr) { return nullptr; }
-//     if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
-//         printf("dir can't write\n");
-//         ep->entRelse();
-//         return nullptr;
-//     }
-//     if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
-//         printf("it is not dir\n");
-//         ep->entRelse();
-//         return nullptr;
-//     }
-//     return make_shared<File>(ep, a_flags);
-// }
+int Path::pathOpen(int a_flags, mode_t a_mode) {
+    shared_ptr<DEntry> entry;
+    if(a_flags & O_CREATE) {
+        entry = pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags);
+        if(entry == nullptr) { return -1; }
+    }
+    else {
+        if((entry = pathSearch()) == nullptr) { return -1; }
+        if((entry->getINode()->rAttr()&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
+            printf("dir can't write\n");
+            return -1;
+        }
+        if((a_flags&O_DIRECTORY) && !(entry->getINode()->rAttr()&ATTR_DIRECTORY)) {
+            printf("it is not dir\n");
+            return -1;
+        }
+    }
+    shared_ptr<File> file = make_shared<File>(entry, a_flags);
+    file->off = (a_flags&O_APPEND) ? entry->getINode()->rFileSize() : 0;
+    int fd = kHartObj().curtask->getProcess()->fdAlloc(file);
+    if(fdOutRange(fd)) { return -1; }
+    if(!(entry->getINode()->rAttr()&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { entry->getINode()->nodTrunc(); }
+
+    return fd;
+}
 int fs::rootFSInit() {
     new ((void*)&mnt_table) unordered_map<string, shared_ptr<FileSystem>>();
     shared_ptr<FileSystem> rootfs = make_shared<fat::FileSystem>(true, "/");
@@ -300,5 +311,9 @@ int fs::rootFSInit() {
         return -1;
     }
     return 0;
+}
+bool fs::fdOutRange(int &a_fd) {
+    if(a_fd == AT_FDCWD) { a_fd = proc::FdCwd; }
+    return (a_fd<0) || (a_fd>proc::MaxOpenFile);
 }
 

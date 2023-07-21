@@ -23,6 +23,7 @@ namespace syscall {
     using fs::KStat;
     using fs::DStat;
     using fs::DEntry;
+    using fs::fdOutRange;
     using eastl::unique_ptr;
     using eastl::shared_ptr;
     using eastl::make_shared;
@@ -127,7 +128,6 @@ namespace syscall {
 
         return (xlen_t)a_buf;
     }
-    inline bool fdOutRange(int a_fd) { return (a_fd<0) || (a_fd>proc::MaxOpenFile); }
     xlen_t dupArgsIn(int a_fd, int a_newfd=-1) {
         if(fdOutRange(a_fd)) { return statcode::err; }
 
@@ -159,7 +159,6 @@ namespace syscall {
         int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         mode_t a_mode = ctx.x(12); // @todo 还没用上
-        if(a_dirfd == AT_FDCWD) { a_dirfd = 3; };
         if(fdOutRange(a_dirfd) || a_path == nullptr) { return statcode::err; }
 
         auto curproc = kHartObj().curtask->getProcess();
@@ -180,7 +179,6 @@ namespace syscall {
         int a_dirfd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12); // 这玩意有什么用？
-        if(a_dirfd == AT_FDCWD) { a_dirfd = 3; };
         if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
 
         auto curproc = kHartObj().curtask->getProcess();
@@ -198,8 +196,6 @@ namespace syscall {
         int a_newdirfd = ctx.x(12);
         const char *a_newpath = (const char*)ctx.x(13);
         int a_flags = ctx.x(14);
-        if(a_olddirfd == AT_FDCWD) { a_olddirfd = 3; };
-        if(a_newdirfd == AT_FDCWD) { a_newdirfd = 3; };
         if(fdOutRange(a_olddirfd) || fdOutRange(a_newdirfd) || a_oldpath==nullptr || a_newpath==nullptr) { return statcode::err; }
 
         auto curproc = kHartObj().curtask->getProcess();
@@ -276,45 +272,19 @@ namespace syscall {
     }
     xlen_t openAt() {
         auto &ctx = kHartObj().curtask->ctx;
-        int a_dirfd = ctx.x(10);
+        int a_basefd = ctx.x(10);
         const char *a_path = (const char*)ctx.x(11);
         int a_flags = ctx.x(12);
         mode_t a_mode = ctx.x(13);
-        if(a_dirfd == AT_FDCWD) { a_dirfd = 3; };
-        if(fdOutRange(a_dirfd) || a_path==nullptr) { return statcode::err; }
+        if(fdOutRange(a_basefd) || a_path==nullptr) { return statcode::err; }
 
         auto curproc = kHartObj().curtask->getProcess();
         klib::ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
-        shared_ptr<File> f1, f2;
-        if(path[0] != '/') { f2 = curproc->files[a_dirfd]; }
-        shared_ptr<DEntry> ep;
-        int fd;
+        shared_ptr<File> base = nullptr;
+        if(path[0] != '/') { base = curproc->files[a_basefd]; }
 
-        if(a_flags & O_CREATE) {
-            // ep = fs::pathCreateAt(path, S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags, f2);
-            ep = Path(path, f2).pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags);
-            if(ep == nullptr) { return statcode::err; }
-        }
-        else {
-            // if((ep = fs::entEnterFrom(path, f2)) == nullptr) { return statcode::err; }
-            if((ep = Path(path, f2).pathSearch()) == nullptr) { return statcode::err; }
-            if((ep->getINode()->rAttr()&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
-                printf("dir can't write\n");
-                return statcode::err;
-            }
-            if((a_flags&O_DIRECTORY) && !(ep->getINode()->rAttr()&ATTR_DIRECTORY)) {
-                printf("it is not dir\n");
-                return statcode::err;
-            }
-        }
-        f1 = make_shared<File>(ep, a_flags);
-        f1->off = (a_flags&O_APPEND) ? ep->getINode()->rFileSize() : 0;
-        fd = curproc->fdAlloc(f1);
-        if(fdOutRange(fd)) { return statcode::err; }
-        if(!(ep->getINode()->rAttr()&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { ep->getINode()->nodTrunc(); }
-
-        return fd;
+        return Path(path, base).pathOpen(a_flags, a_mode);
     }
     xlen_t close() {
         auto &ctx = kHartObj().curtask->ctx;

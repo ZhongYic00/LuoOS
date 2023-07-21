@@ -73,6 +73,7 @@ namespace proc
         UserHeapTop=(UserStackDefault-(1l<<29)),
         UserHeapBottom=vm::ceil(UserHeapTop-(1l<<30));
     constexpr int MaxOpenFile = 101; // 官网测例往fd=100中写东西
+    constexpr int FdCwd = 3;
 
     typedef tid_t pid_t;
     struct Process:public IdManagable,public Scheduable{

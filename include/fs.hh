@@ -143,9 +143,9 @@ namespace fs{
             int pathHardUnlink();
             int pathMount(Path a_devpath, string a_fstype);
             int pathUnmount() const;
-            // shared_ptr<File> pathOpen(int a_flags, shared_ptr<File> a_file) const;
-            // inline shared_ptr<File> pathOpen(shared_ptr<File> a_file) const { return pathOpen(0, a_file); }
+            int pathOpen(int a_flags, mode_t a_mode);
             // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
+            // inline shared_ptr<File> pathOpen(mode_t a_mode) const { return pathOpen(0, a_file); }
             // inline shared_ptr<File> pathOpen() const { return pathOpen(0, nullptr); }
     };
 	class DStat {
@@ -203,6 +203,7 @@ namespace fs{
 
 	};
     int rootFSInit();
+    bool fdOutRange(int &a_fd);
 
     // namespace internal{
     //     class SuperBlock {};
