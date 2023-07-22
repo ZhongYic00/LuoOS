@@ -8,16 +8,18 @@ namespace vm
 {
     class VMOPaged:public VMO{
         eastl::vector<PBufRef> pages;
-        Arc<Pager> pager;
     public:
+        Arc<Pager> pager;
         VMOPaged(PageNum len,Arc<Pager> pager):pages(len),pager(pager){}
         VMOPaged(const VMOPaged& other):pages(other.len()),pager(other.pager){}
         inline PageNum len() const override{return pages.size();}
         inline PageSlice req(PageNum offset) override{
+            assert(offset<pages.size());
             if(!pages[offset]){
                 // load page
                 pages[offset]=pager->load(offset);
             }
+            assert(pages[offset].use_count());
             return {offset,pages[offset]->ppn,1};
         }
         inline eastl::vector<tuple<PageNum,PageNum>> req(const Segment& region){}

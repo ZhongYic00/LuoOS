@@ -84,6 +84,8 @@ namespace vm
     class Pager{
     public:
         virtual PBufRef load(PageNum offset)=0;
+        virtual void loadTo(PageNum offset,PBufRef pbuf){panic("unimplemented");}
+        virtual bool contains(PageNum offset)=0;
         virtual void put(PBufRef)=0;
     };
     class VMO
