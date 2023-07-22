@@ -17,6 +17,7 @@ namespace fs{
     using eastl::shared_ptr;
     using eastl::make_shared;
     using eastl::unordered_map;
+    using klib::ByteArray;
 
     class DEntry;
     class FileSystem;
@@ -127,9 +128,10 @@ namespace fs{
         File(shared_ptr<DEntry> a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags) {}
         ~File();
         xlen_t write(xlen_t addr, size_t len);
-        klib::ByteArray read(size_t len, long a_off = -1, bool a_update = true);
-        klib::ByteArray readAll();
+        ByteArray read(size_t len, long a_off = -1, bool a_update = true);
+        ByteArray readAll();
         off_t lSeek(off_t a_offset, int a_whence);
+        ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
     };
     class Path {
         private:
@@ -279,8 +281,8 @@ namespace fs{
     //     public:
     //         virtual DEntry *lookUp(INode *a_inode, DEntry *a_dent, string a_name);
     //         virtual ~INode()=default;
-    //         virtual expected<klib::ByteArray,Err> read(size_t off,size_t len)=0;
-    //         virtual expected<xlen_t,Err> write(size_t off,klib::ByteArray bytes)=0;
+    //         virtual expected<ByteArray,Err> read(size_t off,size_t len)=0;
+    //         virtual expected<xlen_t,Err> write(size_t off,ByteArray bytes)=0;
     //     };
     //     class Directory:public INode{
     //     public:

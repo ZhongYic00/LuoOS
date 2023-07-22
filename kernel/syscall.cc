@@ -371,6 +371,24 @@ namespace syscall {
         cur->getProcess()->exit(status);
         yield();
     }
+    xlen_t sendFile() {
+        auto &ctx=kHartObj().curtask->ctx;
+        int a_outfd = ctx.x(10);
+        int a_infd = ctx.x(11);
+        off_t *a_offset = (off_t*)ctx.x(12);
+        size_t a_len = ctx.x(13);
+
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> outfile = curproc->ofile(a_outfd);
+        shared_ptr<File> infile = curproc->ofile(a_infd);
+        if(outfile==nullptr || infile==nullptr) { return -EBADF; }
+        ByteArray offsetarr = curproc->vmar.copyin((xlen_t)a_offset, sizeof(off_t));
+
+        ssize_t ret = infile->sendFile(outfile, (off_t*)offsetarr.buff, a_len);
+
+        curproc->vmar.copyout((xlen_t)a_offset, offsetarr);
+        return ret;
+    }
     xlen_t fStatAt() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
@@ -808,6 +826,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::lseek,lSeek);
         DECLSYSCALL(scnum::read,read);
         DECLSYSCALL(scnum::write,write);
+        DECLSYSCALL(scnum::sendfile,sendFile);
         DECLSYSCALL(scnum::fstatat,fStatAt);
         DECLSYSCALL(scnum::fstat,fStat);
         DECLSYSCALL(scnum::sync,sync);

@@ -13,9 +13,12 @@
 // @todo error handling
 using namespace fs;
 
-constexpr uint8 MAX_DEV = 8;
+using vm::pageSize;
+
 static unordered_map<string, shared_ptr<FileSystem>> mnt_table;
-static uint8 mount_num = 0;
+static constexpr int SEEK_SET = 0;
+static constexpr int SEEK_CUR = 1;
+static constexpr int SEEK_END = 2;
 
 xlen_t File::write(xlen_t addr,size_t len){
     xlen_t rt=sys::statcode::err;
@@ -43,7 +46,7 @@ xlen_t File::write(xlen_t addr,size_t len){
     }
     return rt;
 }
-klib::ByteArray File::read(size_t len, long a_off, bool a_update){
+ByteArray File::read(size_t len, long a_off, bool a_update){
     if(a_off < 0) { a_off = off; }
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.r) { return rt; }
@@ -59,20 +62,20 @@ klib::ByteArray File::read(size_t len, long a_off, bool a_update){
             break;
         case FileType::entry: {
             int rdbytes = 0;
-            klib::ByteArray buf(len);
+            ByteArray buf(len);
             if((rdbytes = obj.ep->getINode()->nodRead(false, (uint64)buf.buff, a_off, len)) > 0) {
                 if(a_update) { off = a_off + rdbytes; }
             }
-            return klib::ByteArray(buf.buff, rdbytes);
+            return ByteArray(buf.buff, rdbytes);
             break;
         }
         default:
             panic("File::read(): unknown file type");
             break;
     }
-    return klib::ByteArray{0};
+    return ByteArray{0};
 }
-klib::ByteArray File::readAll(){
+ByteArray File::readAll(){
     switch(type){
         case FileType::entry:{
             size_t size=obj.ep->getINode()->rFileSize();
@@ -83,9 +86,6 @@ klib::ByteArray File::readAll(){
     }
 }
 off_t File::lSeek(off_t a_offset, int a_whence) {
-    static constexpr int SEEK_SET = 0;
-    static constexpr int SEEK_CUR = 1;
-    static constexpr int SEEK_END = 2;
     KStat kst = obj.ep;
     if ((kst.st_mode&S_IFMT)==S_IFCHR || (kst.st_mode&S_IFMT)==S_IFIFO) { return 0; }
     switch (a_whence) {  // @todo: st_size处是否越界？
@@ -109,6 +109,30 @@ off_t File::lSeek(off_t a_offset, int a_whence) {
         default: { return -EINVAL; }
     }
     return off;
+}
+ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len) {
+    uint64_t in_off = 0;
+    if(a_offset != nullptr) {
+        in_off = a_outfile->lSeek(0, SEEK_CUR);
+        if((ssize_t)in_off < 0) { return (ssize_t) in_off; } // this fails only if in_fd is invalid
+        lSeek(*a_offset, SEEK_SET); // and this must success
+    }
+    ssize_t nsend = 0;
+    while (a_len > 0) {
+        ssize_t rem = (ssize_t)(a_len > pageSize ? pageSize : a_len);
+        ByteArray buf = read(rem);
+        int ret = buf.len;
+        ret = a_outfile->write((xlen_t)buf.buff, ret);
+        if (ret < 0) { return ret; }
+        nsend += ret;
+        if (rem != ret) { break; } // EOF reached in in_fd or out_fd is full
+        a_len -= rem;
+    }
+    if (a_offset != nullptr) {
+        *a_offset = lSeek(0, SEEK_CUR);
+        lSeek(in_off, SEEK_SET);
+    }
+    return nsend;
 }
 File::~File() {
     switch(type){
