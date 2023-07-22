@@ -5,7 +5,9 @@
 #include "resmgr.hh"
 #include "linux/fcntl.h"
 #include "error.hh"
-#include "EASTL/unordered_map.h"
+#include "vm.hh"
+#include <EASTL/map.h>
+#include <EASTL/unordered_map.h>
 
 namespace fs{
     using pipe::Pipe;
@@ -14,6 +16,8 @@ namespace fs{
     using eastl::shared_ptr;
     using eastl::make_shared;
     using eastl::unordered_map;
+    using klib::Segment;
+    using memvec=eastl::vector<Segment<xlen_t>>;
 
     class DEntry;
     class FileSystem;
@@ -45,6 +49,7 @@ namespace fs{
     };
     class INode {
         public:
+            eastl::weak_ptr<vm::VMO> vmo;
             INode() = default;
             INode(const INode& a_inode) = default;
             virtual ~INode() = default;  // 需要保证脏数据落盘
@@ -57,6 +62,14 @@ namespace fs{
             virtual void nodTrunc() = 0;  // 清空该INode的元信息，并标志该INode为脏
             virtual int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) = 0;  // 从该文件的a_off偏移处开始，读取a_len字节的数据到a_dst处，返回实际读取的字节数
             virtual int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) = 0;  // 从a_src处开始，写入a_len字节的数据到该文件的a_off偏移处，返回实际写入的字节数
+            /// @brief copy contents from src to dst
+            /// @param src memvec(lba in bytes)
+            /// @param dst memvec(paddr in bytes)
+            void readv(const memvec &src,const memvec &dst);
+            /// @brief copy contents from src to dst
+            /// @param src memvec(lba in pages)
+            /// @param dst memvec(ppn)
+            void readPages(const memvec &src,const memvec &dst);
             virtual uint8 rAttr() const = 0;  // 返回该文件的属性
             virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
             virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
@@ -120,6 +133,7 @@ namespace fs{
         xlen_t write(xlen_t addr, size_t len);
         klib::ByteArray read(size_t len, long a_off = -1, bool a_update = true);
         klib::ByteArray readAll();
+        shared_ptr<vm::VMO> vmo();
     };
     class Path {
         private:
@@ -221,81 +235,5 @@ namespace fs{
             unordered_map<string, shared_ptr<FileSystem>>& getTable() { return mnt_table; }
     };
     int rootFSInit();
-
-    // namespace internal{
-    //     class SuperBlock {};
-    //     /// @bug sharedptr会直接删除，需要引入cache
-    //     class INode;
-    //     class DEntry;
-    //     typedef shared_ptr<INode> INodeRef;
-    //     class FileSystem{
-    //     public:
-    //         FileSystem(){}
-    //         virtual ~FileSystem(){}
-    //         virtual shared_ptr<INode> mknod()=0;
-    //         virtual INodeRef getRoot()=0;
-    //         // no rmnod since inode is managed by its refcount?
-    //     };
-    //     class INode{
-    //     private:
-    //         struct hlist_node i_hash;
-    //         struct list_head i_list;
-    //         struct list_head i_sb_list;
-    //         struct list_head i_dentry;
-    //         uint64 i_ino;
-    //         int i_count;  // @todo: 原类型为atomic_t，寻找替代？
-    //         uint i_nlink;
-    //         uid_t i_uid;  //inode拥有者id
-    //         gid_t i_gid;  //inode所属群组id
-    //         dev_t i_rdev;  //若是设备文件，表示记录设备的设备号
-    //         u64 i_version;
-    //         uint32 i_size;  //文件所占字节数(原loff_t类)
-    //         struct timespec i_atime;  //inode最近一次的存取时间
-    //         struct timespec i_mtime;  //inode最近一次修改时间
-    //         struct timespec i_ctime;  //inode的生成时间
-    //         uint  i_blkbits;
-    //         blkcnt_t  i_blocks;  // 文件所占扇区数
-    //         uint16 i_bytes;  // inode本身的字节数
-    //         mode_t i_mode;  // 文件权限
-    //         SuperBlock *i_sb;
-    //         struct address_space *i_mapping;
-    //         struct address_space i_data;
-    //         struct list_head i_devices;
-    //         union {
-    //             struct pipe_inode_info *i_pipe;
-    //             struct block_device *i_bdev;
-    //             struct cdev  *i_cdev;  //若是字符设备，对应的为cdev结构
-    //         };
-    //         ///@todo other metadata
-    //     public:
-    //         virtual DEntry *lookUp(INode *a_inode, DEntry *a_dent, string a_name);
-    //         virtual ~INode()=default;
-    //         virtual expected<klib::ByteArray,Err> read(size_t off,size_t len)=0;
-    //         virtual expected<xlen_t,Err> write(size_t off,klib::ByteArray bytes)=0;
-    //     };
-    //     class Directory:public INode{
-    //     public:
-    //         /// @brief lookup
-    //         virtual expected<INodeRef,Err> find(const string& name)=0;
-    //         virtual expected<void,Err> link(const string& name,INodeRef inode)=0;
-    //         virtual expected<void,Err> unlink(const DEntry &sub)=0;
-    //     };
-    //     class DEntry{
-    //     public:
-    //         shared_ptr<INode> nod;
-    //         const string name;
-    //         const shared_ptr<DEntry> parent;
-    //     };
-    //     /// @brief a cursor in vfs
-    //     class Dir{
-    //         DEntry cur;
-    //     public:
-    //         bool mkdir(const string& name){ auto sub=cur.nod->fs->mknod(); eastl::dynamic_pointer_cast<Directory>(cur.nod)->link(name,sub); }
-    //         bool rmdir(const string& name){}
-    //         bool cd(const string& name){ if(auto rt=eastl::dynamic_pointer_cast<Directory>(cur.nod)->find(name)){ cur=rt.value(); } }
-    //         bool cdUp(){}
-    //     };
-    //     struct FileSystem_:private FileSystem{ FileSystem_():FileSystem(){} };
-    // }
 }
 #endif

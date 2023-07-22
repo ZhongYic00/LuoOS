@@ -22,7 +22,7 @@ void Logger::log(int level,const char *fmt,...){
     item.id=++lid;
     va_list vl;
     va_start(vl,fmt);
-    _vsnprintf(item.buf,300,fmt,vl);
+    _vsnprintf(item.buf,500,fmt,vl);
     va_end(vl);
     if(level>=outputLevel)puts(item.buf);
 }

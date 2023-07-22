@@ -46,6 +46,9 @@ namespace csr
             storeAccessFault=7,
             uecall=8,
             secall=9,
+            instrPageFault=12,
+            loadPageFault=13,
+            storePageFault=15,
         };
         constexpr bool isInterrupt(xlen_t mcause){return (mcause>>63)&1;}
     }

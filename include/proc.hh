@@ -4,10 +4,11 @@
 // #include "resmgr.hh"
 #include "sched.hh"
 #include "vm.hh"
-#include "TINYSTL/unordered_set.h"
-#include "TINYSTL/string.h"
-#include "TINYSTL/vector.h"
 #include "fs.hh"
+#include <EASTL/unordered_set.h>
+#include <EASTL/string.h>
+#include <EASTL/vector.h>
+#include <EASTL/stack.h>
 
 namespace proc
 {
@@ -78,9 +79,9 @@ namespace proc
         tid_t parent;
         VMAR vmar;
         xlen_t heapTop=UserHeapBottom;
-        tinystl::unordered_set<Task*> tasks;
+        eastl::unordered_set<Task*> tasks;
         shared_ptr<File> files[MaxOpenFile];
-        tinystl::string name;
+        eastl::string name;
         Tms ti;
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
@@ -103,24 +104,7 @@ namespace proc
         void print();
         int fdAlloc(shared_ptr<File> a_file, int a_fd=-1);
         /// @todo rtval
-        inline xlen_t brk(xlen_t addr){
-            Log(info,"brk %lx",addr);
-            if(addr>=UserHeapTop||addr<=UserHeapBottom)return heapTop;
-            if(vmar.contains(addr))return heapTop=addr;
-            else {
-                /// @todo free redundant vmar
-                /// @brief alloc new vmar
-                using namespace vm;
-                xlen_t curtop=bytes2pages(heapTop),
-                    destop=bytes2pages(addr),
-                    pages=destop-curtop;
-                Log(info,"curtop=%x,destop=%x, needs to alloc %d pages",curtop,destop,pages);
-                auto vmo=VMO::alloc(pages);
-                using perm=PageTableEntry::fieldMasks;
-                vmar.map(PageMapping{curtop,vmo,perm::r|perm::w|perm::x|perm::u|perm::v,PageMapping::MappingType::anon});
-                return heapTop=addr;
-            }
-        }
+        xlen_t brk(xlen_t addr);
         void exit(int status);
         void zombieExit();
     private:
@@ -134,6 +118,7 @@ namespace proc
         };
         Context ctx;
         KContext kctx;
+        eastl::stack<KContext> kctxs;
         const pid_t proc;
         Priv lastpriv;
         Process *getProcess();
@@ -176,8 +161,8 @@ namespace proc
     typedef ObjManager<Task> TaskManager;
     class ProcManager:public ProcManagerBase{
     public:
-        tinystl::vector<Process*> getChilds(pid_t pid){
-            tinystl::vector<Process*> rt;
+        eastl::vector<Process*> getChilds(pid_t pid){
+            eastl::vector<Process*> rt;
             for(int i=0;i<128;i++){
                 auto p=this->operator[](i);
                 if(p && p->parent==pid)

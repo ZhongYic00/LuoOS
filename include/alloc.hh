@@ -16,27 +16,22 @@ namespace alloc
         PageMgr(xlen_t start,xlen_t end);
         ~PageMgr();
         xlen_t alloc(size_t pages);
-        xlen_t free(PageNum ppn,int order);
+        void free(PageNum ppn,int order);
         inline void print(){
             Log(debug,"buddy: |"); for(xlen_t i=0;i<buddyTreeSize;i++)Log(debug,"%d | ",buddyNodes[i]-1);Log(debug,"\n");
         }
+        void freeUnaligned(PageNum ppn,PageNum pages);
     private:
-        // void split();
-        // void merge();
         inline constexpr xlen_t lsub(xlen_t x){return ((x+1)<<1)-1;}
         inline constexpr xlen_t rsub(xlen_t x){return ((x+1)<<1);}
         inline constexpr xlen_t prnt(xlen_t x){return ((x+1)>>1)-1;}
-        // inline constexpr xlen_t lsib(xlen_t x){return x-1;}
-        // inline constexpr xlen_t rsib(xlen_t x){return x+1;}
         inline xlen_t pos2node(xlen_t pos,int order){
             DBG(assert(((pos>>rootOrder)&1)==0);)
             xlen_t nd=0;
             for(int size=rootOrder-1;size>=order;size-=1){
                 if((pos>>size)&1)nd=rsub(nd);
                 else nd=lsub(nd);
-                // DBG(printf("%ld ",nd);)
             }
-            // DBG(printf("\n");)
             return nd;
         }
 
@@ -54,10 +49,10 @@ namespace alloc
     protected:
         ptr_t pool;
         constexpr static int retryLimit=2;
-        virtual void growHeap(){}
+        virtual void growHeap(size_t size){}
     public:
         HeapMgr(ptr_t addr,xlen_t len);
-        ~HeapMgr();
+        virtual ~HeapMgr();
         ptr_t alloc(xlen_t size);
         ptr_t alligned_alloc(xlen_t size,xlen_t alignment);
         void free(ptr_t ptr);
@@ -75,8 +70,7 @@ namespace alloc
         };
         LockedObject<PageMgr>& pmgr;
         slist<Span,Allocator> dynPages;
-        int growsize;
-        void growHeap() override;
+        void growHeap(size_t size) override;
     public:
         HeapMgrGrowable(HeapMgr &other,LockedObject<PageMgr> &pmgr);
         HeapMgrGrowable(ptr_t addr,xlen_t len,LockedObject<PageMgr> &pmgr);

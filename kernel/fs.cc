@@ -1,6 +1,8 @@
 #include "fs.hh"
 #include "fat.hh"
 #include "vm.hh"
+#include "vm/pager.hh"
+#include "vm/vmo.hh"
 #include "kernel.hh"
 // #include "klib.h"
 
@@ -302,3 +304,35 @@ int fs::rootFSInit() {
     return 0;
 }
 
+namespace fs
+{
+    void INode::readv(const memvec &src,const memvec &dst){
+        auto srcit=src.begin();
+        auto srcseg=*srcit;
+        auto totrdbytes=0u;
+        for(auto seg:dst){
+            auto rdbytes=nodRead(false,seg.l,srcit->l,seg.length());
+            srcseg.l+=rdbytes;
+            if(!srcseg)srcseg=*++srcit;
+            totrdbytes+=rdbytes;
+        }
+    }
+    void INode::readPages(const memvec &src,const memvec &dst){
+        memvec src1,dst1;
+        for(auto seg:src)
+            src1.push_back(Segment<xlen_t>{vm::pn2addr(seg.l),vm::pn2addr(seg.r+1)-1});
+        for(auto seg:dst)
+            dst1.push_back(Segment<xlen_t>{vm::pn2addr(seg.l),vm::pn2addr(seg.r+1)-1});
+        return readv(src1,dst1);
+    }
+
+    shared_ptr<vm::VMO> File::vmo(){
+        auto vnode=obj.ep->getINode();
+        if(vnode->vmo.expired()){
+            auto rt=make_shared<vm::VMOPaged>(vm::bytes2pages(vnode->rFileSize()),eastl::dynamic_pointer_cast<vm::Pager>(make_shared<vm::VnodePager>(vnode)));
+            vnode->vmo=eastl::weak_ptr<vm::VMOPaged>(rt);
+            return rt;
+        }
+        return vnode->vmo.lock();
+    }
+} // namespace fs
