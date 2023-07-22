@@ -168,7 +168,7 @@ namespace fat {
             inline int entNext(uint a_off) { return entNext(nullptr, a_off, nullptr); }
             int relocClus(uint a_off, bool a_alloc);
             const uint32 allocClus() const;
-            inline DirEnt *entDup();
+            DirEnt *entDup();
             DirEnt *eCacheHit(string a_name) const;
             void entRelse();
             void entTrunc();

@@ -132,8 +132,8 @@ PageNum PageMgr::alloc(size_t pages){
     assert(ppn<end);
     return ppn;
 }
-PageNum PageMgr::free(PageNum ppn,int order){
-    xlen_t idx=pos2node(ppn-start,order);
+void PageMgr::free(PageNum ppn,int order){
+    int idx=pos2node(ppn-start,order);
     DBG(Log(debug,"PageMgr::free(ppn=%x pos=%ld order=%d) idx=0x%lx\n",ppn,ppn-start,order,idx);)
     // xlen_t idx=ppn-start+(1l<<rootOrder);
     buddyNodes[idx]=++order;

@@ -16,7 +16,7 @@ namespace alloc
         PageMgr(xlen_t start,xlen_t end);
         ~PageMgr();
         xlen_t alloc(size_t pages);
-        xlen_t free(PageNum ppn,int order);
+        void free(PageNum ppn,int order);
         inline void print(){
             Log(debug,"buddy: |"); for(xlen_t i=0;i<buddyTreeSize;i++)Log(debug,"%d | ",buddyNodes[i]-1);Log(debug,"\n");
         }
