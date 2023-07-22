@@ -9,7 +9,7 @@ using namespace vm;
 PageBuf::PageBuf(const PageKey key_):key(key),ppn(kGlobObjs->pageMgr->alloc(1)){}
 PageBuf::~PageBuf(){
     Log(debug,"free(%x)",ppn);
-    kGlobObjs->pageMgr->free(ppn,1);
+    kGlobObjs->pageMgr->free(ppn,0);
 }
 
 VMOMapper::VMOMapper(Arc<VMO> vmo){
