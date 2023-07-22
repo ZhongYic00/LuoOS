@@ -49,10 +49,10 @@ namespace alloc
     protected:
         ptr_t pool;
         constexpr static int retryLimit=2;
-        virtual void growHeap(){}
+        virtual void growHeap(size_t size){}
     public:
         HeapMgr(ptr_t addr,xlen_t len);
-        ~HeapMgr();
+        virtual ~HeapMgr();
         ptr_t alloc(xlen_t size);
         ptr_t alligned_alloc(xlen_t size,xlen_t alignment);
         void free(ptr_t ptr);
@@ -70,8 +70,7 @@ namespace alloc
         };
         LockedObject<PageMgr>& pmgr;
         slist<Span,Allocator> dynPages;
-        int growsize;
-        void growHeap() override;
+        void growHeap(size_t size) override;
     public:
         HeapMgrGrowable(HeapMgr &other,LockedObject<PageMgr> &pmgr);
         HeapMgrGrowable(ptr_t addr,xlen_t len,LockedObject<PageMgr> &pmgr);
