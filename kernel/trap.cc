@@ -184,12 +184,13 @@ void _strapexit(){
         auto gprvaddr=cur->kctx.vaddr+offsetof(proc::Task,ctx.gpr);
         csrWrite(sscratch,gprvaddr);
         csrWrite(sepc,cur->ctx.pc);
+        assert(!(cur->ctx.pc>=0x80200000&&cur->ctx.pc<=0x80300000));
         csrClear(sstatus,1l<<csr::mstatus::spp);
         csrSet(sstatus,BIT(csr::mstatus::spie));
         csrWrite(stvec,strapwrapper);
-        csrWrite(satp,kHartObj().curtask->kctx.satp);
         if(cur->ctx.pc<0x100000)
             prevs0--;
+        csrWrite(satp,kHartObj().curtask->kctx.satp);
         ExecInst(sfence.vma);
         register xlen_t t6 asm("t6");
         csrRead(sscratch,t6);
