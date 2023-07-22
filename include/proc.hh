@@ -99,7 +99,7 @@ namespace proc
         inline tid_t pid(){return id;}
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
-        inline shared_ptr<File> ofile(int fd){return files[fd];}
+        shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围
         Task* newTask();
         Task* newTask(const Task &other,bool allocStack=true);
         Task* newKTask(prior_t prior=0);
@@ -197,6 +197,7 @@ namespace proc
     Process* createProcess();
     Process* createKProcess(prior_t prior);
     pid_t clone(Task* task);
+    inline bool fdOutRange(int a_fd) { return (a_fd<0) || (a_fd>=proc::MaxOpenFile); }
 } // namespace proc
 
 

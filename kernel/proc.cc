@@ -155,23 +155,29 @@ Process::~Process(){
     tasks.clear();
 }
 Process *Process::parentProc(){return (**kGlobObjs->procMgr)[parent];}
-
-int Process::fdAlloc(shared_ptr<File> a_file, int a_fd){ // fd缺省值为-1，在头文件中定义
-    if(a_fd < 0) {
-        for(int fd = 0; fd < MaxOpenFile; ++fd){
-            if(files[fd] == nullptr){
+shared_ptr<File> Process::ofile(int a_fd) {
+    if(a_fd == AT_FDCWD) { a_fd = FdCwd; }
+    if(fdOutRange(a_fd)) { return nullptr; }
+    return files[a_fd];
+}
+int Process::fdAlloc(shared_ptr<File> a_file, int a_fd) {
+    if(a_fd == -1) {
+        for(int fd = 0; fd < MaxOpenFile; ++fd) {
+            if(files[fd] == nullptr) {
                 files[fd] = a_file;
                 return fd;
             }
         }
+        return -ENOMEM;
     }
-    else {
-        if((a_fd<MaxOpenFile) && (files[a_fd]==nullptr)){
+    else if(!fdOutRange(a_fd)) {
+        if(files[a_fd] == nullptr) {
             files[a_fd] = a_file;
             return a_fd;
         }
+        else { return -EBADF; }
     }
-    return -1;  // 返回错误码
+    else { return -EBADF; }  // 返回错误码
 }
 
 void Task::accept(){

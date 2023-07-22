@@ -230,7 +230,6 @@ namespace fs{
             ~StatFS() = default;
     };
     int rootFSInit();
-    bool fdOutRange(int &a_fd);
 
     // namespace internal{
     //     class SuperBlock {};

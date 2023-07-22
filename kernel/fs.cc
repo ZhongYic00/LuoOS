@@ -127,7 +127,9 @@ File::~File() {
     }
 }
 void Path::pathBuild() {
-    if(base == nullptr) { base = kHartObj().curtask->getProcess()->cwd; }
+    if(pathname.length() < 1) { base = kHartObj().curtask->getProcess()->cwd; return; }
+    else if(pathname[0] == '/') { base = mnt_table["/"]->getSpBlk()->getRoot(); }
+    else if(base == nullptr) { base = kHartObj().curtask->getProcess()->cwd; }
     size_t len = pathname.length();
     if(len > 0) {  // 保证数组长度不为0
         auto ind = new size_t[len][2] { { 0, 0 } };
@@ -190,9 +192,8 @@ shared_ptr<DEntry> Path::pathSearch(bool a_parent) {
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
     else if((entry=pathHitTable()) != nullptr) {}  // 查挂载表，若查到则起始目录存到entry中
-    else if(pathname[0] == '/') { entry = mnt_table["/"]->getSpBlk()->getRoot(); }  // 绝对路径
-    else if(base != nullptr) { entry = base; }  // 相对路径（指定目录）
-    // else { entry = kHartObj().curtask->getProcess()->cwd; }  // 相对路径（工作目录）
+    // else if(pathname[0] == '/') { entry = mnt_table["/"]->getSpBlk()->getRoot(); }  // 绝对路径
+    else { entry = base; }  // 相对路径
     for(int i = 0; i < dirnum; ++i) {
         while(entry->isMntPoint()) { entry = entry->getINode()->getSpBlk()->getRoot(); }
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
@@ -324,7 +325,7 @@ int Path::pathOpen(int a_flags, mode_t a_mode) {
     shared_ptr<File> file = make_shared<File>(entry, a_flags);
     file->off = (a_flags&O_APPEND) ? entry->getINode()->rFileSize() : 0;
     int fd = kHartObj().curtask->getProcess()->fdAlloc(file);
-    if(fdOutRange(fd)) { return -1; }
+    if(fd < 0) { return -1; }
     if(!(entry->getINode()->rAttr()&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { entry->getINode()->nodTrunc(); }
 
     return fd;
@@ -339,8 +340,3 @@ int fs::rootFSInit() {
     }
     return 0;
 }
-bool fs::fdOutRange(int &a_fd) {
-    if(a_fd == AT_FDCWD) { a_fd = proc::FdCwd; }
-    return (a_fd<0) || (a_fd>proc::MaxOpenFile);
-}
-
