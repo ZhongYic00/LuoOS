@@ -15,7 +15,7 @@ namespace ld
             // return mask::r|mask::w|mask::x|mask::v|mask::u;
         }
     } // namespace elf
-    xlen_t loadElf(const uint8_t *buff,vm::VMAR &vmar);
+    eastl::tuple<xlen_t,xlen_t> loadElf(const uint8_t *buff,vm::VMAR &vmar);
 } // namespace ld
 
 #endif

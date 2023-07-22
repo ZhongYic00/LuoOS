@@ -5,7 +5,7 @@
 #include "kernel.hh"
 #include "virtio.hh"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::warning
 
 static hook_t hooks[]={schedule};
 

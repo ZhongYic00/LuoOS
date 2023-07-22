@@ -198,7 +198,9 @@ void init(int hartid){
         extern char _uimg_start;
         auto uproc=proc::createProcess();
         uproc->name="uprog00";
-        uproc->defaultTask()->ctx.pc=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
+        auto [pc,brk]=ld::loadElf((uint8_t*)((xlen_t)&_uimg_start),uproc->vmar);
+        uproc->defaultTask()->ctx.pc=pc;
+        uproc->heapTop=brk;
         // plicInit();
         // csrClear(sstatus,1l<<csr::mstatus::spp);
         // csrSet(sstatus,BIT(csr::mstatus::spie));

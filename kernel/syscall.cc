@@ -574,8 +574,9 @@ namespace syscall {
         // static_cast<proc::Context>(kHartObj().curtask->kctx)=proc::Context();
         ctx.sp()=proc::UserStackDefault;
         /// load elf
-        ctx.pc=
-            ld::loadElf(buf.buff,kHartObj().curtask->getProcess()->vmar);
+        auto [pc,brk]=ld::loadElf(buf.buff,kHartObj().curtask->getProcess()->vmar);
+        ctx.pc=pc;
+        kHartObj().curtask->getProcess()->heapTop=brk;
         /// setup stack
         auto &vmar=kHartObj().curtask->getProcess()->vmar;
         klib::ArrayBuff<xlen_t> argv(args.size()+1);
