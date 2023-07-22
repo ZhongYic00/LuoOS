@@ -5,7 +5,6 @@
 #include "safestl.hh"
 #include "klib.hh"
 
-typedef int tid_t;
 struct IdManagable{
     const tid_t id;
     IdManagable(tid_t id):id(id){}

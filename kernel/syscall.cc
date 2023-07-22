@@ -528,6 +528,91 @@ namespace syscall {
 
         return ticks;
     }
+    xlen_t setGid() {
+        auto &ctx = kHartObj().curtask->ctx;
+        gid_t a_gid = ctx.x(10);
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        curproc->rgid() = curproc->egid() = curproc->sgid() = a_gid;
+
+        return statcode::ok;
+    }
+    xlen_t setUid() {
+        auto &ctx = kHartObj().curtask->ctx;
+        uid_t a_uid = ctx.x(10);
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        curproc->ruid() = curproc->euid() = curproc->suid() = a_uid;
+
+        return statcode::ok;
+    }
+    xlen_t getRESgid() {
+        auto &ctx = kHartObj().curtask->ctx;
+        gid_t *a_rgid = (gid_t*)ctx.x(10);
+        gid_t *a_egid = (gid_t*)ctx.x(11);
+        gid_t *a_sgid = (gid_t*)ctx.x(12);
+        if(a_rgid==nullptr || a_egid==nullptr || a_sgid==nullptr) { return -EFAULT; }
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        curproc->vmar.copyout((xlen_t)a_rgid, ByteArray((uint8*)&curproc->rgid(), sizeof(gid_t)));
+        curproc->vmar.copyout((xlen_t)a_egid, ByteArray((uint8*)&curproc->egid(), sizeof(gid_t)));
+        curproc->vmar.copyout((xlen_t)a_sgid, ByteArray((uint8*)&curproc->sgid(), sizeof(gid_t)));
+
+        return statcode::ok;
+    }
+    xlen_t getRESuid() {
+        auto &ctx = kHartObj().curtask->ctx;
+        uid_t *a_ruid = (uid_t*)ctx.x(10);
+        uid_t *a_euid = (uid_t*)ctx.x(11);
+        uid_t *a_suid = (uid_t*)ctx.x(12);
+        if(a_ruid==nullptr || a_euid==nullptr || a_suid==nullptr) { return -EFAULT; }
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        curproc->vmar.copyout((xlen_t)a_ruid, ByteArray((uint8*)&curproc->ruid(), sizeof(uid_t)));
+        curproc->vmar.copyout((xlen_t)a_euid, ByteArray((uint8*)&curproc->euid(), sizeof(uid_t)));
+        curproc->vmar.copyout((xlen_t)a_suid, ByteArray((uint8*)&curproc->suid(), sizeof(uid_t)));
+
+        return statcode::ok;
+    }
+    xlen_t setPGid() {
+        auto &ctx = kHartObj().curtask->ctx;
+        pid_t a_pid = (pid_t)ctx.x(10);
+        pid_t a_pgid = (pid_t)ctx.x(11);
+
+        auto proc = (a_pid==0 ? kHartObj().curtask->getProcess() : (**kGlobObjs->procMgr)[a_pid]);
+        if(proc == nullptr) { return -ESRCH; }
+        proc->pgid() = (a_pgid==0 ? proc->pid() : a_pgid);
+
+        return statcode::ok;
+    }
+    xlen_t getPGid() {
+        auto &ctx = kHartObj().curtask->ctx;
+        pid_t a_pid = (pid_t)ctx.x(10);
+        
+        auto proc = (a_pid==0 ? kHartObj().curtask->getProcess() : (**kGlobObjs->procMgr)[a_pid]);
+        if(proc == nullptr) { return -ESRCH; }
+
+        return proc->pgid();
+    }
+    xlen_t getSid() {
+        auto &ctx = kHartObj().curtask->ctx;
+        pid_t a_pid = (pid_t)ctx.x(10);
+        
+        auto proc = (a_pid==0 ? kHartObj().curtask->getProcess() : (**kGlobObjs->procMgr)[a_pid]);
+        if(proc == nullptr) { return -ESRCH; }
+
+        return proc->sid();
+    }
+    xlen_t setSid() {
+        auto &ctx = kHartObj().curtask->ctx;
+
+        auto curproc = kHartObj().curtask->getProcess();
+        if(curproc->pgid() == curproc->pid()) { return -EPERM; }
+        curproc->sid()  = curproc->pid();
+        curproc->pgid() = curproc->pid();
+
+        return curproc->sid();
+    }
     xlen_t uName(void) {
         auto &ctx = kHartObj().curtask->ctx;
         struct UtSName *a_uts = (struct UtSName*)ctx.x(10);
@@ -562,6 +647,18 @@ namespace syscall {
         yield();
         return statcode::ok;
     }
+    xlen_t getUid() {
+        return kHartObj().curtask->getProcess()->ruid();
+    }
+    xlen_t getEuid() {
+        return kHartObj().curtask->getProcess()->euid();
+    }
+    xlen_t getGid() {
+        return kHartObj().curtask->getProcess()->rgid();
+    }
+    xlen_t getEgid() {
+        return kHartObj().curtask->getProcess()->egid();
+    }
     xlen_t getTid() {
         return kHartObj().curtask->tid();
     }
@@ -576,7 +673,7 @@ namespace syscall {
         Log(debug,"clone curproc=%d, new proc=%d",kHartObj().curtask->getProcess()->pid(),pid);
         return pid;
     }
-    int waitpid(tid_t pid,xlen_t wstatus,int options){
+    int waitpid(pid_t pid,xlen_t wstatus,int options){
         Log(debug,"waitpid(pid=%d,options=%d)",pid,options);
         auto curproc=kHartObj().curtask->getProcess();
         proc::Process* target=nullptr;
@@ -839,11 +936,23 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::sigaction,sigAction);
         DECLSYSCALL(scnum::sigprocmask,sigProcMask);
         DECLSYSCALL(scnum::sigreturn,sigReturn);
+        DECLSYSCALL(scnum::setgid,setGid);
+        DECLSYSCALL(scnum::setuid,setUid);
+        DECLSYSCALL(scnum::getresgid,getRESgid);
+        DECLSYSCALL(scnum::getresuid,getRESuid);
+        DECLSYSCALL(scnum::setpgid,setPGid);
+        DECLSYSCALL(scnum::getpgid,getPGid);
+        DECLSYSCALL(scnum::getsid,getSid);
+        DECLSYSCALL(scnum::setsid,setSid);
         DECLSYSCALL(scnum::times,times);
         DECLSYSCALL(scnum::uname,uName);
         DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);
         DECLSYSCALL(scnum::getpid,getPid);
         DECLSYSCALL(scnum::getppid,getPPid);
+        DECLSYSCALL(scnum::getuid,getUid);
+        DECLSYSCALL(scnum::geteuid,getEuid);
+        DECLSYSCALL(scnum::getgid,getGid);
+        DECLSYSCALL(scnum::getegid,getEgid);
         DECLSYSCALL(scnum::gettid,getTid);
         DECLSYSCALL(scnum::brk,brk);
         DECLSYSCALL(scnum::munmap,munmap);

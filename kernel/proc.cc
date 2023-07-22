@@ -4,10 +4,10 @@
 
 using namespace proc;
 // #define moduleLevel LogLevel::info
-Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
+Process::Process(pid_t pid,prior_t prior,pid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
 }
-Process::Process(prior_t prior,tid_t parent):Process(id,prior,parent){}
+Process::Process(prior_t prior,pid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
     auto ustack=UserStackDefault;
     using perm=vm::PageTableEntry::fieldMasks;
@@ -116,7 +116,7 @@ Process* proc::createProcess(){
     return proc;
 }
 Process* Task::getProcess(){ return (**kGlobObjs->procMgr)[proc]; }
-proc::pid_t proc::clone(Task *task){
+pid_t proc::clone(Task *task){
     auto proc=task->getProcess();
     Log(info,"clone(src=%p:[%d])",proc,proc->pid());
     TRACE(Log(info,"src proc VMAR:\n");proc->vmar.print();)
@@ -127,7 +127,7 @@ proc::pid_t proc::clone(Task *task){
     return newproc->pid();
 }
 
-Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd){
+Process::Process(const Process &other,pid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd){
     for(int i=0;i<MaxOpenFile;i++)files[i]=other.files[i];
 }
 void Process::exit(int status){

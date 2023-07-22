@@ -75,9 +75,8 @@ namespace proc
     constexpr int MaxOpenFile = 101; // 官网测例往fd=100中写东西
     constexpr int FdCwd = 3;
 
-    typedef tid_t pid_t;
     struct Process:public IdManagable,public Scheduable{
-        tid_t parent;
+        pid_t parent;
         VMAR vmar;
         xlen_t heapTop=UserHeapBottom;
         tinystl::unordered_set<Task*> tasks;
@@ -87,16 +86,28 @@ namespace proc
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
         SignalAction actions[numSignals];
+        pid_t m_pgid, m_sid;
+        uid_t m_ruid, m_euid, m_suid;
+        gid_t m_rgid, m_egid, m_sgid;
 
-        Process(prior_t prior,tid_t parent);
-        Process(tid_t pid,prior_t prior,tid_t parent);
-        Process(const Process &other,tid_t pid);
+        Process(prior_t prior,pid_t parent);
+        Process(pid_t pid,prior_t prior,pid_t parent);
+        Process(const Process &other,pid_t pid);
         inline Process(const Process &other):Process(other,id){}
         ~Process();
 
         inline Task* defaultTask(){ return *tasks.begin(); } // @todo needs to mark default
         Process *parentProc();
-        inline tid_t pid(){return id;}
+        inline pid_t pid() { return id; }
+        // 下列id读/写一体
+        inline pid_t& pgid() { return m_pgid; }
+        inline pid_t& sid() { return m_sid; }
+        inline uid_t& ruid() { return m_ruid; }
+        inline uid_t& euid() { return m_euid; }
+        inline uid_t& suid() { return m_suid; }
+        inline gid_t& rgid() { return m_rgid; }
+        inline gid_t& egid() { return m_egid; }
+        inline gid_t& sgid() { return m_sgid; }
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
         shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围
