@@ -100,7 +100,17 @@ void externalInterruptHandler(){
     }
     plicComplete(irq);
 }
-
+bool isPrevPriv(){xlen_t sstatus;csrRead(sstatus,sstatus);return sstatus&BIT(csr::mstatus::spp);}
+void pagefaultHandler(xlen_t addr){
+    if(isPrevPriv()){
+        xlen_t satp;
+        csrRead(satp,satp);
+        assert(satp==kGlobObjs->vmar->satp());
+        kGlobObjs->vmar->pfhandler(addr);
+    } else {
+        kHartObj().curtask->getProcess()->vmar.pfhandler(addr);
+    }
+}
 
 extern "C" void straphandler(){
     ptr_t sepc; csrRead(sepc,sepc);
@@ -108,8 +118,6 @@ extern "C" void straphandler(){
     xlen_t stval; csrRead(stval,stval);
     Log(debug,"straphandler cause=[%d]%d sepc=%lx stval=%lx\n",csr::mcause::isInterrupt(scause),scause<<1>>1,sepc,stval);
     Log(debug,"strap enter, saved context=%s",kHartObj().curtask->toString().c_str());
-    if(kHartObj().curtask->lastpriv==proc::Task::Priv::User)kHartObj().curtask->ctx.pc=(xlen_t)sepc;
-    else kHartObj().curtask->kctx.ra()=(xlen_t)sepc;
 
     if(csr::mcause::isInterrupt(scause)){
         switch(scause<<1>>1){
@@ -138,6 +146,11 @@ extern "C" void straphandler(){
             case uecall:uecallHandler();break;
             // case secall:break;
             case storeAccessFault:break;
+            case instrPageFault:
+            case loadPageFault:
+            case storePageFault:
+                pagefaultHandler(stval);
+                break;
             default:
                 Log(error,"exception[%d] sepc=%x stval=%x",scause,sepc,stval);
                 // kHartObj().curtask->kctx.ra()=(xlen_t)sepc+4;
@@ -166,12 +179,22 @@ void _strapenter(){
         csrWrite(satp,kGlobObjs->ksatp);
         ExecInst(sfence.vma);
         regWrite(sp,kHartObj().curtask->trapstack());
+        csrRead(sepc,kHartObj().curtask->ctx.pc);
         // assert(curtask->trapstack()&0xff==0);
     } else {
+        // __asm__("addi sp,sp,-16\nsd ra,0(sp)\ncsrr ra,sepc\nsd ra,8(sp)");
+        // csrSwap(sscratch,t6);
+        // __asm__("addi t6,sp,-248");
+        // saveContext();
+        // __asm__("addi sp,sp,-248");
         /// @todo set stack
-        int tp;
-        regRead(tp,tp);
-        regWrite(sp,kInfo.segments.kstack.first+tp*0x1000+0x1000);
+        // int tp;
+        // regRead(tp,tp);
+        // regWrite(sp,kInfo.segments.kstack.first+tp*0x1000+0x1000);
+        auto curtask=kHartObj().curtask;
+        csrRead(sepc,curtask->kctx.pc);
+        curtask->kctxs.push(curtask->kctx);
+        csrWrite(sscratch,curtask->kctx.gpr);
     }
 }
 __attribute__((always_inline))
@@ -202,9 +225,12 @@ void _strapexit(){
         csrWrite(sscratch,cur->kctx.gpr);
         if(cur->lastpriv==proc::Task::Priv::AlwaysKernel)csrSet(sstatus,BIT(csr::mstatus::spie))
         else csrClear(sstatus,BIT(csr::mstatus::spie))
-        csrWrite(sepc,cur->kctx.ra());
+        cur->kctx=cur->kctxs.top();cur->kctxs.pop();
+        csrWrite(sepc,cur->kctx.pc);
         volatile register ptr_t t6 asm("t6")=cur->kctx.gpr;
+        // __asm__("mv t6,sp");
         restoreContext();
+        // __asm__("ld ra,8(sp)\ncsrw sepc,ra\nld ra,0(sp)\n addi sp,sp,16");
         ExecInst(sret);
     }
 }

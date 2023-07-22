@@ -93,27 +93,31 @@ namespace vm
         if(unaligned){
             auto partial=klib::min(bigPageSize-unaligned,pages);
             PageTableEntry &entry=table[(vpn/bigPageSize)&vpnMask];
-            assert(entry.isValid() && !entry.isLeaf());
-            pgtbl_t subTable=entry.child();
-            DBG_ENTRY
-            Log(debug,"subtable=%lx\n",subTable);
-            removeMapping(subTable,vpn,partial,level-1); // actual create mapping
-            if(freePTNode(subTable))entry.setInvalid();
+            if(entry.isValid()){
+                assert(!entry.isLeaf());
+                pgtbl_t subTable=entry.child();
+                DBG_ENTRY
+                Log(debug,"subtable=%lx\n",subTable);
+                removeMapping(subTable,vpn,partial,level-1); // actual create mapping
+                if(freePTNode(subTable))entry.setInvalid();
+            }
             vpn+=partial,pages-=partial;
         }
         // unmap aligned whole pages
         for(int i=(vpn/bigPageSize)&vpnMask;pages>=bigPageSize;i++){
             PageTableEntry &entry=table[i];
-            assert(entry.isValid());
-            // big page entry
-            if(entry.isLeaf())entry.setInvalid();
-            else {
-                // pushed down
-                removeMapping(entry.child(),vpn,pages,level-1);
-                assert(freePTNode(entry.child()));
-                entry.setInvalid();
+            /// @note assertion is removed due to demand paging
+            // assert(entry.isValid());
+            if(entry.isValid()){
+                // big page entry
+                if(entry.isLeaf())entry.setInvalid();
+                else {
+                    // pushed down
+                    removeMapping(entry.child(),vpn,pages,level-1);
+                    assert(freePTNode(entry.child()));
+                    entry.setInvalid();
+                }
             }
-
             vpn+=bigPageSize;
             pages-=bigPageSize;
         }
@@ -121,12 +125,14 @@ namespace vm
         if(pages){
             assert(pages>0);
             PageTableEntry &entry=table[(vpn/bigPageSize)&vpnMask];
-            assert(entry.isValid() && !entry.isLeaf());
-            pgtbl_t subTable=entry.child();
-            DBG_ENTRY
-            Log(debug,"subtable=%lx\n",subTable);
-            removeMapping(subTable,vpn,pages,level-1); // actual create mapping
-            if(freePTNode(subTable))entry.setInvalid();
+            if(entry.isValid()){
+                assert(!entry.isLeaf());
+                pgtbl_t subTable=entry.child();
+                DBG_ENTRY
+                Log(debug,"subtable=%lx\n",subTable);
+                removeMapping(subTable,vpn,pages,level-1); // actual create mapping
+                if(freePTNode(subTable))entry.setInvalid();
+            }
         }
     }
     klib::string PageTable::toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){

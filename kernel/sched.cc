@@ -3,7 +3,7 @@
 #include "rvcsr.hh"
 #include "kernel.hh"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::debug
 
 using namespace sched;
 
@@ -29,7 +29,7 @@ klib::string print(Scheduable* const &tsk){
     return task->toString();
 }
 void sched::Scheduler::add(Scheduable *task){
-    // Log(debug,"add(%s)",static_cast<proc::Task*>(task)->toString().c_str());
+    Log(debug,"add(%s)",static_cast<proc::Task*>(task)->toString().c_str());
     if(task->state==Zombie||task->state==Pending)
         return ;
     auto &ready=this->ready[task->prior];

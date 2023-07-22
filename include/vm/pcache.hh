@@ -1,3 +1,5 @@
+#pragma once
+
 #include "vm.hh"
 #include "bio.hh"
 

@@ -232,12 +232,13 @@ void init(int hartid){
         printf("lock acquired! %d\n",hartid);
     }
     assert(hartid==1||hartid==0);
-    if(true){
+    if(hartid==0){
         timerInit();
         plicInit();
         std::atomic_thread_fence(std::memory_order_acquire);
         auto kidle=proc::createKProcess(sched::maxPrior);
-        kidle->defaultTask()->kctx.ra()=(xlen_t)idle;
+        kidle->defaultTask()->kctx.pc=(xlen_t)idle;
+        kidle->defaultTask()->kctxs.push(kidle->defaultTask()->kctx);
         schedule();
         Log(info,"first schedule on hart%d",kernel::readHartId());
         kLogger.outputLevel=warning;

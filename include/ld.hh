@@ -2,6 +2,7 @@
 #define LD_HH__
 #include "common.h"
 #include "vm.hh"
+#include "fs.hh"
 #include <elf.h>
 
 namespace ld
@@ -16,6 +17,7 @@ namespace ld
         }
     } // namespace elf
     xlen_t loadElf(const uint8_t *buff,vm::VMAR &vmar);
+    xlen_t loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar);
 } // namespace ld
 
 #endif

@@ -23,3 +23,23 @@ xlen_t ld::loadElf(const uint8_t *buff,vm::VMAR &vmar){
     vmar.print();
     return elfHeader->e_entry;
 }
+xlen_t ld::loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar){
+    auto vmo=file->vmo();
+    vm::VMOMapper mapper(vmo);
+    auto buff=(uint8_t*)mapper.start();
+    Elf64_Ehdr *elfHeader=(Elf64_Ehdr*)(buff);
+    Log(info,"Elf header=%p, section header table=%lx, secheader str indx=%lx",elfHeader,elfHeader->e_shoff,elfHeader->e_shstrndx);
+    for(int i=0;i<EI_NIDENT;i++)
+        Log(trace,"%x ",elfHeader->e_ident[i]);
+    Elf64_Phdr* phdrTable=(Elf64_Phdr*)(buff+elfHeader->e_phoff);
+
+    for(int i=0;i<elfHeader->e_phnum;i++){
+        const Elf64_Phdr &entry=phdrTable[i];
+        if(entry.p_type!=PT_LOAD)continue;
+        auto pages=vm::addr2pn(entry.p_vaddr+entry.p_memsz-1)-vm::addr2pn(entry.p_vaddr)+1;
+        // Log(debug,"%x<=%x[%d pages@%x]",vm::addr2pn(entry.p_vaddr),ppn,pages,ld::elf::flags2perm(entry.p_flags));
+        vmar.map(vm::PageMapping{vm::addr2pn(entry.p_vaddr),pages,vm::addr2pn(entry.p_offset),vmo,ld::elf::flags2perm(entry.p_flags),vm::PageMapping::MappingType::file,vm::PageMapping::SharingType::shared});
+    }
+    vmar.print();
+    return elfHeader->e_entry;
+}

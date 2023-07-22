@@ -40,7 +40,7 @@ namespace vm
             #define Off2Mask(field) field=1<<fieldOffsets::field##Off
             Off2Mask(v),Off2Mask(r),Off2Mask(w),Off2Mask(x),Off2Mask(u),Off2Mask(g),Off2Mask(a),Off2Mask(d)
         };
-        inline bool isValid(){ return fields.v; }
+        inline bool isValid(){ assert(this);return fields.v; }
         inline void setValid(){ fields.v=1; }
         inline void setInvalid(){ raw.perm=0; }
         inline void setPTNode(){ fields.r=fields.w=fields.x=0; }
@@ -142,13 +142,21 @@ namespace vm
             rt|=(prot&mask)<<1;
             return rt;
         }
-        inline bool contains(xlen_t addr){
+        inline bool contains(xlen_t addr) const {
             return addr>=pn2addr(vpn) && addr<=pn2addr(vpn+vmo->len());
         }
         inline Segment vsegment() const{return Segment{vpn,vend()};}
         bool operator==(const PageMapping &other) const { return vpn == other.vpn && vmo == other.vmo && perm == other.perm && mapping == other.mapping && sharing == other.sharing; }
         bool operator<(const PageMapping &other) const { return vpn < other.vpn; }
         Segment operator&(const PageMapping &other) const { return vsegment()&other.vsegment(); }
+    };
+    class VMOMapper{
+        Segment region;
+    public:
+        VMOMapper(Arc<VMO> vmo);
+        ~VMOMapper();
+        inline xlen_t start(){return pn2addr(region.l);}
+        inline klib::ByteArray asBytes(){return klib::ByteArray((uint8_t*)pn2addr(region.l),region.length()*pageSize);}
     };
 
     class PageTable{
@@ -189,21 +197,24 @@ namespace vm
         inline VMAR(const VMAR &other):pagetable(){
             for(const auto &mapping:other.mappings)map(mapping.clone());
         }
-        /// @brief overlap should has been unmapped
-        inline void map(const PageMapping &mapping){
-            /// @todo always forget to set v-bit or u-bit
-            Log(debug, "map %s", mapping.toString().c_str());
-            mappings.insert(mapping);
-            /// @todo on-demand paging
-            for(PageNum i=0;i<mapping.pages();){
-                auto [off,ppn,pages]=mapping.req(i);
-                auto voff=off-mapping.offset;
-                pagetable.createMapping(mapping.vpn+voff,ppn,pages,mapping.perm);
-                /// @bug |vmo.start...i...start+pages|
-                i=voff+pages;
-            }
-            Log(debug, "after map, VMAR:%s", klib::toString(mappings).c_str());
+        inline auto find(xlen_t addr){
+            auto vpn=addr2pn(addr);
+            auto mapping=mappings.upper_bound(PageMapping{vpn});
+            if(mapping!=mappings.begin())mapping--;
+            if(!mapping->contains(addr))return mappings.end();
+            else return mapping;
         }
+        inline void pfhandler(xlen_t addr){
+            // find last elem <= vpn
+            auto vpn=addr2pn(addr);
+            auto mapping=find(addr);
+            assert(mapping!=mappings.end());
+            auto [off,ppn,pages]=mapping->req(vpn-mapping->vpn);
+            auto voff=off-mapping->offset;
+            pagetable.createMapping(mapping->vpn+voff,ppn,pages,mapping->perm);
+        }
+        /// @brief overlap should has been unmapped
+        void map(const PageMapping &mapping,bool ondemand=false);
         /// @param region absolute vpn
         inline void unmap(const Segment region){
             // Log(debug, "unmap %s", mapping.toString().c_str());
@@ -233,18 +244,7 @@ namespace vm
             Log(debug, "after unmap, VMAR:%s", klib::toString(mappings).c_str());
         }
         /// @brief clear all mmaps
-        inline void reset(){
-            Log(debug,"before reset, VMAR:%s",klib::toString(mappings).c_str());
-            for(auto it=mappings.begin();it!=mappings.end();){
-                if(it->mapping!=PageMapping::MappingType::system){
-                    Log(trace,"unmap %s",klib::toString(mappings).c_str());
-                    pagetable.removeMapping(*it);
-                    it=mappings.erase(it);
-                } else it++;
-            }
-            Log(debug,"after reset, VMAR:%s",klib::toString(mappings).c_str());
-            TRACE(print();)
-        }
+        void reset();
         inline xlen_t satp(){return PageTable::toSATP(pagetable);}
         // @todo @bug what if region is on border?
         inline klib::ByteArray copyinstr(xlen_t addr, size_t len) {
@@ -263,8 +263,11 @@ namespace vm
         }
         inline void copyout(xlen_t addr,const klib::ByteArray &buff){
             // @todo 检查拷贝后是否会越界（addr+buff.len后超出用户进程大小）
-            xlen_t paddr=pagetable.transaddr(addr);
-            memmove((ptr_t)paddr,buff.buff,buff.len);
+            // xlen_t paddr=pagetable.transaddr(addr);
+            auto mapping=find(addr);
+            VMOMapper mapper(mapping->vmo);
+            auto off=addr-pn2addr(mapping->vpn)+pn2addr(mapping->offset);
+            memmove((ptr_t)mapper.start()+off,buff.buff,buff.len);
         }
         inline bool contains(xlen_t addr){
             for(auto mapping: mappings){

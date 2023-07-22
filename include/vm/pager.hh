@@ -1,15 +1,23 @@
+#pragma once
 #include "vm.hh"
+#include "vm/pcache.hh"
 #include "bio.hh"
+#include "kernel.hh"
 #include <EASTL/vector.h>
+#include <EASTL/unordered_map.h>
 
 namespace vm
 {
     class VnodePager:public Pager{
         Arc<fs::INode> vnode;
+        eastl::unordered_map<PageNum,PBufRef> pages;
     public:
         VnodePager(Arc<fs::INode> vnode):vnode(vnode){}
         PBufRef load(PageNum offset) override{
-            // vnode->nodRead();
+            if(!pages.count(offset))pages[offset]=make_shared<PageBuf>(PageKey{.dev={0,(uint32_t)offset}});
+            auto pbuf=pages[offset];
+            vnode->readPages(fs::memvec{Segment{offset,offset}},fs::memvec{Segment{pbuf->ppn,pbuf->ppn}});
+            return pbuf;
         }
         void put(PBufRef pbuf) override{
         }

@@ -235,7 +235,7 @@ public:
 class Logger{
   struct LogItem{
     int id;
-    char buf[300];
+    char buf[500];
   };
   klib::ringbuf<LogItem> ring[5];
   std::atomic_uint32_t lid=0;

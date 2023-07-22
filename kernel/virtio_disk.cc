@@ -278,7 +278,7 @@ virtio_disk_rw(bio::BlockBuf &buf, int write)
   csrClear(sstatus,BIT(csr::mstatus::sie));
   csrSet(sie,BIT(csr::mie::stie));
   csrRead(sip,sip1);
-  assert(((sip^sip1)&sip&0xff)==0);
+  // assert(((sip^sip1)&sip&0xff)==0);
 
   free_chain(idx[0]);
   }
