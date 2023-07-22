@@ -126,9 +126,9 @@ namespace klib
       return rt;
     }
     template<typename T1>
-    ArrayBuff<T1> toArrayBuff(){
+    ArrayBuff<T1> toArrayBuff() const{
       auto rt=ArrayBuff<T1>{reinterpret_cast<T1*>(buff),len*(sizeof(T)/sizeof(T1))};
-      buff=nullptr;
+      // buff=nullptr;
       return rt;
     }
     class iterator{

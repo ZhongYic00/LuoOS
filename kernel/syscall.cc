@@ -317,7 +317,7 @@ namespace syscall {
         auto rfile=make_shared<File>(pipe,fs::FileOp::read);
         auto wfile=make_shared<File>(pipe,fs::FileOp::write);
         int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
-        proc->vmar[fd]=fds;
+        proc->vmar[fd]<<fds;
     }
     xlen_t getDents64(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -342,7 +342,7 @@ namespace syscall {
         xlen_t uva=ctx.x(11),len=ctx.x(12);
         auto file=kHartObj().curtask->getProcess()->ofile(fd);
         auto bytes=file->read(len);
-        kHartObj().curtask->getProcess()->vmar[uva]=bytes;
+        kHartObj().curtask->getProcess()->vmar[uva]<<bytes;
         return bytes.len;
     }
     xlen_t write(){
@@ -441,7 +441,7 @@ namespace syscall {
         auto cur=eastl::chrono::system_clock::now();
         auto ticks=cur.time_since_epoch().count();
         struct timespec ts = { ticks/kernel::CLK_FREQ, ((100000*ticks/kernel::CLK_FREQ)%100000)*10 };
-        curproc->vmar[a_ts]=ts;
+        curproc->vmar[a_ts]<<ts;
 
         return statcode::ok;
     }
@@ -499,7 +499,7 @@ namespace syscall {
         if(target==nullptr)return statcode::err;
         curproc->ti += target->ti;
         auto rt=target->pid();
-        if(wstatus)curproc->vmar[wstatus]=(int)(target->exitstatus<<8);
+        if(wstatus)curproc->vmar[wstatus]<<(int)(target->exitstatus<<8);
         target->zombieExit();
         return rt;
     }
@@ -585,21 +585,30 @@ namespace syscall {
         auto &vmar=kHartObj().curtask->getProcess()->vmar;
         klib::ArrayBuff<xlen_t> argv(args.size()+1);
         int argc=0;
+        auto ustream=vmar[ctx.sp()];
+        ustream.reverse=true;
         for(auto arg:args){
-            ctx.sp()-=arg.len;
-            vmar[ctx.sp()]=arg;
-            argv.buff[argc++]=ctx.sp();
+            ustream<<arg;
+            argv.buff[argc++]=ustream.addr();
         }
+        // ctx.sp()=ustream.addr();
         argv.buff[argc]=0;
-        ctx.sp()-=argv.len*sizeof(xlen_t);
-        ctx.sp()-=ctx.sp()%16;
-        auto argvsp=ctx.sp();
-        vmar[ctx.sp()]=argv.toArrayBuff<uint8_t>();
+        // ctx.sp()-=argv.len*sizeof(xlen_t);
+        // ctx.sp()-=ctx.sp()%16;
+        eastl::vector<Elf64_auxv_t> auxv;
+        auxv.push_back({AT_PAGESZ,vm::pageSize});
+        auxv.push_back({AT_NULL,0});
+        ustream<<klib::ArrayBuff(auxv.data(),auxv.size());
+        ustream<<argv;
+        auto argvsp=ustream.addr();
+        // assert(argvsp==ctx.sp());
         /// @bug alignment?
-        ctx.sp()-=8;
-        auto argcsp=ctx.sp();
-        vmar[ctx.sp()]=argc;
-        Log(debug,"$sp=%x, argc@%x, argv@%x",ctx.sp(),argcsp,argvsp);
+        // ctx.sp()-=8;
+        ustream<<(xlen_t)argc;
+        auto argcsp=ustream.addr();
+        ctx.sp()=ustream.addr();
+        // assert(argcsp==ctx.sp());
+        Log(debug,"$sp=%x, argc@%x, argv@%x",ustream.addr(),argcsp,argvsp);
         /// setup argc, argv
         return ctx.sp();
     }

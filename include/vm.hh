@@ -289,20 +289,37 @@ namespace vm
             xlen_t vaddr;
             VMAR &parent;
         public:
-            Writer(xlen_t addr,VMAR &parent):vaddr(addr),parent(parent){}
+            bool reverse;
+            Writer(xlen_t addr,VMAR &parent):vaddr(addr),parent(parent),reverse(false){}
             template<typename T>
-            inline void operator=(const T &d){
+            inline Writer& operator<<(const T &d){
                 auto buff=klib::ByteArray((uint8_t*)&d,sizeof(d));
-                operator=(buff);
+                return operator<<(buff);
             }
-            inline void operator=(const klib::ByteArray &bytes){
-                parent.copyout(vaddr,bytes);
+            inline Writer& operator<<(const klib::ByteArray &bytes){
+                if(!reverse){
+                    parent.copyout(vaddr,bytes);
+                    vaddr+=bytes.len;
+                } else {
+                    vaddr-=bytes.len;
+                    parent.copyout(vaddr,bytes);
+                }
+                return *this;
+            }
+            template<typename T>
+            inline Writer& operator<<(const klib::ArrayBuff<T> &array){
+                auto partial=vaddr%16;
+                if(reverse)partial=-partial;
+                vaddr+=partial;
+                auto buf=array.template toArrayBuff<uint8_t>();
+                return operator<<(buf);
             }
             template<typename T>
             void operator>>(T &d){
                 auto buf=parent.copyin(vaddr,sizeof(T));
                 d=*reinterpret_cast<T*>(buf.buff);
             }
+            inline xlen_t addr() const{return vaddr;}
         };
         inline Writer operator[](xlen_t vaddr){return Writer(vaddr,*this);}
         inline void print(){
