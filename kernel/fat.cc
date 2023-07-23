@@ -306,7 +306,7 @@ const uint32 DirEnt::allocClus() const {  // @todo 应该写成FileSystem的成�
     uint32 const ent_per_sec = spblk->rBPS() / sizeof(uint32);
     for (uint32 i = 0; i < spblk->rFS(); i++, sec++) {
         auto ref = bcache[{spblk->rDev(), sec}];
-        auto buf = *ref;
+        auto &buf = *ref;
         for (uint32 j = 0; j < ent_per_sec; j++) {
             if (buf.as<uint32_t>(j) == 0) {
                 buf.as<uint32_t>(j) = FAT32_EOC + 7;

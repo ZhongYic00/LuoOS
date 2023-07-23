@@ -67,9 +67,10 @@ namespace bio{
         const BlockKey key;
         bool dirty;
         uint8_t *d;
-        BlockBuf(const BlockKey& key_):key(key_),d(reinterpret_cast<uint8_t*>(new AlignedBytes<blockSize>)){
+        BlockBuf(const BlockKey& key_):key(key_),d(reinterpret_cast<uint8_t*>(new AlignedBytes<>)){
             reload();
         }
+        BlockBuf(const BlockBuf &other)=delete;
         ~BlockBuf(){
             flush();
             delete reinterpret_cast<AlignedBytes<>*>(d);
