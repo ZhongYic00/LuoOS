@@ -5,7 +5,6 @@
 #include "safestl.hh"
 #include "klib.hh"
 
-typedef int tid_t;
 struct IdManagable{
     const tid_t id;
     IdManagable(tid_t id):id(id){}
@@ -19,6 +18,7 @@ class ObjManager{
 public:
     inline tid_t newId(){return ++idCnt;}
     inline void addObj(tid_t id,T* obj){objlist[id]=obj;}
+    inline int getObjNum() { return nobjs; }
     void del(T *obj);
     inline T* operator[](tid_t id){return objlist[id];}
 };

@@ -22,7 +22,7 @@ namespace syscall
 } // namespace syscall
 
 
-eastl::list<proc::Task*> waiting;
+list<proc::Task*> waiting;
 
 static struct disk {
  // memory for virtio descriptors &c for queue 0.

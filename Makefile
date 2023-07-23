@@ -12,7 +12,7 @@ OS := $(objdir)/os.elf
 
 UCFLAGS = $(CFLAGS) -T user/user.ld
 # linuxheaders = /usr/src/linux-headers-$(shell uname -r)/include/
-CFLAGS += -Iinclude/ -Ithirdparty/tinystl/include -Ithirdparty/eastl-port/include -Ithirdparty/eastl-port/test/packages/EABase/include/Common -O0 -g
+CFLAGS += -Iinclude/ -Ithirdparty/tinystl/include -Ithirdparty/eastl-port/include -Ithirdparty/eastl-port/test/packages/EABase/include/Common -Ithirdparty/linux -O0 -g
 compile = $(CC) $(depflags) $(CFLAGS)
 
 # SBI: sbi/sbi.elf;

@@ -12,7 +12,7 @@ namespace semaphore
     class Semaphore{
         /// @todo use atomic
         int count;
-        eastl::list<proc::Task*> waiting;
+        list<proc::Task*> waiting;
     public:
         Semaphore(int init=1):count(init){}
         void req();

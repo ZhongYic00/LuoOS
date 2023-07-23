@@ -24,7 +24,7 @@ Scheduable* sched::Scheduler::next(Scheduable* prev){
         }
     }
 }
-klib::string print(Scheduable* const &tsk){
+string print(Scheduable* const &tsk){
     auto task=static_cast<const proc::Task*>(tsk);
     return task->toString();
 }

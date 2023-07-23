@@ -1,8 +1,8 @@
-#include "fs.hh"
+// #include "fs.hh"
 #include "fat.hh"
-#include "vm.hh"
 #include "vm/pager.hh"
 #include "vm/vmo.hh"
+#include "proc.hh"
 #include "kernel.hh"
 // #include "klib.h"
 
@@ -14,9 +14,12 @@
 // @todo error handling
 using namespace fs;
 
-constexpr uint8 MAX_DEV = 8;
-MntTable mnt_table;
-static uint8 mount_num = 0;
+using vm::pageSize;
+
+static unordered_map<string, shared_ptr<FileSystem>> mnt_table;
+static constexpr int SEEK_SET = 0;
+static constexpr int SEEK_CUR = 1;
+static constexpr int SEEK_END = 2;
 
 xlen_t File::write(xlen_t addr,size_t len){
     xlen_t rt=sys::statcode::err;
@@ -26,7 +29,7 @@ xlen_t File::write(xlen_t addr,size_t len){
     switch(type){
         case FileType::stdout:
         case FileType::stderr:
-            FMT_PROC("%s",klib::string(bytes.c_str(),len).c_str());
+            FMT_PROC("%s",string(bytes.c_str(),len).c_str());
             rt=bytes.len;
             break;
         case FileType::pipe:
@@ -44,7 +47,7 @@ xlen_t File::write(xlen_t addr,size_t len){
     }
     return rt;
 }
-klib::ByteArray File::read(size_t len, long a_off, bool a_update){
+ByteArray File::read(size_t len, long a_off, bool a_update){
     if(a_off < 0) { a_off = off; }
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.r) { return rt; }
@@ -60,20 +63,20 @@ klib::ByteArray File::read(size_t len, long a_off, bool a_update){
             break;
         case FileType::entry: {
             int rdbytes = 0;
-            klib::ByteArray buf(len);
+            ByteArray buf(len);
             if((rdbytes = obj.ep->getINode()->nodRead(false, (uint64)buf.buff, a_off, len)) > 0) {
                 if(a_update) { off = a_off + rdbytes; }
             }
-            return klib::ByteArray::from((xlen_t)buf.buff, rdbytes);
+            return ByteArray::from((xlen_t)buf.buff, rdbytes);
             break;
         }
         default:
             panic("File::read(): unknown file type");
             break;
     }
-    return klib::ByteArray{0};
+    return ByteArray{0};
 }
-klib::ByteArray File::readAll(){
+ByteArray File::readAll(){
     switch(type){
         case FileType::entry:{
             size_t size=obj.ep->getINode()->rFileSize();
@@ -83,7 +86,55 @@ klib::ByteArray File::readAll(){
             panic("readAll doesn't support this type");
     }
 }
-
+off_t File::lSeek(off_t a_offset, int a_whence) {
+    KStat kst = obj.ep;
+    if ((kst.st_mode&S_IFMT)==S_IFCHR || (kst.st_mode&S_IFMT)==S_IFIFO) { return 0; }
+    switch (a_whence) {  // @todo: st_size处是否越界？
+        case SEEK_SET: {
+            if(a_offset<0 || a_offset>kst.st_size) { return -EINVAL; }
+            off = a_offset;
+            break;
+        }
+        case SEEK_CUR: {
+            off_t noff = off + a_offset;
+            if(noff<0 || noff>kst.st_size) { return -EINVAL; }
+            off = noff;
+            break;
+        }
+        case SEEK_END: {
+            off_t noff = kst.st_size + a_offset;
+            if(noff<0 || noff>kst.st_size) { return -EINVAL; }
+            off = noff;
+            break;
+        }
+        default: { return -EINVAL; }
+    }
+    return off;
+}
+ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len) {
+    uint64_t in_off = 0;
+    if(a_offset != nullptr) {
+        in_off = a_outfile->lSeek(0, SEEK_CUR);
+        if((ssize_t)in_off < 0) { return (ssize_t) in_off; } // this fails only if in_fd is invalid
+        lSeek(*a_offset, SEEK_SET); // and this must success
+    }
+    ssize_t nsend = 0;
+    while (a_len > 0) {
+        ssize_t rem = (ssize_t)(a_len > pageSize ? pageSize : a_len);
+        ByteArray buf = read(rem);
+        int ret = buf.len;
+        ret = a_outfile->write((xlen_t)buf.buff, ret);
+        if (ret < 0) { return ret; }
+        nsend += ret;
+        if (rem != ret) { break; } // EOF reached in in_fd or out_fd is full
+        a_len -= rem;
+    }
+    if (a_offset != nullptr) {
+        *a_offset = lSeek(0, SEEK_CUR);
+        lSeek(in_off, SEEK_SET);
+    }
+    return nsend;
+}
 File::~File() {
     switch(type){
         case FileType::pipe: {
@@ -101,7 +152,9 @@ File::~File() {
     }
 }
 void Path::pathBuild() {
-    if(base == nullptr) { base = kHartObj().curtask->getProcess()->cwd; }
+    if(pathname.length() < 1) { base = kHartObj().curtask->getProcess()->cwd; return; }
+    else if(pathname[0] == '/') { base = mnt_table["/"]->getSpBlk()->getRoot(); }
+    else if(base == nullptr) { base = kHartObj().curtask->getProcess()->cwd; }
     size_t len = pathname.length();
     if(len > 0) {  // 保证数组长度不为0
         auto ind = new size_t[len][2] { { 0, 0 } };
@@ -141,7 +194,7 @@ shared_ptr<DEntry> Path::pathHitTable() {
     size_t len = path_abs.size();
     size_t longest = 0;
     string longest_prefix = "";
-    for(auto tbl : mnt_table.getTable()) {
+    for(auto tbl : mnt_table) {
         string prefix = tbl.first;
         size_t len_prefix = prefix.size();
         if(len>=len_prefix && len_prefix>longest && path_abs.compare(0, len_prefix, prefix)==0) {
@@ -164,9 +217,8 @@ shared_ptr<DEntry> Path::pathSearch(bool a_parent) {
     int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
     else if((entry=pathHitTable()) != nullptr) {}  // 查挂载表，若查到则起始目录存到entry中
-    else if(pathname[0] == '/') { entry = mnt_table["/"]->getSpBlk()->getRoot(); }  // 绝对路径
-    else if(base != nullptr) { entry = base; }  // 相对路径（指定目录）
-    // else { entry = kHartObj().curtask->getProcess()->cwd; }  // 相对路径（工作目录）
+    // else if(pathname[0] == '/') { entry = mnt_table["/"]->getSpBlk()->getRoot(); }  // 绝对路径
+    else { entry = base; }  // 相对路径
     for(int i = 0; i < dirnum; ++i) {
         while(entry->isMntPoint()) { entry = entry->getINode()->getSpBlk()->getRoot(); }
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
@@ -278,23 +330,50 @@ int Path::pathUnmount() const {
     // mnt_point->clearMnt();
     return 0;
 }
-// shared_ptr<File> Path::pathOpen(int a_flags, shared_ptr<File> a_file) const {
-//     DirEnt *ep = pathSearch(a_file);
-//     if(ep == nullptr) { return nullptr; }
-//     if((ep->attribute&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
-//         printf("dir can't write\n");
-//         ep->entRelse();
-//         return nullptr;
-//     }
-//     if((a_flags&O_DIRECTORY) && !(ep->attribute&ATTR_DIRECTORY)) {
-//         printf("it is not dir\n");
-//         ep->entRelse();
-//         return nullptr;
-//     }
-//     return make_shared<File>(ep, a_flags);
-// }
+int Path::pathOpen(int a_flags, mode_t a_mode) {
+    shared_ptr<DEntry> entry;
+    if(a_flags & O_CREATE) {
+        entry = pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags);
+        if(entry == nullptr) { return -1; }
+    }
+    else {
+        if((entry = pathSearch()) == nullptr) { return -1; }
+        if((entry->getINode()->rAttr()&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
+            printf("dir can't write\n");
+            return -1;
+        }
+        if((a_flags&O_DIRECTORY) && !(entry->getINode()->rAttr()&ATTR_DIRECTORY)) {
+            printf("it is not dir\n");
+            return -1;
+        }
+    }
+    shared_ptr<File> file = make_shared<File>(entry, a_flags);
+    file->off = (a_flags&O_APPEND) ? entry->getINode()->rFileSize() : 0;
+    int fd = kHartObj().curtask->getProcess()->fdAlloc(file);
+    if(fd < 0) { return -1; }
+    if(!(entry->getINode()->rAttr()&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { entry->getINode()->nodTrunc(); }
+
+    return fd;
+}
+int Path::pathSymLink(string a_target) {
+    shared_ptr<DEntry> entry = pathSearch();
+    if(entry != nullptr) {
+        Log(error, "linkpath exists\n");
+        return -1;
+    }
+    entry = pathSearch(true);
+    if(entry == nullptr) {
+        Log(error, "dir not exists\n");
+        return -1;
+    }
+    else if(!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) {
+        Log(error, "parent not dir\n");
+        return -1;
+    }
+    return entry->entSymLink(a_target);
+}
 int fs::rootFSInit() {
-    new ((void*)&mnt_table) MntTable();
+    new ((void*)&mnt_table) unordered_map<string, shared_ptr<FileSystem>>();
     shared_ptr<FileSystem> rootfs = make_shared<fat::FileSystem>(true, "/");
     mnt_table.emplace("/", rootfs);
     if(rootfs->ldSpBlk(0, nullptr) == -1) {

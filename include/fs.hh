@@ -6,16 +6,12 @@
 #include "linux/fcntl.h"
 #include "error.hh"
 #include "vm.hh"
-#include <EASTL/map.h>
-#include <EASTL/unordered_map.h>
+
+// FAT32
+#define MSDOS_SUPER_MAGIC     0x4d44
 
 namespace fs{
     using pipe::Pipe;
-    using eastl::vector;
-    using eastl::string;
-    using eastl::shared_ptr;
-    using eastl::make_shared;
-    using eastl::unordered_map;
     using klib::Segment;
     using memvec=eastl::vector<Segment<xlen_t>>;
 
@@ -28,7 +24,6 @@ namespace fs{
             SuperBlock(const SuperBlock& a_spblk) = default;
             virtual ~SuperBlock() = default;
             SuperBlock& operator=(const SuperBlock& a_spblk);
-            virtual uint32 rBlkSize() const = 0;  // 返回块大小
             virtual shared_ptr<DEntry> getRoot() const = 0;  // 返回指向该超级块的根目录项的共享指针
             virtual shared_ptr<DEntry> getMntPoint() const = 0;  // 返回文件系统在父文件系统上的挂载点，如果是根文件系统则返回根目录
             virtual FileSystem *getFS() const = 0;  // 返回指向该文件系统对象的共享指针
@@ -46,10 +41,17 @@ namespace fs{
             virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该文件系统超级块的共享指针
             virtual int ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) = 0;  // 从设备号为a_dev的物理设备上装载该文件系统的超级块，并设挂载点为a_mnt，若a_mnt为nullptr则作为根文件系统装载，返回错误码
             virtual void unInstall() = 0;  // 卸载该文件系统的超级块
+            virtual long rMagic() const = 0;  // 读魔数
+            virtual long rBlkSiz() const = 0;  // 读块大小
+            virtual long rBlkNum() const = 0;  // 读块总数
+            virtual long rBlkFree() const = 0;  // 读空闲块数量
+            virtual long rMaxFile() const = 0;  // 读最大文件数量
+            virtual long rFreeFile() const = 0;  // 读空闲块允许的最大文件数量
+            virtual long rNameLen() const = 0;  // 读最大文件名长度
     };
     class INode {
         public:
-            eastl::weak_ptr<vm::VMO> vmo;
+            weak_ptr<vm::VMO> vmo;
             INode() = default;
             INode(const INode& a_inode) = default;
             virtual ~INode() = default;  // 需要保证脏数据落盘
@@ -70,6 +72,7 @@ namespace fs{
             /// @param src memvec(lba in pages)
             /// @param dst memvec(ppn)
             void readPages(const memvec &src,const memvec &dst);
+            virtual int readLink(char *a_buf, size_t a_bufsiz) = 0;
             virtual uint8 rAttr() const = 0;  // 返回该文件的属性
             virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
             virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
@@ -84,8 +87,11 @@ namespace fs{
             DEntry& operator=(const DEntry& a_entry) = default;
             virtual shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) = 0;  // 在该目录项下(不包含子目录)搜索名为a_dirname的目录项，返回指向目标目录项的共享指针（找不到则返回nullptr）
             virtual shared_ptr<DEntry> entCreate(string a_name, int a_attr) = 0;  // 在该目录项下以a_attr属性创建名为a_name的文件，返回指向该文件目录项的共享指针
+            virtual int entSymLink(string a_target) = 0;
             virtual void setMntPoint(const FileSystem *a_fs) = 0;  // 设该目录项为a_fs文件系统的挂载点（不更新a_fs）
             virtual void clearMnt() = 0;  // 清除该目录项的挂载点记录
+            virtual int chMod(mode_t a_mode) = 0;
+            virtual int chOwn(uid_t a_owner, gid_t a_group) = 0;
             virtual const char *rName() const = 0;  // 返回该目录项的文件名
             virtual shared_ptr<DEntry> getParent() const = 0;  // 返回指向该目录项父目录的共享指针
             virtual shared_ptr<INode> getINode() const = 0;  // 返回指向该目录项对应INode的共享指针
@@ -131,9 +137,14 @@ namespace fs{
         File(shared_ptr<DEntry> a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags) {}
         ~File();
         xlen_t write(xlen_t addr, size_t len);
-        klib::ByteArray read(size_t len, long a_off = -1, bool a_update = true);
-        klib::ByteArray readAll();
+        ByteArray read(size_t len, long a_off = -1, bool a_update = true);
+        ByteArray readAll();
         shared_ptr<vm::VMO> vmo();
+        inline int readLink(char *a_buf, size_t a_bufsiz) { return obj.ep->getINode()->readLink(a_buf, a_bufsiz); }
+        off_t lSeek(off_t a_offset, int a_whence);
+        ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
+        inline int chMod(mode_t a_mode) { obj.ep->chMod(a_mode); }
+        inline int chOwn(uid_t a_owner, gid_t a_group) { return obj.ep->chOwn(a_owner, a_group); }
     };
     class Path {
         private:
@@ -157,9 +168,10 @@ namespace fs{
             int pathHardUnlink();
             int pathMount(Path a_devpath, string a_fstype);
             int pathUnmount() const;
-            // shared_ptr<File> pathOpen(int a_flags, shared_ptr<File> a_file) const;
-            // inline shared_ptr<File> pathOpen(shared_ptr<File> a_file) const { return pathOpen(0, a_file); }
+            int pathOpen(int a_flags, mode_t a_mode);
+            int pathSymLink(string a_target);
             // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
+            // inline shared_ptr<File> pathOpen(mode_t a_mode) const { return pathOpen(0, a_file); }
             // inline shared_ptr<File> pathOpen() const { return pathOpen(0, nullptr); }
     };
 	class DStat {
@@ -212,27 +224,26 @@ namespace fs{
         // public:
             KStat() = default;
             KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
-            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->rBlkSize()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
+            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->getFS()->rBlkSiz()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
             ~KStat() = default;
 
 	};
-    class MntTable {
+    class StatFS {
         private:
-            unordered_map<string, shared_ptr<FileSystem>> mnt_table;
+            long f_type;
+            long f_bsize;
+            long f_blocks;
+            long f_bfree;
+            long f_bavail;
+            long f_files;
+            long f_ffree;
+            long f_fsid;
+            long f_namelen;
         public:
-            MntTable() = default;
-            MntTable(const MntTable& a_table) = default;
-            ~MntTable() = default;
-            MntTable& operator=(const MntTable& a_table) = default;
-            auto operator[](string a_str) { return mnt_table[a_str]; }
-            auto find(string a_str) { return mnt_table.find(a_str); }
-            auto emplace(string a_str, shared_ptr<FileSystem> a_fs) { return mnt_table.emplace(a_str, a_fs); }
-            auto erase(string a_str) { return mnt_table.erase(a_str); }
-            auto empty() { return mnt_table.empty(); }
-            auto size() { return mnt_table.size(); }
-            auto clear() { return mnt_table.clear(); }
-            auto end() { return mnt_table.end(); }
-            unordered_map<string, shared_ptr<FileSystem>>& getTable() { return mnt_table; }
+            StatFS() = default;
+            StatFS(const StatFS& a_statfs) = default;
+            StatFS(const FileSystem& a_fs):f_type(a_fs.rMagic()), f_bsize(a_fs.rBlkSiz()), f_blocks(a_fs.rBlkNum()), f_bfree(a_fs.rBlkFree()), f_bavail(a_fs.rBlkFree()), f_files(a_fs.rMaxFile()), f_ffree(a_fs.rFreeFile()), f_fsid(), f_namelen(a_fs.rNameLen()) {}
+            ~StatFS() = default;
     };
     int rootFSInit();
 }
