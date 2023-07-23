@@ -32,23 +32,31 @@ namespace vm
         eastl::unordered_map<PageNum,PBufRef> pages;
         bool inSwap(PageNum offset){return false;}
     public:
-        PageNum backingoff;
+        Segment backingregion;
         SwapPager(Arc<Pager> other){
             if(auto swppager=eastl::dynamic_pointer_cast<SwapPager>(other)){
                 backing=swppager->backing;
-                backingoff=swppager->backingoff;
+                backingregion=swppager->backingregion;
             } else {
                 backing=other;
-                backingoff=0;
             }
         }
         PBufRef load(PageNum offset) override{
             if(inSwap(offset)){}
             if(!pages.count(offset)){
                 auto pbuf=pages[offset]=make_shared<PageBuf>(PageKey{.swp={this,(uint32_t)offset}});
-                if(backing && backing->contains(backingoff+offset)){
+                auto backingoff=addr2pn(backingregion.l)+offset;
+                if(backing && backingoff<=addr2pn(backingregion.r)){
                     // fill from backing
-                    backing->loadTo(backingoff+offset,pbuf);
+                    backing->loadTo(backingoff,pbuf);
+                    if(offset==0){
+                        auto partial=backingregion.l-pn2addr(backingoff);
+                        memset((ptr_t)pn2addr(pbuf->ppn),0,partial);
+                    }
+                    if(backingoff==addr2pn(backingregion.r)){
+                        auto partial=backingregion.r-pn2addr(backingoff);
+                        memset((ptr_t)pn2addr(pbuf->ppn)+partial,0,pageSize-partial);
+                    }
                 } else {
                     // zero filled
                     pbuf->fillzero();
