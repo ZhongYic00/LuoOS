@@ -308,7 +308,7 @@ namespace vm
             }
             template<typename T>
             inline Writer& operator<<(const klib::ArrayBuff<T> &array){
-                auto partial=vaddr%16;
+                auto partial=vaddr%8;
                 if(reverse)partial=-partial;
                 vaddr+=partial;
                 auto buf=array.template toArrayBuff<uint8_t>();

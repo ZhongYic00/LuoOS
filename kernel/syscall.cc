@@ -534,7 +534,8 @@ namespace syscall {
         if(addr)vpn=align(addr);
         else vpn=choose();
         pages = bytes2pages(len);
-        assert(pages);
+        if(!pages)return -1;
+        // assert(pages);
         Arc<vm::VMO> vmo;
         /// @todo register for shared mapping
         /// @todo copy content to vmo
@@ -579,8 +580,9 @@ namespace syscall {
         // static_cast<proc::Context>(kHartObj().curtask->kctx)=proc::Context();
         ctx.sp()=proc::UserStackDefault;
         /// load elf
-        ctx.pc=
-            ld::loadElf(file,kHartObj().curtask->getProcess()->vmar);
+        auto [pc,brk]=ld::loadElf(file,kHartObj().curtask->getProcess()->vmar);
+        ctx.pc=pc;
+        kHartObj().curtask->getProcess()->heapTop=brk;
         /// setup stack
         auto &vmar=kHartObj().curtask->getProcess()->vmar;
         klib::ArrayBuff<xlen_t> argv(args.size()+1);
@@ -599,6 +601,7 @@ namespace syscall {
         auxv.push_back({AT_PAGESZ,vm::pageSize});
         auxv.push_back({AT_NULL,0});
         ustream<<klib::ArrayBuff(auxv.data(),auxv.size());
+        ustream<<nullptr;
         ustream<<argv;
         auto argvsp=ustream.addr();
         // assert(argvsp==ctx.sp());

@@ -17,7 +17,9 @@ namespace ld
         }
     } // namespace elf
     eastl::tuple<xlen_t,xlen_t> loadElf(const uint8_t *buff,vm::VMAR &vmar);
-    xlen_t loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar);
+    /// @brief 
+    /// @return [entry, program break, ]
+    eastl::tuple<xlen_t,xlen_t> loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar);
 } // namespace ld
 
 #endif

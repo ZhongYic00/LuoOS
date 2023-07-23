@@ -16,7 +16,7 @@ eastl::tuple<xlen_t,xlen_t> ld::loadElf(const uint8_t *buff,vm::VMAR &vmar){
         const Elf64_Phdr &entry=phdrTable[i];
         if(entry.p_type!=PT_LOAD)continue;
         auto pages=vm::addr2pn(entry.p_vaddr+entry.p_memsz-1)-vm::addr2pn(entry.p_vaddr)+1;
-        programbreak=klib::max(programbreak,entry.p_vaddr+pages);
+        programbreak=klib::max(programbreak,entry.p_vaddr+entry.p_memsz);
         vm::PageNum ppn=(kGlobObjs->pageMgr->alloc(pages));
         Log(debug,"%x<=%x[%d pages@%x]",vm::addr2pn(entry.p_vaddr),ppn,pages,ld::elf::flags2perm(entry.p_flags));
         auto vmo=make_shared<vm::VMOContiguous>(ppn,pages);
@@ -26,7 +26,7 @@ eastl::tuple<xlen_t,xlen_t> ld::loadElf(const uint8_t *buff,vm::VMAR &vmar){
     vmar.print();
     return eastl::make_tuple(elfHeader->e_entry,programbreak);
 }
-xlen_t ld::loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar){
+eastl::tuple<xlen_t,xlen_t> ld::loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar){
     auto vmo=file->vmo();
     vm::VMOMapper mapper(vmo);
     auto buff=(uint8_t*)mapper.start();
@@ -36,10 +36,12 @@ xlen_t ld::loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar){
         Log(trace,"%x ",elfHeader->e_ident[i]);
     Elf64_Phdr* phdrTable=(Elf64_Phdr*)(buff+elfHeader->e_phoff);
 
+    xlen_t programbreak=0;
     for(int i=0;i<elfHeader->e_phnum;i++){
         const Elf64_Phdr &entry=phdrTable[i];
         if(entry.p_type!=PT_LOAD)continue;
         auto pages=vm::addr2pn(entry.p_vaddr+entry.p_memsz-1)-vm::addr2pn(entry.p_vaddr)+1;
+        programbreak=klib::max(programbreak,entry.p_vaddr+entry.p_memsz);
         using mask=vm::PageTableEntry::fieldMasks;
         auto perm=ld::elf::flags2perm(entry.p_flags);
         if(!perm&mask::w)
@@ -53,5 +55,5 @@ xlen_t ld::loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar){
         // Log(debug,"%x<=%x[%d pages@%x]",vm::addr2pn(entry.p_vaddr),ppn,pages,ld::elf::flags2perm(entry.p_flags));
     }
     vmar.print();
-    return elfHeader->e_entry;
+    return eastl::make_tuple(elfHeader->e_entry,programbreak);
 }
