@@ -296,6 +296,26 @@ namespace syscall {
 
         return file->chMod(a_mode);
     }
+    xlen_t fChModAt() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_basefd = ctx.x(10);
+        const char *a_path = (const char*)ctx.x(11);
+        mode_t a_mode = ctx.x(12);
+        int a_flags = ctx.x(13);
+
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_FILENAME);
+        const char *path = (const char*)patharr.buff;
+        shared_ptr<File> base = curproc->ofile(a_basefd);
+        if(base == nullptr) { return -EBADF; }
+
+        int fd = Path(path, base).pathOpen(a_flags, S_IFREG);
+
+        if(fd < 0) { return fd; }  // 错误码
+        int ret = curproc->ofile(fd)->chMod(a_mode);
+        curproc->files[fd].reset();  // 关闭
+        return ret;
+    }
     xlen_t openAt() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
@@ -928,6 +948,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::chdir,chDir);
         DECLSYSCALL(scnum::fchdir,fChDir);
         DECLSYSCALL(scnum::fchmod,fChMod);
+        DECLSYSCALL(scnum::fchmodat,fChModAt);
         DECLSYSCALL(scnum::openat,openAt);
         DECLSYSCALL(scnum::close,close);
         DECLSYSCALL(scnum::pipe2,pipe2);

@@ -134,7 +134,7 @@ ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len
     }
     return nsend;
 }
-xlen_t File::chMod(mode_t a_mode) {
+int File::chMod(mode_t a_mode) {
     Log(error,"FAT32 does not support chmod\n");
     return -EPERM;
 }
