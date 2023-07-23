@@ -135,9 +135,9 @@ namespace vm
             }
         }
     }
-    klib::string PageTable::toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
+    string PageTable::toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
         assert(entrySize>0);
-        klib::string s;
+        string s;
         for(int i=0;i<pageEntriesPerPage;i++){
             auto &entry=table[i];
             if(entry.isValid()){

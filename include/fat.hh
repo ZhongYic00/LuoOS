@@ -7,10 +7,6 @@
 namespace fat {
     using BlockBuf = struct bio::BlockBuf;
     using fs::File;
-    using eastl::string;
-    using eastl::shared_ptr;
-    using eastl::make_shared;
-    extern fs::MntTable mnt_table;
     class FileSystem;
     class DirEnt;
     class DEntry;
@@ -75,7 +71,6 @@ namespace fat {
             inline uint32 rFS() const { return bpb.fat_sz; }
             inline uint32 rRC() const { return bpb.root_clus; }
             inline uint8 rDev() const { return dev; }
-            inline uint32 rBlkSize() const { return rBPC(); }
             inline shared_ptr<fs::DEntry> getRoot() const;
             inline shared_ptr<fs::DEntry> getMntPoint() const { return mnt_point; }
             inline fs::FileSystem *getFS() const;
@@ -102,6 +97,13 @@ namespace fat {
             inline shared_ptr<fs::SuperBlock> getSpBlk() const { return spblk; }
             int ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt);
             void unInstall();
+            inline long rMagic() const { return MSDOS_SUPER_MAGIC; }
+            inline long rBlkSiz() const { return spblk->rBPS(); }
+            inline long rBlkNum() const { return spblk->rTS(); }
+            inline long rBlkFree() const { return rBlkNum(); }  // @todo: 未实现
+            inline long rMaxFile() const { return rBlkNum()/spblk->rSPC(); }
+            inline long rFreeFile() const { return rBlkFree()/spblk->rSPC(); }
+            virtual long rNameLen() const { return FAT32_MAX_FILENAME; }
     };
     typedef struct ShortNameEntry_t {
         char name[CHAR_SHORT_NAME];  // 文件名.扩展名（8+3）
@@ -206,6 +208,7 @@ namespace fat {
             inline void nodTrunc() { nodPanic(); entry->entTrunc(); }
             inline int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) { nodPanic(); return entry->entRead(a_usrdst, a_dst, a_off, a_len); }
             inline int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) { nodPanic(); return entry->entWrite(a_usrsrc, a_src, a_off, a_len); }
+            inline int readLink(char *a_buf, size_t a_bufsiz) { Log(error,"FAT32 does not support readlink\n"); return -EPERM; }
             inline void setMntBlk(shared_ptr<fs::SuperBlock> a_spblk) { nodPanic(); entry->mntblk = a_spblk; }
             inline void unInstall() { nodPanic(); entry->entRelse(); entry->spblk.reset(); entry->mntblk.reset(); entry = nullptr; }
             inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
@@ -232,9 +235,12 @@ namespace fat {
             inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
             inline shared_ptr<fs::DEntry> entSearch(string a_dirname, uint *a_off = nullptr) { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
             inline shared_ptr<fs::DEntry> entCreate(string a_name, int a_attr) { dEPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
+            inline int entSymLink(string a_target) { Log(error,"FAT32 does not support symlink\n"); return -EPERM; }
             inline void setMntPoint(const fs::FileSystem *a_fs) { dEPanic(); entry->mount_flag = true; inode->setMntBlk(a_fs->getSpBlk()); }
             inline void clearMnt() { dEPanic(); entry->mount_flag = false; inode->setMntBlk(inode->rawPtr()->spblk); }
             inline void unInstall() { dEPanic(); entry->entRelse(); entry = nullptr; inode->unInstall(); inode.reset(); }
+            inline int chMod(mode_t a_mode) { Log(error,"FAT32 does not support chmod\n"); return -EPERM; }
+            inline int chOwn(uid_t a_owner, gid_t a_group) { Log(error,"FAT32 does not support chown\n"); return -EPERM; }
             inline const char *rName() const { dEPanic(); return entry->filename; }
             inline shared_ptr<fs::DEntry> getParent() const { dEPanic(); return entry->parent==nullptr ? inode->getSpBlk()->getMntPoint() : make_shared<DEntry>(entry->parent); }
             inline shared_ptr<fs::INode> getINode() const { return inode; }

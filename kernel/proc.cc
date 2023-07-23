@@ -5,10 +5,10 @@
 
 using namespace proc;
 // #define moduleLevel LogLevel::info
-Process::Process(tid_t pid,prior_t prior,tid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
+Process::Process(pid_t pid,prior_t prior,pid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
 }
-Process::Process(prior_t prior,tid_t parent):Process(id,prior,parent){}
+Process::Process(prior_t prior,pid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
     auto ustack=UserStackDefault;
     using perm=vm::PageTableEntry::fieldMasks;
@@ -77,6 +77,21 @@ xlen_t Process::brk(xlen_t addr){
         return heapTop=addr;
     }
 }
+ByteArray Process::getGroups(int a_size) {
+    ArrayBuff<gid_t> grps(a_size);
+    int i = 0;
+    for(auto gid: supgids) {
+        if(i >= a_size) { break; }
+        grps.buff[i] = gid;
+        ++i;
+    }
+    return ByteArray((uint8*)grps.buff, i * sizeof(gid_t));
+}
+void Process::setGroups(ArrayBuff<gid_t> a_grps) {
+    clearGroups();
+    for(auto gid: a_grps) { supgids.emplace(gid); }
+    return;
+}
 
 template<typename ...Ts>
 Task* Task::createTask(ObjManager<Task> &mgr,xlen_t buff,Ts&& ...args){
@@ -127,7 +142,7 @@ Process* proc::createProcess(){
     static bool inited = false;
     if(inited) {
         if(proc->cwd == nullptr) { proc->cwd = fs::Path("/").pathSearch(); };
-        proc->files[3] = make_shared<File>(proc->cwd,0);
+        proc->files[FdCwd] = make_shared<File>(proc->cwd,0);
     }
     else { inited = true; }
     using op=fs::FileOp;
@@ -139,7 +154,7 @@ Process* proc::createProcess(){
     return proc;
 }
 Process* Task::getProcess(){ return (**kGlobObjs->procMgr)[proc]; }
-proc::pid_t proc::clone(Task *task){
+pid_t proc::clone(Task *task){
     auto proc=task->getProcess();
     Log(info,"clone(src=%p:[%d])",proc,proc->pid());
     TRACE(Log(info,"src proc VMAR:\n");proc->vmar.print();)
@@ -150,7 +165,7 @@ proc::pid_t proc::clone(Task *task){
     return newproc->pid();
 }
 
-Process::Process(const Process &other,tid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd){
+Process::Process(const Process &other,pid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd){
     for(int i=0;i<MaxOpenFile;i++)files[i]=other.files[i];
 }
 void Process::exit(int status){
@@ -178,21 +193,71 @@ Process::~Process(){
     tasks.clear();
 }
 Process *Process::parentProc(){return (**kGlobObjs->procMgr)[parent];}
-
-int Process::fdAlloc(shared_ptr<File> a_file, int a_fd){ // fd缺省值为-1，在头文件中定义
-    if(a_fd < 0) {
-        for(int fd = 0; fd < MaxOpenFile; ++fd){
-            if(files[fd] == nullptr){
+shared_ptr<File> Process::ofile(int a_fd) {
+    if(a_fd == AT_FDCWD) { a_fd = FdCwd; }
+    if(fdOutRange(a_fd)) { return nullptr; }
+    return files[a_fd];
+}
+int Process::fdAlloc(shared_ptr<File> a_file, int a_fd) {
+    if(a_fd == -1) {
+        for(int fd = 0; fd < MaxOpenFile; ++fd) {
+            if(files[fd] == nullptr) {
                 files[fd] = a_file;
                 return fd;
             }
         }
+        return -ENOMEM;
     }
-    else {
-        if((a_fd<MaxOpenFile) && (files[a_fd]==nullptr)){
+    else if(!fdOutRange(a_fd)) {
+        if(files[a_fd] == nullptr) {
             files[a_fd] = a_file;
             return a_fd;
         }
+        else { return -EBADF; }
     }
-    return -1;  // 返回错误码
+    else { return -EBADF; }  // 返回错误码
+}
+
+void Task::accept(){
+    int sig=(pendingmask&~block).find_first();
+    if(sig==pendingmask.kSize)return ;
+    pendingmask[sig]=0;
+    auto info=std::move(pending[sig]);
+    /// @todo default kill handler
+    if(sig==SIGKILL) return ;
+    /// @todo default stop handler
+    if(sig==SIGSTOP) return ;
+    auto action=getProcess()->actions[sig];
+    if(action.sa_handler==SIG_ERR);
+    if(action.sa_handler==SIG_DFL);
+    if(action.sa_handler==SIG_IGN) return ;
+    xlen_t signalstack;
+    /// @todo setup signal stack
+
+    if(!action.sa_flags&SA_NODEFER){
+        // prevent nested same signal
+        block[sig]=1;
+    }
+    block|=sigset2bitset(action.sa_mask);
+
+    /// @todo put context
+
+    // handle 
+    if(action.sa_flags&SA_SIGINFO){
+        /// @todo put siginfo
+
+        /// @todo put ucontext
+    }
+#ifdef SA_RESTORER
+    if(action.sa_restorer){
+        ctx.ra()=reinterpret_cast<xlen_t>(action.sa_restorer);
+    } else {
+        /// @todo vDSO sigreturn wrapper
+    }
+#endif
+    // setup args
+    ctx.a0()=sig;
+    if(action.sa_flags&SA_SIGINFO){
+        // args: sig, info, ucontext
+    } else ;// only signum arg
 }

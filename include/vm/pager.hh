@@ -3,8 +3,6 @@
 #include "vm/pcache.hh"
 #include "bio.hh"
 #include "kernel.hh"
-#include <EASTL/vector.h>
-#include <EASTL/unordered_map.h>
 
 namespace vm
 {

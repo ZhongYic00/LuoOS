@@ -5,10 +5,6 @@
 #include "sched.hh"
 #include "vm.hh"
 #include "fs.hh"
-#include <EASTL/unordered_set.h>
-#include <EASTL/string.h>
-#include <EASTL/vector.h>
-#include <EASTL/stack.h>
 
 namespace proc
 {
@@ -16,11 +12,10 @@ namespace proc
     using sched::Scheduable;
     using sched::prior_t;
     using vm::VMAR;
-    using eastl::shared_ptr;
-    using eastl::make_shared;
     using fs::File;
     // using fs::DirEnt;
     using fs::DEntry;
+    using namespace signal;
 
     struct Context
     {
@@ -31,8 +26,8 @@ namespace proc
         FORCEDINLINE inline xlen_t& sp(){return x(2);}
         FORCEDINLINE inline xlen_t& tp(){return x(4);}
         xlen_t pc;
-        inline klib::string toString() const{
-            klib::string rt;
+        inline string toString() const{
+            string rt;
             for(int i=1;i<31;i++)
                 rt+=klib::format("%x,",gpr[i-1]);
             return klib::format("{gpr={%s},pc=%x}",rt.c_str(),pc);
@@ -73,31 +68,49 @@ namespace proc
         UserHeapTop=(UserStackDefault-(1l<<29)),
         UserHeapBottom=vm::ceil(UserHeapTop-(1l<<30));
     constexpr int MaxOpenFile = 101; // 官网测例往fd=100中写东西
+    constexpr int FdCwd = 3;
 
-    typedef tid_t pid_t;
     struct Process:public IdManagable,public Scheduable{
-        tid_t parent;
+        pid_t parent;
         VMAR vmar;
         xlen_t heapTop=UserHeapBottom;
-        eastl::unordered_set<Task*> tasks;
+        unordered_set<Task*> tasks;
         shared_ptr<File> files[MaxOpenFile];
-        eastl::string name;
+        string name;
         Tms ti;
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
+        SignalAction actions[numSignals];
+        pid_t m_pgid, m_sid;
+        uid_t m_ruid, m_euid, m_suid;
+        gid_t m_rgid, m_egid, m_sgid;
+        unordered_set<gid_t> supgids;
 
-        Process(prior_t prior,tid_t parent);
-        Process(tid_t pid,prior_t prior,tid_t parent);
-        Process(const Process &other,tid_t pid);
+        Process(prior_t prior,pid_t parent);
+        Process(pid_t pid,prior_t prior,pid_t parent);
+        Process(const Process &other,pid_t pid);
         inline Process(const Process &other):Process(other,id){}
         ~Process();
 
         inline Task* defaultTask(){ return *tasks.begin(); } // @todo needs to mark default
         Process *parentProc();
-        inline tid_t pid(){return id;}
+        inline pid_t pid() { return id; }
+        // 下列id读/写一体
+        inline pid_t& pgid() { return m_pgid; }
+        inline pid_t& sid() { return m_sid; }
+        inline uid_t& ruid() { return m_ruid; }
+        inline uid_t& euid() { return m_euid; }
+        inline uid_t& suid() { return m_suid; }
+        inline gid_t& rgid() { return m_rgid; }
+        inline gid_t& egid() { return m_egid; }
+        inline gid_t& sgid() { return m_sgid; }
+        inline void clearGroups() { supgids.clear(); }
+        inline int getGroupsNum() { return supgids.size(); }
+        ByteArray getGroups(int a_size);
+        void setGroups(ArrayBuff<gid_t> a_grps);
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
-        inline shared_ptr<File> ofile(int fd){return files[fd];}
+        shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围
         Task* newTask();
         Task* newTask(const Task &other,bool allocStack=true);
         Task* newKTask(prior_t prior=0);
@@ -118,10 +131,15 @@ namespace proc
         };
         Context ctx;
         KContext kctx;
-        eastl::stack<KContext> kctxs;
+        stack<KContext> kctxs;
         const pid_t proc;
         Priv lastpriv;
+        SignalMask block,pendingmask;
+        unique_ptr<SignalInfo> pending[numSignals];
+        SignalStack signal_stack;
+        void accept();
         Process *getProcess();
+        inline tid_t tid() { return id; }
         inline Task(tid_t tid,prior_t pri,tid_t proc):IdManagable(tid),Scheduable(pri),proc(proc),lastpriv(Priv::User){
             ctx.x(2)=UserStackDefault; //x2, sp
             kctx.satp=getProcess()->satp();
@@ -140,7 +158,7 @@ namespace proc
         void switchTo();
         void sleep();
 
-        inline klib::string toString(bool detail=false) const{
+        inline string toString(bool detail=false) const{
             if(detail)return klib::format("Task<%d> priv=%d kctx=%s",id,lastpriv,kctx.toString());
             else return klib::format("Task<%d> priv=%d sp=%x ksp=%x pc=%x kra=%x",id,lastpriv,ctx.gpr[1],kctx.gpr[1],ctx.pc,kctx.gpr[0]);
         }
@@ -161,8 +179,8 @@ namespace proc
     typedef ObjManager<Task> TaskManager;
     class ProcManager:public ProcManagerBase{
     public:
-        eastl::vector<Process*> getChilds(pid_t pid){
-            eastl::vector<Process*> rt;
+        vector<Process*> getChilds(pid_t pid){
+            vector<Process*> rt;
             for(int i=0;i<128;i++){
                 auto p=this->operator[](i);
                 if(p && p->parent==pid)
@@ -174,6 +192,7 @@ namespace proc
     Process* createProcess();
     Process* createKProcess(prior_t prior);
     pid_t clone(Task* task);
+    inline bool fdOutRange(int a_fd) { return (a_fd<0) || (a_fd>=proc::MaxOpenFile); }
 } // namespace proc
 
 

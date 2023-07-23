@@ -3,7 +3,6 @@
 
 #include "common.h"
 #include "klib.hh"
-#include <EASTL/set.h>
 
 // #define moduleLevel LogLevel::info
 
@@ -48,13 +47,13 @@ namespace vm
         inline perm_t perm(){ return raw.perm; }
         inline xlen_t ppn(){ return raw.ppn; }
         inline pgtbl_t child(){ return reinterpret_cast<pgtbl_t>( pn2addr(ppn()) ); }
-        inline klib::string toString(){
+        inline string toString(){
             return klib::format("[%lx] %c%c%c%c",(xlen_t)raw.ppn,fields.r?'r':'-',fields.w?'w':'-',fields.x?'x':'-',fields.v?'v':'-');
         }
-        inline klib::string toString(PageNum vpn,PageNum pages){
+        inline string toString(PageNum vpn,PageNum pages){
             return klib::format("%lx=>%lx[%x] %c%c%c%c",vpn,ppn(),pages,fields.r?'r':'-',fields.w?'w':'-',fields.x?'x':'-',fields.v?'v':'-');
         }
-        inline klib::string toString(PageNum vpn){
+        inline string toString(PageNum vpn){
             return klib::format("%lx => PTNode@%lx",vpn,ppn());
         }
     };
@@ -93,7 +92,7 @@ namespace vm
     public:
         virtual ~VMO(){}
         virtual PageNum len() const=0;
-        virtual klib::string toString() const=0;
+        virtual string toString() const=0;
         /// @brief create a shallow copy of [start,end], pages are shared
         /// @param start @param end relative pagenum
         // virtual Arc<VMO> shallow(PageNum start,PageNum end);
@@ -125,7 +124,7 @@ namespace vm
         const SharingType sharing = SharingType::privt;
         inline PageNum pages() const{return len;}
         inline PageNum vend() const { return vpn + pages() - 1; }
-        inline klib::string toString() const { return klib::format("%lx=>%s", vpn, vmo->toString()); }
+        inline string toString() const { return klib::format("%lx=>%s", vpn, vmo->toString()); }
         /// @param region absolute vpn region
         inline PageMapping splitChild(Segment region) const {
             /// @todo reduce mem
@@ -184,8 +183,8 @@ namespace vm
         inline xlen_t transaddr(xlen_t addr){
             return pn2addr(trans(addr2pn(addr)))+addr2offset(addr);
         }
-        klib::string toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize);
-        inline klib::string toString(){return toString(root,0l,1l<<18);}
+        string toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize);
+        inline string toString(){return toString(root,0l,1l<<18);}
         inline void print(){
             Log(debug,"PageTable::print(root=%p)\n",root);
             Log(info,"%s",toString().c_str());
@@ -249,21 +248,21 @@ namespace vm
         void reset();
         inline xlen_t satp(){return PageTable::toSATP(pagetable);}
         // @todo @bug what if region is on border?
-        inline klib::ByteArray copyinstr(xlen_t addr, size_t len) {
+        inline ByteArray copyinstr(xlen_t addr, size_t len) {
             // @todo 检查用户源是否越界（addr+len来自用户进程大小之外的空间）
             xlen_t paddr = pagetable.transaddr(addr);
-            auto buf=klib::ByteArray(len+1);
+            auto buf=ByteArray(len+1);
             strncpy((char*)buf.buff, (char*)paddr, len);
             buf.buff[len]='\0';
             return buf;
         }
-        inline klib::ByteArray copyin(xlen_t addr,size_t len){
+        inline ByteArray copyin(xlen_t addr,size_t len){
             // @todo 检查用户源是否越界（addr+len来自用户进程大小之外的空间）
             xlen_t paddr=pagetable.transaddr(addr);
-            auto buff=klib::ByteArray::from(paddr,len);
+            auto buff=ByteArray::from(paddr,len);
             return buff;
         }
-        inline void copyout(xlen_t addr,const klib::ByteArray &buff){
+        inline void copyout(xlen_t addr,const ByteArray &buff){
             // @todo 检查拷贝后是否会越界（addr+buff.len后超出用户进程大小）
             // xlen_t paddr=pagetable.transaddr(addr);
             auto mapping=find(addr);
@@ -293,10 +292,10 @@ namespace vm
             Writer(xlen_t addr,VMAR &parent):vaddr(addr),parent(parent),reverse(false){}
             template<typename T>
             inline Writer& operator<<(const T &d){
-                auto buff=klib::ByteArray((uint8_t*)&d,sizeof(d));
+                auto buff=ByteArray((uint8_t*)&d,sizeof(d));
                 return operator<<(buff);
             }
-            inline Writer& operator<<(const klib::ByteArray &bytes){
+            inline Writer& operator<<(const ByteArray &bytes){
                 if(!reverse){
                     parent.copyout(vaddr,bytes);
                     vaddr+=bytes.len;
@@ -307,7 +306,7 @@ namespace vm
                 return *this;
             }
             template<typename T>
-            inline Writer& operator<<(const klib::ArrayBuff<T> &array){
+            inline Writer& operator<<(const ArrayBuff<T> &array){
                 auto partial=vaddr%8;
                 if(reverse)partial=-partial;
                 vaddr+=partial;
@@ -328,7 +327,7 @@ namespace vm
         }
     private:
         // klib::list<VMAR> children;
-        eastl::set<PageMapping> mappings;
+        set<PageMapping> mappings;
         PageTable pagetable;
     };
 

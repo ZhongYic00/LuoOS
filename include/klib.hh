@@ -5,16 +5,34 @@
 #include "platform.h"
 #include "klib.h"
 #include "safestl.hh"
-// #include "TINYSTL/string.h"
 #include "new.hh"
-#include <EASTL/shared_ptr.h>
-#include <EASTL/string.h>
-#include <EASTL/vector.h>
-#include <EASTL/list.h>
+#include <asm/errno.h>
+#include "EASTL/string.h"
+#include "EASTL/vector.h"
+#include "EASTL/list.h"
+#include "EASTL/stack.h"
+#include "EASTL/set.h"
+#include "EASTL/unordered_set.h"
+#include "EASTL/unordered_map.h"
+#include "EASTL/shared_ptr.h"
+#include "EASTL/weak_ptr.h"
+#include "EASTL/unique_ptr.h"
+
+using eastl::string;
+using eastl::vector;
+using eastl::list;
+using eastl::stack;
+using eastl::set;
+using eastl::unordered_set;
+using eastl::unordered_map;
+using eastl::unique_ptr;
+using eastl::shared_ptr;
+using eastl::weak_ptr;
+using eastl::make_unique;
+using eastl::make_shared;
 
 namespace klib
 {
-  using eastl::string;
   template<typename T1,typename T2>
   inline auto min(T1 a,T2 b){ return a<b?a:b; }
   template<typename T1,typename T2>
@@ -93,7 +111,7 @@ namespace klib
     return __format_internal::format_(fmt,__format_internal::myForward<Ts>(std::forward<Ts>(args))...);
   }
   template<typename T>
-  string toString(const eastl::list<T> &l){
+  string toString(const list<T> &l){
     string s="<list>[";
     for(auto &item:l)
       s+=item.toString()+",";
@@ -187,7 +205,7 @@ namespace klib
     iterator end(){return iterator(buff+len);}
     const char* c_str(){return reinterpret_cast<char*>(buff);}
   };
-  typedef ArrayBuff<uint8_t> ByteArray;
+  typedef ArrayBuff<uint8> ByteArray;
 
   template<typename T>
   struct Segment{
@@ -198,18 +216,12 @@ namespace klib
     constexpr explicit operator bool() const noexcept{return l<=r;}
     inline constexpr T length() const{return r-l+1;}
   };
-  /*
-    SharedPtr, by Ct_Unvs
-    SharedPtr只能用于动态对象，且SharedPtr本身不应使用new创建
-  */
 } // namespace klib
 
-using eastl::shared_ptr;
-using eastl::make_shared;
-using eastl::unique_ptr;
-using eastl::make_unique;
+using klib::ArrayBuff;
+using klib::ByteArray;
 template<typename T>
-using Arc=eastl::shared_ptr<T>;
+using Arc=shared_ptr<T>;
 
 static klib::ringbuf<char> buf;
 

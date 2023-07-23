@@ -2,12 +2,11 @@
 #include "vm/pager.hh"
 #include "vm/pcache.hh"
 #include "kernel.hh"
-#include <EASTL/vector.h>
 
 namespace vm
 {
     class VMOPaged:public VMO{
-        eastl::vector<PBufRef> pages;
+        vector<PBufRef> pages;
     public:
         Arc<Pager> pager;
         VMOPaged(PageNum len,Arc<Pager> pager):pages(len),pager(pager){}
@@ -22,8 +21,8 @@ namespace vm
             assert(pages[offset].use_count());
             return {offset,pages[offset]->ppn,1};
         }
-        inline eastl::vector<tuple<PageNum,PageNum>> req(const Segment& region){}
-        virtual klib::string toString() const{return klib::format("<VMOPaged>{len=0x%x}",len());}
+        inline vector<tuple<PageNum,PageNum>> req(const Segment& region){}
+        virtual string toString() const{return klib::format("<VMOPaged>{len=0x%x}",len());}
         // inline Arc<VMO> shallow(PageNum start,PageNum end) override{
         //     auto rt=make_shared<VMOPaged>(*this);
         //     rt->pages.assign(pages.begin()+start,pages.begin()+end+1);
@@ -43,7 +42,7 @@ namespace vm
         ~VMOContiguous() { kGlobObjs->pageMgr->freeUnaligned(ppn_,pages_); }
         inline PageNum len() const override{ return pages_; }
         inline PageNum ppn() const{ return ppn_; }
-        inline klib::string toString() const override{ return klib::format("<VMOCont>{%x[%x]}", ppn(), len()); }
+        inline string toString() const override{ return klib::format("<VMOCont>{%x[%x]}", ppn(), len()); }
 
         inline PageSlice req(PageNum offset) override{
             return {0,ppn_,pages_};
