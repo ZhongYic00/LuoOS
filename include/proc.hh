@@ -104,17 +104,10 @@ namespace proc
         inline gid_t& rgid() { return m_rgid; }
         inline gid_t& egid() { return m_egid; }
         inline gid_t& sgid() { return m_sgid; }
+        inline void clearGroups() { supgids.clear(); }
         inline int getGroupsNum() { return supgids.size(); }
-        ByteArray getGroups(int a_size) {
-            ArrayBuff<gid_t> grps(a_size);
-            int i = 0;
-            for(auto gid: supgids) {
-                if(i >= a_size) { break; }
-                grps.buff[i] = gid;
-                ++i;
-            }
-            return ByteArray((uint8*)grps.buff, i * sizeof(gid_t));
-        }
+        ByteArray getGroups(int a_size);
+        void setGroups(ArrayBuff<gid_t> a_grps);
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
         shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围

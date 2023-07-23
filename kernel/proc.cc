@@ -54,6 +54,21 @@ Task* Process::newTask(const Task &other,bool allocStack){
     kGlobObjs->scheduler->add(thrd);
     return thrd;
 }
+ByteArray Process::getGroups(int a_size) {
+    ArrayBuff<gid_t> grps(a_size);
+    int i = 0;
+    for(auto gid: supgids) {
+        if(i >= a_size) { break; }
+        grps.buff[i] = gid;
+        ++i;
+    }
+    return ByteArray((uint8*)grps.buff, i * sizeof(gid_t));
+}
+void Process::setGroups(ArrayBuff<gid_t> a_grps) {
+    clearGroups();
+    for(auto gid: a_grps) { supgids.emplace(gid); }
+    return;
+}
 
 template<typename ...Ts>
 Task* Task::createTask(ObjManager<Task> &mgr,xlen_t buff,Ts&& ...args){

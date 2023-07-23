@@ -723,6 +723,19 @@ namespace syscall {
 
         return grps.len / sizeof(gid_t);
     }
+    xlen_t setGroups() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_size = ctx.x(10);
+        gid_t *a_list = (gid_t*)ctx.x(11);
+        if(a_list == nullptr) { return -EFAULT; }
+
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray listarr = curproc->vmar.copyin((xlen_t)a_list, a_size * sizeof(gid_t));
+        ArrayBuff<gid_t> grps((gid_t*)listarr.buff, a_size);
+        curproc->setGroups(grps);
+
+        return 0;
+    }
     xlen_t uName(void) {
         auto &ctx = kHartObj().curtask->ctx;
         struct UtSName *a_uts = (struct UtSName*)ctx.x(10);
@@ -1061,6 +1074,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::getsid,getSid);
         DECLSYSCALL(scnum::setsid,setSid);
         DECLSYSCALL(scnum::getgroups,getGroups);
+        DECLSYSCALL(scnum::setgroups,setGroups);
         DECLSYSCALL(scnum::times,times);
         DECLSYSCALL(scnum::uname,uName);
         DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);

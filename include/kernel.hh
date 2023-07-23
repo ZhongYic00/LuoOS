@@ -71,6 +71,7 @@ namespace sys
         getsid=156,
         setsid=157,
         getgroups=158,
+        setgroups=159,
         times=153,
         uname=160,
         gettimeofday=169,
