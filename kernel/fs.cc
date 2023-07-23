@@ -309,12 +309,19 @@ namespace fs
     void INode::readv(const memvec &src,const memvec &dst){
         auto srcit=src.begin();
         auto srcseg=*srcit;
+        auto dstit=dst.begin();
+        auto dstseg=*dstit;
         auto totrdbytes=0u;
-        for(auto seg:dst){
-            auto rdbytes=nodRead(false,seg.l,srcit->l,seg.length());
-            srcseg.l+=rdbytes;
-            if(!srcseg)srcseg=*++srcit;
+        while(dstseg&&srcseg){
+            auto rdbytes=nodRead(false,dstseg.l,srcseg.l,dstseg.length());
+            srcseg.l+=rdbytes;dstseg.l+=rdbytes;
+            if(!srcseg||!rdbytes)srcseg=*++srcit;
+            if(!dstseg)dstseg=*++dstit;
             totrdbytes+=rdbytes;
+        }
+        while(dstit!=dst.end()){
+            memset((ptr_t)dstseg.l,0,dstseg.length());
+            dstseg=*++dstit;
         }
     }
     void INode::readPages(const memvec &src,const memvec &dst){
