@@ -47,7 +47,7 @@ void uecallHandler(){
     using namespace sys;
     kHartObj().curtask->lastpriv=proc::Task::Priv::Kernel;
     if(ecallId<nSyscalls){
-        Log(warning,"proc called %s[%d]",syscall::syscallHelper[ecallId],ecallId);
+        Log(syscallPtrs[ecallId]?info:error,"proc called %s[%d]",syscall::syscallHelper[ecallId],ecallId);
         /// @bug is this needed??
         // kHartObj().curtask->lastpriv=proc::Task::Priv::Kernel;
         csrWrite(sscratch,kHartObj().curtask->kctx.gpr);
