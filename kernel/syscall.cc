@@ -285,6 +285,17 @@ namespace syscall {
 
         return statcode::ok;
     }
+    xlen_t fChMod() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_fd = ctx.x(10);
+        mode_t a_mode = ctx.x(11);
+
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> file = curproc->ofile(a_fd);
+        if(file == nullptr) { return -EBADF; }
+
+        return file->chMod(a_mode);
+    }
     xlen_t openAt() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
@@ -916,6 +927,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::statfs,statFS);
         DECLSYSCALL(scnum::chdir,chDir);
         DECLSYSCALL(scnum::fchdir,fChDir);
+        DECLSYSCALL(scnum::fchmod,fChMod);
         DECLSYSCALL(scnum::openat,openAt);
         DECLSYSCALL(scnum::close,close);
         DECLSYSCALL(scnum::pipe2,pipe2);

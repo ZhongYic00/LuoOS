@@ -132,6 +132,7 @@ namespace fs{
         ByteArray readAll();
         off_t lSeek(off_t a_offset, int a_whence);
         ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
+        xlen_t chMod(mode_t a_mode);
     };
     class Path {
         private:
