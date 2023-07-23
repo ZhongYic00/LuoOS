@@ -237,9 +237,12 @@ namespace fat {
             inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
             inline shared_ptr<fs::DEntry> entSearch(string a_dirname, uint *a_off = nullptr) { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
             inline shared_ptr<fs::DEntry> entCreate(string a_name, int a_attr) { dEPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
+            inline int entSymLink(string a_target) { Log(error,"FAT32 does not support symlink\n"); return -EPERM; }
             inline void setMntPoint(const fs::FileSystem *a_fs) { dEPanic(); entry->mount_flag = true; inode->setMntBlk(a_fs->getSpBlk()); }
             inline void clearMnt() { dEPanic(); entry->mount_flag = false; inode->setMntBlk(inode->rawPtr()->spblk); }
             inline void unInstall() { dEPanic(); entry->entRelse(); entry = nullptr; inode->unInstall(); inode.reset(); }
+            inline int chMod(mode_t a_mode) { Log(error,"FAT32 does not support chmod\n"); return -EPERM; }
+            inline int chOwn(uid_t a_owner, gid_t a_group) { Log(error,"FAT32 does not support chown\n"); return -EPERM; }
             inline const char *rName() const { dEPanic(); return entry->filename; }
             inline shared_ptr<fs::DEntry> getParent() const { dEPanic(); return entry->parent==nullptr ? inode->getSpBlk()->getMntPoint() : make_shared<DEntry>(entry->parent); }
             inline shared_ptr<fs::INode> getINode() const { return inode; }

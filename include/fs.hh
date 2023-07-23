@@ -81,8 +81,11 @@ namespace fs{
             DEntry& operator=(const DEntry& a_entry) = default;
             virtual shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) = 0;  // 在该目录项下(不包含子目录)搜索名为a_dirname的目录项，返回指向目标目录项的共享指针（找不到则返回nullptr）
             virtual shared_ptr<DEntry> entCreate(string a_name, int a_attr) = 0;  // 在该目录项下以a_attr属性创建名为a_name的文件，返回指向该文件目录项的共享指针
+            virtual int entSymLink(string a_target) = 0;
             virtual void setMntPoint(const FileSystem *a_fs) = 0;  // 设该目录项为a_fs文件系统的挂载点（不更新a_fs）
             virtual void clearMnt() = 0;  // 清除该目录项的挂载点记录
+            virtual int chMod(mode_t a_mode) = 0;
+            virtual int chOwn(uid_t a_owner, gid_t a_group) = 0;
             virtual const char *rName() const = 0;  // 返回该目录项的文件名
             virtual shared_ptr<DEntry> getParent() const = 0;  // 返回指向该目录项父目录的共享指针
             virtual shared_ptr<INode> getINode() const = 0;  // 返回指向该目录项对应INode的共享指针
@@ -132,8 +135,8 @@ namespace fs{
         ByteArray readAll();
         off_t lSeek(off_t a_offset, int a_whence);
         ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
-        int chMod(mode_t a_mode);
-        int chOwn(uid_t a_owner, gid_t a_group);
+        inline int chMod(mode_t a_mode) { obj.ep->chMod(a_mode); }
+        inline int chOwn(uid_t a_owner, gid_t a_group) { return obj.ep->chOwn(a_owner, a_group); }
     };
     class Path {
         private:
@@ -158,6 +161,7 @@ namespace fs{
             int pathMount(Path a_devpath, string a_fstype);
             int pathUnmount() const;
             int pathOpen(int a_flags, mode_t a_mode);
+            int pathSymLink(string a_target);
             // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
             // inline shared_ptr<File> pathOpen(mode_t a_mode) const { return pathOpen(0, a_file); }
             // inline shared_ptr<File> pathOpen() const { return pathOpen(0, nullptr); }

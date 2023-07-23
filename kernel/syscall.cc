@@ -189,6 +189,22 @@ namespace syscall {
 
         return Path(path, base).pathHardUnlink();
     }
+    xlen_t symLinkAt() {
+        auto &ctx = kHartObj().curtask->ctx;
+        const char *a_target = (const char*)ctx.x(10);
+        int a_basefd = ctx.x(11);
+        const char *a_linkpath = (const char*)ctx.x(13);
+
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray targetarr = curproc->vmar.copyinstr((xlen_t)a_target, FAT32_MAX_PATH);
+        ByteArray linkarr = curproc->vmar.copyinstr((xlen_t)a_linkpath, FAT32_MAX_PATH);
+        const char *target = (const char*)targetarr.buff;
+        const char *link = (const char*)linkarr.buff;
+        shared_ptr<File> base = curproc->ofile(a_basefd);
+        if(base == nullptr) { return -EBADF; }
+
+        return Path(link, base).pathSymLink(target);
+    }
     xlen_t linkAt(void) {
         auto &ctx = kHartObj().curtask->ctx;
         int a_oldbasefd = ctx.x(10);
@@ -201,8 +217,8 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray oldpatharr = curproc->vmar.copyinstr((xlen_t)a_oldpath, FAT32_MAX_PATH);
         ByteArray newpatharr = curproc->vmar.copyinstr((xlen_t)a_newpath, FAT32_MAX_PATH);
-        char *oldpath = (char*)oldpatharr.buff;
-        char *newpath = (char*)newpatharr.buff;
+        const char *oldpath = (const char*)oldpatharr.buff;
+        const char *newpath = (const char*)newpatharr.buff;
         shared_ptr<File> oldbase = curproc->ofile(a_oldbasefd);
         shared_ptr<File> newbase = curproc->ofile(a_newbasefd);
         if(oldbase==nullptr || newbase==nullptr) { return -EBADF; }
@@ -975,6 +991,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::mkdirat,mkDirAt);
         DECLSYSCALL(scnum::linkat,linkAt);
         DECLSYSCALL(scnum::unlinkat,unlinkAt);
+        DECLSYSCALL(scnum::symlinkat,symLinkAt);
         DECLSYSCALL(scnum::umount2,umount2);
         DECLSYSCALL(scnum::mount,mount);
         DECLSYSCALL(scnum::statfs,statFS);

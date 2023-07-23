@@ -29,6 +29,7 @@ namespace sys
         dup3=24,
         mkdirat=34,
         unlinkat=35,
+        symlinkat=36,
         linkat=37,
         umount2=39,
         mount=40,
