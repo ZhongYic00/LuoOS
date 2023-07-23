@@ -469,6 +469,27 @@ namespace syscall {
         curproc->vmar.copyout((xlen_t)a_offset, offsetarr);
         return ret;
     }
+    xlen_t readLinkAt() {
+        auto &ctx=kHartObj().curtask->ctx;
+        int a_basefd = ctx.x(10);
+        const char *a_path = (const char*)ctx.x(11);
+        char *a_buf = (char*)ctx.x(12);
+        size_t a_bufsiz = ctx.x(13);
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> base = curproc->ofile(a_basefd);
+        ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
+        const char *path = (const char*)patharr.buff;
+
+        int fd = Path(path, base).pathOpen(O_RDONLY, S_IFREG);
+        if(fd < 0) { return fd; }
+        ByteArray bufarr(a_bufsiz);
+        int ret = curproc->ofile(fd)->readLink((char*)bufarr.buff, bufarr.len);
+        curproc->files[fd].reset();
+        curproc->vmar.copyout((xlen_t)a_buf, bufarr);
+
+        return ret;
+    }
     xlen_t fStatAt() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
@@ -1009,6 +1030,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::read,read);
         DECLSYSCALL(scnum::write,write);
         DECLSYSCALL(scnum::sendfile,sendFile);
+        DECLSYSCALL(scnum::readlinkat,readLinkAt);
         DECLSYSCALL(scnum::fstatat,fStatAt);
         DECLSYSCALL(scnum::fstat,fStat);
         DECLSYSCALL(scnum::sync,sync);

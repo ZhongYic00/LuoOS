@@ -67,6 +67,7 @@ namespace fs{
             virtual void nodTrunc() = 0;  // 清空该INode的元信息，并标志该INode为脏
             virtual int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) = 0;  // 从该文件的a_off偏移处开始，读取a_len字节的数据到a_dst处，返回实际读取的字节数
             virtual int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) = 0;  // 从a_src处开始，写入a_len字节的数据到该文件的a_off偏移处，返回实际写入的字节数
+            virtual int readLink(char *a_buf, size_t a_bufsiz) = 0;
             virtual uint8 rAttr() const = 0;  // 返回该文件的属性
             virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
             virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
@@ -133,6 +134,7 @@ namespace fs{
         xlen_t write(xlen_t addr, size_t len);
         ByteArray read(size_t len, long a_off = -1, bool a_update = true);
         ByteArray readAll();
+        inline int readLink(char *a_buf, size_t a_bufsiz) { return obj.ep->getINode()->readLink(a_buf, a_bufsiz); }
         off_t lSeek(off_t a_offset, int a_whence);
         ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
         inline int chMod(mode_t a_mode) { obj.ep->chMod(a_mode); }

@@ -48,6 +48,7 @@ namespace sys
         read=63,
         write=64,
         sendfile=71,
+        readlinkat=78,
         fstatat=79,
         fstat=80,
         sync=81,
