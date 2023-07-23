@@ -12,12 +12,6 @@
 
 namespace fs{
     using pipe::Pipe;
-    using eastl::vector;
-    using eastl::string;
-    using eastl::shared_ptr;
-    using eastl::make_shared;
-    using eastl::unordered_map;
-    using klib::ByteArray;
 
     class DEntry;
     class FileSystem;

@@ -8,13 +8,25 @@
 // #include "TINYSTL/string.h"
 #include "new.hh"
 #include <asm/errno.h>
-#include "EASTL/shared_ptr.h"
 #include "EASTL/string.h"
 #include "EASTL/vector.h"
+#include "EASTL/unordered_set.h"
+#include "EASTL/unordered_map.h"
+#include "EASTL/shared_ptr.h"
+#include "EASTL/weak_ptr.h"
+#include "EASTL/unique_ptr.h"
+
+using eastl::string;
+using eastl::vector;
+using eastl::unordered_set;
+using eastl::unordered_map;
+using eastl::unique_ptr;
+using eastl::shared_ptr;
+using eastl::weak_ptr;
+using eastl::make_shared;
 
 namespace klib
 {
-  using eastl::string;
   template<typename T>
   inline T min(T a,T b){ return a<b?a:b; }
   template<typename T>
@@ -307,15 +319,11 @@ struct list:public Seq<T>{
     iterator end(){return iterator(buff+len);}
     const char* c_str(){return reinterpret_cast<char*>(buff);}
   };
-  typedef ArrayBuff<uint8_t> ByteArray;
-
-  template<typename T>
-  using SharedPtr=::eastl::shared_ptr<T>;
-  /*
-    SharedPtr, by Ct_Unvs
-    SharedPtr只能用于动态对象，且SharedPtr本身不应使用new创建
-  */
+  typedef ArrayBuff<uint8> ByteArray;
 } // namespace klib
+
+using klib::ArrayBuff;
+using klib::ByteArray;
 
 static klib::ringbuf<char> buf;
 

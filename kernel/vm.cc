@@ -130,9 +130,9 @@ void PageTable::removeMapping(pgtbl_t table,PageNum vpn,xlen_t pages,int level){
         if(freePTNode(subTable))entry.setInvalid();
     }
 }
-klib::string PageTable::toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
+string PageTable::toString(pgtbl_t table,xlen_t vpnBase,xlen_t entrySize){
     assert(entrySize>0);
-    klib::string s;
+    string s;
     for(int i=0;i<pageEntriesPerPage;i++){
         auto &entry=table[i];
         if(entry.isValid()){

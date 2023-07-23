@@ -28,7 +28,7 @@ xlen_t File::write(xlen_t addr,size_t len){
     switch(type){
         case FileType::stdout:
         case FileType::stderr:
-            FMT_PROC("%s",klib::string(bytes.c_str(),len).c_str());
+            FMT_PROC("%s",string(bytes.c_str(),len).c_str());
             rt=bytes.len;
             break;
         case FileType::pipe:

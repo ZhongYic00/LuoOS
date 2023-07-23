@@ -24,7 +24,7 @@ namespace pipe{
         inline void decReader(){rcnt--;}
         inline void addWriter(){wcnt++;}
         inline void decWriter(){wcnt--;}
-        inline void write(klib::ByteArray bytes){
+        inline void write(ByteArray bytes){
             auto n=bytes.len;
             if(rcnt==0)return ;
             // TODO parallelize, copy avai bytes at once
@@ -42,8 +42,8 @@ namespace pipe{
             }
             // wakeup();
         }
-        inline klib::ByteArray read(int n){
-            klib::ByteArray bytes(n);
+        inline ByteArray read(int n){
+            ByteArray bytes(n);
             // while(buff.empty())sleep();
             /// @todo error handling
             if(buff.empty()&&wcnt==0)return 0;
@@ -68,7 +68,6 @@ namespace signal{
     #include <asm/sigcontext.h>
 
     using eastl::bitset;
-    using eastl::unique_ptr;
     using proc::Process;
     using proc::Task;
     using proc::Context;

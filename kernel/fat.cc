@@ -7,7 +7,7 @@ using fs::File;
 
 static struct entry_cache { DirEnt entries[ENTRY_CACHE_NUM]; } ecache; // 目录缓冲区
 static int bufCopyOut(int user_dst, uint64 dst, void *src, uint64 len) {
-    if(user_dst) { kHartObj().curtask->getProcess()->vmar.copyout(dst, klib::ByteArray((uint8_t*)src, len)); }
+    if(user_dst) { kHartObj().curtask->getProcess()->vmar.copyout(dst, ByteArray((uint8_t*)src, len)); }
     else { memmove((void*)dst, src, len); }
     return 0;
 }

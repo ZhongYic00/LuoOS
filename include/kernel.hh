@@ -70,6 +70,7 @@ namespace sys
         getpgid=155,
         getsid=156,
         setsid=157,
+        getgroups=158,
         times=153,
         uname=160,
         gettimeofday=169,

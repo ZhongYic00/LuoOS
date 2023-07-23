@@ -4,9 +4,6 @@
 // #include "resmgr.hh"
 #include "sched.hh"
 #include "vm.hh"
-#include "TINYSTL/unordered_set.h"
-#include "TINYSTL/string.h"
-#include "TINYSTL/vector.h"
 #include "fs.hh"
 
 namespace proc
@@ -15,8 +12,6 @@ namespace proc
     using sched::Scheduable;
     using sched::prior_t;
     using vm::VMAR;
-    using eastl::shared_ptr;
-    using eastl::make_shared;
     using fs::File;
     // using fs::DirEnt;
     using fs::DEntry;
@@ -31,8 +26,8 @@ namespace proc
         FORCEDINLINE inline xlen_t& sp(){return x(2);}
         FORCEDINLINE inline xlen_t& tp(){return x(4);}
         xlen_t pc;
-        inline klib::string toString() const{
-            klib::string rt;
+        inline string toString() const{
+            string rt;
             for(int i=1;i<31;i++)
                 rt+=klib::format("%x,",gpr[i-1]);
             return klib::format("{gpr={%s},pc=%x}",rt.c_str(),pc);
@@ -79,9 +74,9 @@ namespace proc
         pid_t parent;
         VMAR vmar;
         xlen_t heapTop=UserHeapBottom;
-        tinystl::unordered_set<Task*> tasks;
+        unordered_set<Task*> tasks;
         shared_ptr<File> files[MaxOpenFile];
-        tinystl::string name;
+        string name;
         Tms ti;
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
@@ -89,6 +84,7 @@ namespace proc
         pid_t m_pgid, m_sid;
         uid_t m_ruid, m_euid, m_suid;
         gid_t m_rgid, m_egid, m_sgid;
+        unordered_set<gid_t> supgids;
 
         Process(prior_t prior,pid_t parent);
         Process(pid_t pid,prior_t prior,pid_t parent);
@@ -108,6 +104,17 @@ namespace proc
         inline gid_t& rgid() { return m_rgid; }
         inline gid_t& egid() { return m_egid; }
         inline gid_t& sgid() { return m_sgid; }
+        inline int getGroupsNum() { return supgids.size(); }
+        ByteArray getGroups(int a_size) {
+            ArrayBuff<gid_t> grps(a_size);
+            int i = 0;
+            for(auto gid: supgids) {
+                if(i >= a_size) { break; }
+                grps.buff[i] = gid;
+                ++i;
+            }
+            return ByteArray((uint8*)grps.buff, i * sizeof(gid_t));
+        }
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
         shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围
@@ -151,7 +158,7 @@ namespace proc
         const pid_t proc;
         Priv lastpriv;
         SignalMask block,pendingmask;
-        eastl::unique_ptr<SignalInfo> pending[numSignals];
+        unique_ptr<SignalInfo> pending[numSignals];
         SignalStack signal_stack;
         void accept();
         Process *getProcess();
@@ -174,7 +181,7 @@ namespace proc
         void switchTo();
         void sleep();
 
-        inline klib::string toString(bool detail=false) const{
+        inline string toString(bool detail=false) const{
             if(detail)return klib::format("Task<%d> priv=%d kctx=%s",id,lastpriv,kctx.toString());
             else return klib::format("Task<%d> priv=%d sp=%x ksp=%x pc=%x kra=%x",id,lastpriv,ctx.gpr[1],kctx.gpr[1],ctx.pc,kctx.gpr[0]);
         }

@@ -15,11 +15,11 @@ namespace ramfs
     //     eastl::vector<uint8_t> bytes;
     // public:
     //     Inode(ino_t ino):fs::internal::Inode(ino){}
-    //     expected<klib::ByteArray,Err> read(size_t off,size_t len) override{
+    //     expected<ByteArray,Err> read(size_t off,size_t len) override{
     //         size_t rdbytes=max(min(len,bytes.size()-off),0ul);
-    //         // return make_expected(klib::ByteArray)
+    //         // return make_expected(ByteArray)
     //     }
-    //     expected<xlen_t,Err> write(size_t off,klib::ByteArray bytes) override{
+    //     expected<xlen_t,Err> write(size_t off,ByteArray bytes) override{
     //         return make_unexpected("unimplemented");
     //     }
     // };

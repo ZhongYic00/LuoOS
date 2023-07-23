@@ -52,7 +52,6 @@ namespace eastl{
 
 
 namespace bio{
-    using ::eastl::shared_ptr;
     /// @todo move to klib
     template<int SIZE=512>
     struct alignas(SIZE) AlignedBytes{uint8_t bytes[SIZE];};
@@ -90,10 +89,10 @@ namespace bio{
         /// @todo load from dev:secno
         void reload();
     private:
-        inline klib::ByteArray asArray(){return klib::ByteArray(d,blockSize);}
+        inline ByteArray asArray(){return ByteArray(d,blockSize);}
     };
-    typedef eastl::weak_ptr<BlockBuf> BufWeakRef;
-    typedef eastl::shared_ptr<BlockBuf> BufRef;
+    typedef weak_ptr<BlockBuf> BufWeakRef;
+    typedef shared_ptr<BlockBuf> BufRef;
 }
 
 namespace eastl{

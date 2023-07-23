@@ -7,9 +7,6 @@
 namespace fat {
     using BlockBuf = struct bio::BlockBuf;
     using fs::File;
-    using eastl::string;
-    using eastl::shared_ptr;
-    using eastl::make_shared;
     class FileSystem;
     class DirEnt;
     class DEntry;
