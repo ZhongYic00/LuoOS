@@ -38,6 +38,7 @@ namespace sys
         fchmod=52,
         fchmodat=53,
         fchownat=54,
+        fchown=55,
         openat=56,
         close=57,
         pipe2=59,
