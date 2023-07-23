@@ -135,7 +135,13 @@ ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len
     return nsend;
 }
 int File::chMod(mode_t a_mode) {
+    // @todo: 对内存对象进行操作（尽管无法写到磁盘上，因为FAT32不支持）
     Log(error,"FAT32 does not support chmod\n");
+    return -EPERM;
+}
+int File::chOwn(uid_t a_owner, gid_t a_group) {
+    // @todo: 对内存对象进行操作（尽管无法写到磁盘上，因为FAT32不支持）
+    Log(error,"FAT32 does not support chown\n");
     return -EPERM;
 }
 File::~File() {

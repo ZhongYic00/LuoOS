@@ -133,6 +133,7 @@ namespace fs{
         off_t lSeek(off_t a_offset, int a_whence);
         ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
         int chMod(mode_t a_mode);
+        int chOwn(uid_t a_owner, gid_t a_group);
     };
     class Path {
         private:

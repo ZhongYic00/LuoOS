@@ -316,6 +316,27 @@ namespace syscall {
         curproc->files[fd].reset();  // 关闭
         return ret;
     }
+    xlen_t fChOwnAt() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_basefd = ctx.x(10);
+        const char *a_path = (const char*)ctx.x(11);
+        uid_t a_uid = ctx.x(12);
+        gid_t a_gid = ctx.x(13);
+        int a_flags = ctx.x(14);
+
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_FILENAME);
+        const char *path = (const char*)patharr.buff;
+        shared_ptr<File> base = curproc->ofile(a_basefd);
+        if(base == nullptr) { return -EBADF; }
+
+        int fd = Path(path, base).pathOpen(a_flags, S_IFREG);
+
+        if(fd < 0) { return fd; }  // 错误码
+        int ret = curproc->ofile(fd)->chOwn(a_uid, a_gid);
+        curproc->files[fd].reset();  // 关闭
+        return ret;
+    }
     xlen_t openAt() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
@@ -949,6 +970,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::fchdir,fChDir);
         DECLSYSCALL(scnum::fchmod,fChMod);
         DECLSYSCALL(scnum::fchmodat,fChModAt);
+        DECLSYSCALL(scnum::fchownat,fChOwnAt);
         DECLSYSCALL(scnum::openat,openAt);
         DECLSYSCALL(scnum::close,close);
         DECLSYSCALL(scnum::pipe2,pipe2);
