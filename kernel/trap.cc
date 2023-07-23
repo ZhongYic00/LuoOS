@@ -39,28 +39,29 @@ void timerInterruptHandler(){
 extern syscall_t syscallPtrs[];
 namespace syscall{ extern const char* syscallHelper[]; }
 void uecallHandler(){
-    /// @bug should get from ctx
-    int ecallId=kHartObj().curtask->ctx.x(17);
-    xlen_t &rtval=kHartObj().curtask->ctx.x(10);
-    kHartObj().curtask->ctx.pc+=4;
+    auto cur=kHartObj().curtask;
+    auto &ctx=cur->ctx;
+    int ecallId=ctx.x(17);
+    xlen_t &rtval=ctx.x(10);
+    ctx.pc+=4;
     Log(trace,"uecall [%d]",ecallId);
     using namespace sys;
-    kHartObj().curtask->lastpriv=proc::Task::Priv::Kernel;
+    cur->lastpriv=proc::Task::Priv::Kernel;
     if(ecallId<nSyscalls){
         Log(syscallPtrs[ecallId]?info:error,"proc called %s[%d]",syscall::syscallHelper[ecallId],ecallId);
         /// @bug is this needed??
-        // kHartObj().curtask->lastpriv=proc::Task::Priv::Kernel;
-        csrWrite(sscratch,kHartObj().curtask->kctx.gpr);
+        // cur->lastpriv=proc::Task::Priv::Kernel;
+        csrWrite(sscratch,cur->kctx.gpr);
         // csrSet(sstatus,BIT(csr::mstatus::sie));
         if(syscallPtrs[ecallId])
-            rtval=syscallPtrs[ecallId]();
+            rtval=reinterpret_cast<syscall_t>(syscallPtrs[ecallId])(ctx.x(10),ctx.x(11),ctx.x(12),ctx.x(13),ctx.x(14),ctx.x(15));
         // csrClear(sstatus,BIT(csr::mstatus::sie));
         Log(debug,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
     } else {
         Log(error,"syscall num{%d} exceeds valid range",ecallId);
         rtval=1;
     }
-    kHartObj().curtask->lastpriv=proc::Task::Priv::User;
+    cur->lastpriv=proc::Task::Priv::User;
     Log(debug,"uecall exit(id=%d,rtval=%d)",ecallId,rtval);
 }
 int plicClaim(){

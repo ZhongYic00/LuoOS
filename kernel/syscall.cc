@@ -516,11 +516,8 @@ namespace syscall {
         xlen_t addr=ctx.x(10);
         return curproc.brk(addr);
     }
-    xlen_t mmap(){
+    xlen_t mmap(xlen_t addr,size_t len,int prot,int flags,int fd,int offset){
         auto &curproc=*kHartObj().curtask->getProcess();
-        auto &ctx=kHartObj().curtask->ctx;
-        xlen_t addr=ctx.x(10),len=ctx.x(11);
-        int prot=ctx.x(12),flags=ctx.x(13),fd=ctx.x(14),offset=ctx.x(15);
         using namespace vm;
         // determine target
         const auto align=[](xlen_t addr){return addr2pn(addr);};
@@ -552,24 +549,21 @@ namespace syscall {
         // return val
         return pn2addr(vpn);
     }
-    xlen_t munmap(){
+    xlen_t munmap(xlen_t addr,size_t len){
         auto &ctx=kHartObj().curtask->ctx;
         auto &curproc=*kHartObj().curtask->getProcess();
-        xlen_t addr=ctx.x(10),len=ctx.x(11);
         /// @todo len, partial unmap?
         using namespace vm;
         if(addr&vaddrOffsetMask){
             Log(warning,"munmap addr not aligned!");
             return statcode::err;
         }
-        addr=addr2pn(addr);
-        auto mapping=curproc.vmar.find([&](const PageMapping &mapping){
-            /// @todo addr in mapping?
-            return mapping.vpn==addr;
-        });
-        curproc.vmar.unmap(mapping.vsegment());
+        auto region=vm::Segment{addr2pn(addr),addr2pn(addr+len)};
+        curproc.vmar.unmap(region);
     }
-    // xlen_t mprotect(){}
+    sysrt_t mprotect(xlen_t addr,size_t len,int prot){
+        return 0;
+    }
     int execve_(shared_ptr<fs::File> file,eastl::vector<klib::ByteArray> &args,char **envp){
         auto &ctx=kHartObj().curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
@@ -615,11 +609,10 @@ namespace syscall {
         /// setup argc, argv
         return ctx.sp();
     }
-    xlen_t execve(){
+    xlen_t execve(xlen_t pathuva,xlen_t argv,xlen_t envp){
         auto &cur=kHartObj().curtask;
         auto &ctx=cur->ctx;
         auto curproc=cur->getProcess();
-        xlen_t pathuva=ctx.x(10),argv=ctx.x(11),envp=ctx.x(12);
 
         /// @brief get executable from path
         klib::ByteArray pathbuf = curproc->vmar.copyinstr(pathuva, FAT32_MAX_PATH);
@@ -672,7 +665,7 @@ namespace syscall {
         return cur->id;
     }
 const char *syscallHelper[sys::syscalls::nSyscalls];
-#define DECLSYSCALL(x,ptr) syscallPtrs[x]=ptr;syscallHelper[x]=#x;
+#define DECLSYSCALL(x,ptr) syscallPtrs[x]=reinterpret_cast<syscall_t>(ptr);syscallHelper[x]=#x;
     void init(){
         using scnum=sys::syscalls;
         for(int i=0;i<scnum::nSyscalls;i++)syscallHelper[i]="";
