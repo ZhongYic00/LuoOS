@@ -753,6 +753,14 @@ namespace syscall {
 
         return statcode::ok;
     }
+    xlen_t uMask() {
+        auto &ctx = kHartObj().curtask->ctx;
+        mode_t a_mask = ctx.x(10);
+        
+        auto curproc = kHartObj().curtask->getProcess();
+
+        return curproc->setUMask(a_mask);
+    }
     xlen_t getTimeOfDay() {
         auto &ctx = kHartObj().curtask->ctx;
         auto a_ts = ctx.x(10);
@@ -1089,6 +1097,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::setgroups,setGroups);
         DECLSYSCALL(scnum::times,times);
         DECLSYSCALL(scnum::uname,uName);
+        DECLSYSCALL(scnum::umask,uMask);
         DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);
         DECLSYSCALL(scnum::getpid,getPid);
         DECLSYSCALL(scnum::getppid,getPPid);

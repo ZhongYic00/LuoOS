@@ -85,6 +85,7 @@ namespace proc
         uid_t m_ruid, m_euid, m_suid;
         gid_t m_rgid, m_egid, m_sgid;
         unordered_set<gid_t> supgids;
+        mode_t umask;
 
         Process(prior_t prior,pid_t parent);
         Process(pid_t pid,prior_t prior,pid_t parent);
@@ -108,6 +109,7 @@ namespace proc
         inline int getGroupsNum() { return supgids.size(); }
         ByteArray getGroups(int a_size);
         void setGroups(ArrayBuff<gid_t> a_grps);
+        mode_t setUMask(mode_t a_mask) { mode_t ret = umask; umask = a_mask & 0777 ; return ret; }
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
         shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围

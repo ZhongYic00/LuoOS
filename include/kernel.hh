@@ -75,6 +75,7 @@ namespace sys
         setgroups=159,
         times=153,
         uname=160,
+        umask=166,
         gettimeofday=169,
         getpid=172,
         getppid=173,
