@@ -1011,56 +1011,13 @@ namespace syscall {
         xlen_t addr=ctx.x(10);
         return curproc.brk(addr);
     }
-    xlen_t mmap(xlen_t addr,size_t len,int prot,int flags,int fd,int offset){
-        auto &curproc=*kHartObj().curtask->getProcess();
-        using namespace vm;
-        // determine target
-        const auto align=[](xlen_t addr){return addr2pn(addr);};
-        const auto choose=[&](){
-            auto rt=curproc.heapTop=ceil(curproc.heapTop);
-            curproc.heapTop+=len;
-            curproc.heapTop=ceil(curproc.heapTop);
-            return addr2pn(rt);
-        };
-        PageNum vpn,pages;
-        if(addr)vpn=align(addr);
-        else vpn=choose();
-        pages = bytes2pages(len);
-        if(!pages)return -1;
-        // assert(pages);
-        Arc<vm::VMO> vmo;
-        /// @todo register for shared mapping
-        /// @todo copy content to vmo
-        if(fd!=-1){
-            auto file=curproc.ofile(fd);
-            vmo=file->vmo();
-        } else {
-            auto pager=make_shared<SwapPager>(nullptr,Segment{0x0,pn2addr(pages)});
-            vmo=make_shared<VMOPaged>(pages,pager);
-        }
-        // actual map
-        /// @todo fix flags
-        auto mappingType= fd==-1 ?PageMapping::MappingType::file : PageMapping::MappingType::anon;
-        auto sharingType=(PageMapping::SharingType)(flags>>8);
-        curproc.vmar.map(PageMapping{vpn,pages,0,vmo,PageMapping::prot2perm((PageMapping::Prot)prot),mappingType,sharingType});
-        // return val
-        return pn2addr(vpn);
-    }
-    xlen_t munmap(xlen_t addr,size_t len){
-        auto &ctx=kHartObj().curtask->ctx;
-        auto &curproc=*kHartObj().curtask->getProcess();
-        /// @todo len, partial unmap?
-        using namespace vm;
-        if(addr&vaddrOffsetMask){
-            Log(warning,"munmap addr not aligned!");
-            return statcode::err;
-        }
-        auto region=vm::Segment{addr2pn(addr),addr2pn(addr+len-1)};
-        curproc.vmar.unmap(region);
-    }
-    sysrt_t mprotect(xlen_t addr,size_t len,int prot){
-        return 0;
-    }
+    sysrt_t mmap(addr_t addr,size_t len,int prot,int flags,int fd,int offset);
+    sysrt_t munmap(addr_t addr,size_t len);
+    sysrt_t mremap(addr_t oldaddr, size_t oldsize,size_t newsize, int flags, addr_t newaddr);
+    sysrt_t mprotect(addr_t addr,size_t len,int prot);
+    sysrt_t madvise(addr_t addr,size_t length,int advice);
+    sysrt_t mlock(addr_t addr, size_t len);
+    sysrt_t munlock(addr_t addr, size_t len);
     int execve_(shared_ptr<fs::File> file,vector<klib::ByteArray> &args,char **envp){
         auto &ctx=kHartObj().curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
@@ -1273,9 +1230,14 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::gettid,getTid);
         DECLSYSCALL(scnum::brk,brk);
         DECLSYSCALL(scnum::munmap,munmap);
+        DECLSYSCALL(scnum::mremap,mremap);
         DECLSYSCALL(scnum::clone,clone);
         DECLSYSCALL(scnum::execve,execve);
         DECLSYSCALL(scnum::mmap,mmap);
+        DECLSYSCALL(scnum::mprotect,mprotect);
+        DECLSYSCALL(scnum::mlock,mlock);
+        DECLSYSCALL(scnum::munlock,munlock);
+        DECLSYSCALL(scnum::madvise,madvise);
         DECLSYSCALL(scnum::wait,wait);
         DECLSYSCALL(scnum::syncfs,syncFS);
     }
