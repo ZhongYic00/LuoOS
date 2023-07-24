@@ -17,6 +17,11 @@ namespace fs{
 
     class DEntry;
     class FileSystem;
+    
+    constexpr int F_OK = 0x000;
+    constexpr int X_OK = 0x001;
+    constexpr int W_OK = 0x010;
+    constexpr int R_OK = 0x100;
 
     class SuperBlock {
         public:
@@ -174,7 +179,7 @@ namespace fs{
             int pathHardUnlink();
             int pathMount(Path a_devpath, string a_fstype);
             int pathUnmount() const;
-            int pathOpen(int a_flags, mode_t a_mode);
+            int pathOpen(int a_flags, mode_t a_mode = S_IFREG);
             int pathSymLink(string a_target);
             // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
             // inline shared_ptr<File> pathOpen(mode_t a_mode) const { return pathOpen(0, a_file); }

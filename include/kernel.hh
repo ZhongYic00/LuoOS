@@ -35,6 +35,7 @@ namespace sys
         umount2=39,
         mount=40,
         statfs=43,
+        faccessat=48,
         chdir=49,
         fchdir=50,
         fchmod=52,

@@ -251,6 +251,35 @@ namespace syscall {
 
         return statcode::ok;
     }
+    xlen_t fAccessAt() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_basefd = ctx.x(10);
+        const char *a_path = (const char*)ctx.x(11);
+        int a_mode = ctx.x(12);
+        int a_flags = ctx.x(13);
+        if(a_path == nullptr) { return -EFAULT; }
+
+        using fs::F_OK;
+        using fs::R_OK;
+        using fs::W_OK;
+        using fs::X_OK;
+
+        int flags = 0;
+        if ((a_mode & (R_OK | X_OK)) && (a_mode & W_OK)) { flags = O_RDWR; }
+        else if (a_mode & W_OK) { flags = O_WRONLY; }
+        else if (a_mode & (R_OK | X_OK)) { flags = O_RDONLY; }
+        else { return -EINVAL; }
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
+        const char *path = (const char*)patharr.buff;
+        shared_ptr<File> base = curproc->ofile(a_basefd);
+        if(base == nullptr) { return -EBADF; }
+
+        int fd = Path(path, base).pathOpen(flags | a_flags);
+        if(fd<0 && fd!=-EISDIR) { return fd; }  // @todo: 存疑
+        else if(fd >= 0) { curproc->files[fd].reset(); }
+        return 0;
+    }
     xlen_t chDir() {
         auto &ctx = kHartObj().curtask->ctx;
         const char *a_path = (const char*)ctx.x(10);
@@ -1061,6 +1090,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::umount2,umount2);
         DECLSYSCALL(scnum::mount,mount);
         DECLSYSCALL(scnum::statfs,statFS);
+        DECLSYSCALL(scnum::faccessat,fAccessAt);
         DECLSYSCALL(scnum::chdir,chDir);
         DECLSYSCALL(scnum::fchdir,fChDir);
         DECLSYSCALL(scnum::fchmod,fChMod);

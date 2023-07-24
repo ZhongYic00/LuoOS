@@ -331,7 +331,7 @@ int Path::pathUnmount() const {
     // mnt_point->clearMnt();
     return 0;
 }
-int Path::pathOpen(int a_flags, mode_t a_mode) {
+int Path::pathOpen(int a_flags, mode_t a_mode) {  // @todo: 添加不打开额外文件的工作方式
     shared_ptr<DEntry> entry;
     if(a_flags & O_CREATE) {
         entry = pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags);
@@ -340,12 +340,12 @@ int Path::pathOpen(int a_flags, mode_t a_mode) {
     else {
         if((entry = pathSearch()) == nullptr) { return -1; }
         if((entry->getINode()->rAttr()&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
-            printf("dir can't write\n");
-            return -1;
+            Log(error, "try to open a dir as writable\n");
+            return -EISDIR;
         }
         if((a_flags&O_DIRECTORY) && !(entry->getINode()->rAttr()&ATTR_DIRECTORY)) {
-            printf("it is not dir\n");
-            return -1;
+            Log(error, "try to open a not dir file as dir\n");
+            return -ENOTDIR;
         }
     }
     shared_ptr<File> file = make_shared<File>(entry, a_flags);
