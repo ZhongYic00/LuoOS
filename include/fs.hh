@@ -154,8 +154,14 @@ namespace fs{
         public:
             Path() = default;
             Path(const Path& a_path) = default;
-            Path(const string& a_str, shared_ptr<File> a_base = nullptr):pathname(a_str), dirname(), base() { pathBuild(); }
-            Path(const char *a_str, shared_ptr<File> a_base = nullptr):pathname(a_str), dirname(), base() { pathBuild(); }
+            Path(const string& a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.ep) { pathBuild(); }
+            Path(const string& a_str, shared_ptr<DEntry> a_base):pathname(a_str), dirname(), base(a_base) { pathBuild(); }
+            Path(const string& a_str):pathname(a_str), dirname(), base(nullptr) { pathBuild(); }
+            Path(const char *a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.ep) { pathBuild(); }
+            Path(const char *a_str, shared_ptr<DEntry> a_base):pathname(a_str), dirname(), base(a_base) { pathBuild(); }
+            Path(const char *a_str):pathname(a_str), dirname(), base(nullptr) { pathBuild(); }
+            Path(shared_ptr<File> a_base):pathname(), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.ep) { pathBuild(); }
+            Path(shared_ptr<DEntry> a_base):pathname(), dirname(), base(a_base) { pathBuild(); }
             ~Path() = default;
             Path& operator=(const Path& a_path) = default;
             void pathBuild();

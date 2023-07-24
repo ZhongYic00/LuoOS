@@ -103,28 +103,13 @@ namespace syscall {
         }
 
         auto curproc = kHartObj().curtask->getProcess();
-        shared_ptr<DEntry> de = curproc->cwd;
-        char path[FAT32_MAX_PATH];
-        char *s;  // s为path的元素指针
-        // @todo 路径处理过程考虑包装成类
-        if (de->getParent() == nullptr) { s = "/"; } // s为字符串指针，必须指向双引号字符串"/"
-        else {
-            s = path + FAT32_MAX_PATH - 1;
-            *s = '\0';
-            for(size_t len; de->getParent() != nullptr;) {
-                len = strlen(de->rName());
-                s -= len;
-                if (s <= path) { return statcode::err; } // can't reach root '/'
-                strncpy(s, de->rName(), len);
-                *(--s) = '/';
-                de = de->getParent();
-            }
-        }
-        size_t len = strlen(s)+1;
+        shared_ptr<DEntry> base = curproc->cwd;
+        string pathcwd = Path(base).pathAbsolute();
+        const char *strcwd = pathcwd.c_str();
+        
+        size_t len = pathcwd.size() + 1;
         if(a_len < len)  { return NULL; }
-
-        curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)s,len));
-
+        curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)strcwd, len));
         return (xlen_t)a_buf;
     }
     xlen_t dupArgsIn(int a_fd, int a_newfd=-1) {
@@ -598,10 +583,19 @@ namespace syscall {
     xlen_t sigAction() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_sig = ctx.x(10);
-        SignalAction *a_act = (SignalAction*)ctx.x(11);
+        SignalAction *a_nact = (SignalAction*)ctx.x(11);
         SignalAction *a_oact = (SignalAction*)ctx.x(12);
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray nactarr = curproc->vmar.copyin((xlen_t)a_nact, sizeof(SignalAction));
+        SignalAction *nact = (SignalAction*)nactarr.buff;
+        ByteArray oactarr(sizeof(SignalAction));
+        SignalAction *oact = (SignalAction*)oactarr.buff;
+        if(a_oact == nullptr) { oact = nullptr; }
 
-        return doSigAction(a_sig, a_act, a_oact);
+        int ret = doSigAction(a_sig, nact, oact);
+        if(ret==0 && oact!=nullptr) { curproc->vmar.copyout((xlen_t)a_oact, oactarr); }
+        return ret;
     }
     xlen_t sigProcMask() {
         auto &ctx = kHartObj().curtask->ctx;
@@ -610,7 +604,16 @@ namespace syscall {
         SigSet *a_oset = (SigSet*)ctx.x(12);
         size_t a_sigsetsize = ctx.x(13);
 
-        return doSigProcMask(a_how, a_nset, a_oset, a_sigsetsize);
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray nsetarr = curproc->vmar.copyin((xlen_t)a_nset, sizeof(SigSet));
+        SigSet *nset = (SigSet*)nsetarr.buff;
+        ByteArray osetarr(sizeof(SigSet));
+        SigSet *oset = (SigSet*)osetarr.buff;
+        if(a_oset == nullptr) { oset = nullptr; }
+
+        int ret = doSigProcMask(a_how, nset, oset, a_sigsetsize);
+        if(ret==0 && oset!=nullptr) { curproc->vmar.copyout((xlen_t)a_oset, osetarr); }
+        return ret;
     }
     xlen_t sigReturn() {
         return doSigReturn();

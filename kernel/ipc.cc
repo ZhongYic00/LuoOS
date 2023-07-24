@@ -33,11 +33,11 @@ namespace signal
         }
         return ;
     }
-    xlen_t doSigAction(int a_sig, SignalAction *a_act, SignalAction *a_oact) {
+    xlen_t doSigAction(int a_sig, SignalAction *a_nact, SignalAction *a_oact) {
         if (a_sig <= 0 || a_sig > numSignals || a_sig == SIGKILL || a_sig == SIGSTOP) return -EINVAL;
         auto curproc = kHartObj().curtask->getProcess();
         if (a_oact != nullptr) { *a_oact = curproc->actions[a_sig-1]; }
-        if (a_act != nullptr) { curproc->actions[a_sig-1] = *a_act; }
+        if (a_nact != nullptr) { curproc->actions[a_sig-1] = *a_nact; }
         return 0;
     }
     // @todo: block是否等价于NutOS中的sigmask？

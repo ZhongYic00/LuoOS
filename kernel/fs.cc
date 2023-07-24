@@ -152,10 +152,10 @@ File::~File() {
     }
 }
 void Path::pathBuild() {
-    if(pathname.length() < 1) { base = kHartObj().curtask->getProcess()->cwd; return; }
+    if(pathname.size() < 1) { base = kHartObj().curtask->getProcess()->cwd; return; }
     else if(pathname[0] == '/') { base = mnt_table["/"]->getSpBlk()->getRoot(); }
     else if(base == nullptr) { base = kHartObj().curtask->getProcess()->cwd; }
-    size_t len = pathname.length();
+    size_t len = pathname.size();
     if(len > 0) {  // 保证数组长度不为0
         auto ind = new size_t[len][2] { { 0, 0 } };
         bool rep = true;
@@ -184,9 +184,10 @@ void Path::pathBuild() {
 }
 string Path::pathAbsolute() const {
     vector<string> name_abs = dirname;
-    for(shared_ptr<DEntry> entry = base; (!entry->isRoot())||(!entry->getINode()->getSpBlk()->getFS()->isRootFS()); entry = entry->getParent()) { name_abs.emplace(name_abs.begin(), entry->rName()); }
+    for(shared_ptr<DEntry> entry = base; !(entry->isRoot() && entry->getINode()->getSpBlk()->getFS()->isRootFS()); entry = entry->getParent()) { name_abs.emplace(name_abs.begin(), entry->rName()); }
     string path_abs = "";
     for(string name : name_abs) { path_abs = path_abs + "/" + name; }
+    if(path_abs == "") { path_abs = "/"; }
     return path_abs;
 }
 shared_ptr<DEntry> Path::pathHitTable() {
