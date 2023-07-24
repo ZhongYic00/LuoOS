@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "klib.hh"
+#include <thirdparty/expected.hpp>
 
 // #define moduleLevel LogLevel::info
 
@@ -16,6 +17,7 @@ namespace vm
     typedef klib::pair<xlen_t,xlen_t> segment_t;
     using Segment=::klib::Segment<PageNum>;
     using eastl::tuple;
+    using namespace nonstd;
     typedef tuple<PageNum,PageNum,PageNum> PageSlice;
 
     inline constexpr xlen_t pn2addr(xlen_t pn){ return pn<<12; }
@@ -115,13 +117,13 @@ namespace vm
             /// @brief changes are shared
             shared=0x1
         };
-        const PageNum vpn;
-        const PageNum len;
-        const PageNum offset;
+        PageNum vpn;
+        PageNum len;
+        PageNum offset;
         Arc<VMO> vmo;
-        const perm_t perm;
-        const MappingType mapping = MappingType::anon;
-        const SharingType sharing = SharingType::privt;
+        perm_t perm;
+        MappingType mapping = MappingType::anon;
+        SharingType sharing = SharingType::privt;
         inline PageNum pages() const{return len;}
         inline PageNum vend() const { return vpn + pages() - 1; }
         inline string toString() const { return klib::format("%lx=>%s", vpn, vmo->toString()); }
@@ -192,18 +194,23 @@ namespace vm
         static xlen_t toSATP(PageTable &table);
     };
     class VMAR{
-    public:
-        // @todo check initialize order
-        inline VMAR(const std::initializer_list<PageMapping> &mappings,pgtbl_t root=nullptr):mappings(mappings),pagetable(root){for(auto &mapping:mappings)map(mapping);}
-        inline VMAR(const VMAR &other):pagetable(){
-            for(const auto &mapping:other.mappings)map(mapping.clone());
-        }
         inline auto find(xlen_t addr){
             auto vpn=addr2pn(addr);
             auto mapping=mappings.upper_bound(PageMapping{vpn});
             if(mapping!=mappings.begin())mapping--;
             if(!mapping->contains(addr))return mappings.end();
             else return mapping;
+        }
+    public:
+        // @todo check initialize order
+        inline VMAR(const std::initializer_list<PageMapping> &mappings,pgtbl_t root=nullptr):mappings(mappings),pagetable(root){for(auto &mapping:mappings)map(mapping);}
+        inline VMAR(const VMAR &other):pagetable(){
+            for(const auto &mapping:other.mappings)map(mapping.clone());
+        }
+        inline expected<PageMapping,xlen_t> findMapping(xlen_t addr){
+            auto it=find(addr);
+            if(it!=mappings.end())return *it;
+            return make_unexpected(ENOENT);
         }
         inline void pfhandler(xlen_t addr){
             // find last elem <= vpn
@@ -317,6 +324,7 @@ namespace vm
             void operator>>(T &d){
                 auto buf=parent.copyin(vaddr,sizeof(T));
                 d=*reinterpret_cast<T*>(buf.buff);
+                vaddr+=reverse?-sizeof(T):sizeof(T);
             }
             inline xlen_t addr() const{return vaddr;}
         };

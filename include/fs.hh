@@ -10,6 +10,8 @@
 // FAT32
 #define MSDOS_SUPER_MAGIC     0x4d44
 
+class ScatteredIO;
+
 namespace fs{
     using pipe::Pipe;
     using klib::Segment;
@@ -145,6 +147,8 @@ namespace fs{
         xlen_t write(xlen_t addr, size_t len);
         ByteArray read(size_t len, long a_off = -1, bool a_update = true);
         ByteArray readAll();
+        size_t readv(ScatteredIO &dst);
+        size_t writev(ScatteredIO &dst);
         shared_ptr<vm::VMO> vmo();
         inline int readLink(char *a_buf, size_t a_bufsiz) { return obj.ep->getINode()->readLink(a_buf, a_bufsiz); }
         off_t lSeek(off_t a_offset, int a_whence);
