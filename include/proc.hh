@@ -5,6 +5,7 @@
 #include "sched.hh"
 #include "vm.hh"
 #include "fs.hh"
+#include "resource.hh"
 
 namespace proc
 {
@@ -15,6 +16,8 @@ namespace proc
     using fs::File;
     // using fs::DirEnt;
     using fs::DEntry;
+    using resource::RLim;
+    using resource::RSrc;
     using namespace signal;
 
     struct Context
@@ -73,6 +76,7 @@ namespace proc
     constexpr int FdCwd = 3;
 
     struct Process:public IdManagable,public Scheduable{
+
         pid_t parent;
         VMAR vmar;
         xlen_t heapTop=UserHeapBottom;
@@ -88,6 +92,7 @@ namespace proc
         gid_t m_rgid, m_egid, m_sgid;
         unordered_set<gid_t> supgids;
         mode_t umask;
+        RLim rlimits[RSrc::RLIMIT_NLIMITS];
 
         Process(prior_t prior,pid_t parent);
         Process(pid_t pid,prior_t prior,pid_t parent);
@@ -111,7 +116,8 @@ namespace proc
         inline int getGroupsNum() { return supgids.size(); }
         ByteArray getGroups(int a_size);
         void setGroups(ArrayBuff<gid_t> a_grps);
-        mode_t setUMask(mode_t a_mask) { mode_t ret = umask; umask = a_mask & 0777 ; return ret; }
+        int setUMask(mode_t a_mask) { mode_t ret = umask; umask = a_mask & 0777 ; return ret; }
+        inline ByteArray getRLimit(int a_rsrc) { return ByteArray((uint8*)(rlimits+a_rsrc), sizeof(rlimits)); }
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
         shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围

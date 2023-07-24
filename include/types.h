@@ -23,6 +23,7 @@ typedef unsigned long uintptr_t;
 typedef long long loff_t;
 typedef int tid_t;
 typedef tid_t pid_t;
+typedef uint64 rlim_t;
 // 已存在
 // typedef tid_t uid_t;
 // typedef tid_t gid_t;

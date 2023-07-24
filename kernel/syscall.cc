@@ -33,6 +33,8 @@ namespace syscall {
     using signal::doSigAction;
     using signal::doSigProcMask;
     using signal::doSigReturn;
+    using resource::RLim;
+    using resource::RSrc;
     // 前向引用
     void yield();
     xlen_t none() { return 0; }
@@ -442,11 +444,12 @@ namespace syscall {
     }
     xlen_t read(){
         auto &ctx=kHartObj().curtask->ctx;
-        int fd=ctx.x(10);
-        xlen_t uva=ctx.x(11),len=ctx.x(12);
-        auto file=kHartObj().curtask->getProcess()->ofile(fd);
-        auto bytes=file->read(len);
-        kHartObj().curtask->getProcess()->vmar[uva]<<bytes;
+        int fd = ctx.x(10);
+        xlen_t uva = ctx.x(11), len = ctx.x(12);
+        auto file = kHartObj().curtask->getProcess()->ofile(fd);
+        if(file == nullptr) { return -EBADF; }
+        auto bytes = file->read(len);
+        kHartObj().curtask->getProcess()->vmar[uva] << bytes;
         return bytes.len;
     }
     xlen_t write(){
@@ -619,14 +622,18 @@ namespace syscall {
         SignalAction *a_oact = (SignalAction*)ctx.x(12);
         
         auto curproc = kHartObj().curtask->getProcess();
-        ByteArray nactarr = curproc->vmar.copyin((xlen_t)a_nact, sizeof(SignalAction));
-        SignalAction *nact = (SignalAction*)nactarr.buff;
+        ByteArray nactarr(sizeof(SignalAction));
+        SignalAction *nact = nullptr;
+        if(a_nact != nullptr ) {
+            nactarr = curproc->vmar.copyin((xlen_t)a_nact, nactarr.len);
+            nact = (SignalAction*)nactarr.buff;
+        }
         ByteArray oactarr(sizeof(SignalAction));
         SignalAction *oact = (SignalAction*)oactarr.buff;
         if(a_oact == nullptr) { oact = nullptr; }
 
         int ret = doSigAction(a_sig, nact, oact);
-        if(ret==0 && oact!=nullptr) { curproc->vmar.copyout((xlen_t)a_oact, oactarr); }
+        if(ret==0 && a_oact!=nullptr) { curproc->vmar.copyout((xlen_t)a_oact, oactarr); }
         return ret;
     }
     xlen_t sigProcMask() {
@@ -792,6 +799,17 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
 
         return curproc->setUMask(a_mask);
+    }
+    xlen_t getRLimit() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_rsrc = ctx.x(10);
+        RLim *a_rlim = (RLim*)ctx.x(11);
+        if(a_rlim==nullptr || a_rsrc<0 || a_rsrc>=RSrc::RLIMIT_NLIMITS) { return -EFAULT; }
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        curproc->vmar.copyout((xlen_t)a_rlim, curproc->getRLimit(a_rsrc));
+
+        return 0;
     }
     xlen_t getTimeOfDay() {
         auto &ctx = kHartObj().curtask->ctx;
@@ -1133,6 +1151,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::setgroups,setGroups);
         DECLSYSCALL(scnum::times,times);
         DECLSYSCALL(scnum::uname,uName);
+        DECLSYSCALL(scnum::getrlimit,getRLimit);
         DECLSYSCALL(scnum::umask,uMask);
         DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);
         DECLSYSCALL(scnum::getpid,getPid);
