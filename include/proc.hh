@@ -125,7 +125,7 @@ namespace proc
         Task* newTask(const Task &other,bool allocStack=true);
         Task* newKTask(prior_t prior=0);
         void print();
-        int fdAlloc(shared_ptr<File> a_file, int a_fd=-1);
+        int fdAlloc(shared_ptr<File> a_file, int a_fd = 0);
         /// @todo rtval
         xlen_t brk(xlen_t addr);
         void exit(int status);

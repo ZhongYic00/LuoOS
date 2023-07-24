@@ -125,7 +125,8 @@ namespace fs{
         enum FileType { none, pipe, entry, dev, stdin, stdout, stderr };
         FileOps ops;
         const FileType type;
-        uint off=0;
+        int flags;
+        uint off = 0;
         union Data {
             shared_ptr<Pipe> pipe;
             shared_ptr<DEntry> ep;
@@ -136,10 +137,10 @@ namespace fs{
         }obj;
         File(FileType a_type): type(a_type), obj(a_type) {}
         File(FileType a_type, FileOp a_ops = FileOp::none): type(a_type), obj(a_type), ops(a_ops) {}
-        File(FileType a_type, int a_flags): type(a_type), obj(a_type), ops(a_flags) {}
+        File(FileType a_type, int a_flags): type(a_type), obj(a_type), ops(a_flags), flags(a_flags) {}
         File(const shared_ptr<Pipe> &a_pipe, FileOp a_ops): type(FileType::pipe), obj(a_pipe), ops(a_ops) { if(ops.fields.r)obj.pipe->addReader(); if(ops.fields.w)obj.pipe->addWriter(); }
         File(shared_ptr<DEntry> a_ep, FileOp a_ops): type(FileType::entry), obj(a_ep), ops(a_ops) {}
-        File(shared_ptr<DEntry> a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags) {}
+        File(shared_ptr<DEntry> a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags), flags(a_flags) {}
         ~File();
         xlen_t write(xlen_t addr, size_t len);
         ByteArray read(size_t len, long a_off = -1, bool a_update = true);

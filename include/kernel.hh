@@ -28,6 +28,7 @@ namespace sys
         getcwd=17,
         dup=23,
         dup3=24,
+        fcntl=25,
         mkdirat=34,
         unlinkat=35,
         symlinkat=36,

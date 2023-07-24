@@ -58,8 +58,8 @@ namespace syscall {
         // kHartObj().curtask->getProcess()->cwd = Path("/").pathSearch();
         // printf("0x%lx\n", kHartObj().curtask->getProcess()->cwd);
         // shared_ptr<File> f;
-        // // auto testfile = fs::pathCreateAt("/testfile", T_FILE, O_CREATE|O_RDWR, f);
-        // auto testfile = Path("/testfile").pathCreate(T_FILE, O_CREATE|O_RDWR, f);
+        // // auto testfile = fs::pathCreateAt("/testfile", T_FILE, O_CREAT|O_RDWR, f);
+        // auto testfile = Path("/testfile").pathCreate(T_FILE, O_CREAT|O_RDWR, f);
         // assert(rt == 0);
         // Log(info, "pathCreateAt success\n---------------------------------------------------------");
         // string content = "test write";
@@ -126,16 +126,80 @@ namespace syscall {
     xlen_t dup() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> file = curproc->ofile(a_fd);
+        if(file == nullptr) { return -EBADF; }
 
-        return dupArgsIn(a_fd);
+        return curproc->fdAlloc(file);
     }
     xlen_t dup3() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
         int a_newfd = ctx.x(11);
+        int a_flags = ctx.x(12);
         if(fdOutRange(a_newfd)) { return -EBADF; }
+        if(a_fd == a_newfd) { return a_newfd; }
 
-        return dupArgsIn(a_fd, a_newfd);
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> file = curproc->ofile(a_fd);
+        if(file == nullptr) { return -EBADF; }
+
+        int newfd = curproc->fdAlloc(file, -a_newfd);  // -a_newfd要求fdAlloc准确地在a_newfd处分配文件描述符
+        if(newfd >= 0) {
+            curproc->ofile(newfd)->flags &= ~O_CLOEXEC;
+            curproc->ofile(newfd)->flags |= a_flags;
+        }
+        return newfd;
+    }
+    xlen_t fCntl() {
+
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_fd = ctx.x(10);
+        int a_cmd = ctx.x(11);
+        uint64 a_arg = ctx.x(12);
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> file = curproc->ofile(a_fd);
+        if(file == nullptr) { return -EBADF; }
+        switch(a_cmd) {
+            case F_DUPFD: { return curproc->fdAlloc(file, ((int)a_arg)<0 ? 0 : a_arg); }
+            // NOTE: file descripter flags and file status flags are not the same
+            // GET/SETFD asked for file descripter flags
+            // since file descripter flags only have FD_CLOEXEC, we can just return 0 or FD_CLOEXEC
+            // and we dont use another field to store file descripter flags
+            // so we convert O_CLOEXEC to FD_CLOEXEC here
+            case F_GETFD: { return (file->flags&O_CLOEXEC) ? FD_CLOEXEC : 0; }
+            case F_SETFD: {
+                // NOTE: see NOTE in F_GETFD, we convert FD_CLOEXEC to O_CLOEXEC here
+                if (a_arg & FD_CLOEXEC) { file->flags |= O_CLOEXEC; }
+                else { file->flags &= ~O_CLOEXEC; }
+                return 0;
+            }
+            case F_GETFL: { return file->flags; }
+            // NOTE: F_SETFL can change only O_APPEND, O_ASYNC, O_DIRECT, O_NOATIME, and O_NONBLOCK
+            case F_SETFL: {
+                file->flags &= ~(O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK);
+                a_arg &= (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK);
+                if (a_arg & (O_ASYNC|O_DIRECT|O_NOATIME|O_NONBLOCK)) { Log(error, "fcntl: flags(%d) not supported\n", a_arg); }
+                file->flags |= a_arg;
+                return 0;
+            }
+            case F_DUPFD_CLOEXEC: {
+                int newfd = curproc->fdAlloc(file, ((int)a_arg)<0 ? 0 : a_arg);
+                if(newfd >= 0) {
+                    curproc->ofile(newfd)->flags &= ~O_CLOEXEC;
+                    curproc->ofile(newfd)->flags |= O_CLOEXEC;
+                }
+                return newfd;
+            }
+            default: {
+                Log(error, "fcntl: unimplemented cmd %d\n", a_cmd);
+                return -EINVAL;
+            }
+        }
+
+        return -EINVAL;  // should never reach here
     }
     xlen_t mkDirAt(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -1119,6 +1183,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::getcwd,getCwd);
         DECLSYSCALL(scnum::dup,dup);
         DECLSYSCALL(scnum::dup3,dup3);
+        DECLSYSCALL(scnum::fcntl,fCntl);
         DECLSYSCALL(scnum::mkdirat,mkDirAt);
         DECLSYSCALL(scnum::linkat,linkAt);
         DECLSYSCALL(scnum::unlinkat,unlinkAt);

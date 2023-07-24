@@ -333,7 +333,7 @@ int Path::pathUnmount() const {
 }
 int Path::pathOpen(int a_flags, mode_t a_mode) {  // @todo: 添加不打开额外文件的工作方式
     shared_ptr<DEntry> entry;
-    if(a_flags & O_CREATE) {
+    if(a_flags & O_CREAT) {
         entry = pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags);
         if(entry == nullptr) { return -1; }
     }

@@ -201,8 +201,8 @@ shared_ptr<File> Process::ofile(int a_fd) {
     return files[a_fd];
 }
 int Process::fdAlloc(shared_ptr<File> a_file, int a_fd) {
-    if(a_fd == -1) {
-        for(int fd = 0; fd < MaxOpenFile; ++fd) {
+    if(a_fd >= 0) {  // 在不小于a_fd的文件描述符中分配一个
+        for(int fd = a_fd; fd < MaxOpenFile; ++fd) {
             if(files[fd] == nullptr) {
                 files[fd] = a_file;
                 return fd;
@@ -210,14 +210,14 @@ int Process::fdAlloc(shared_ptr<File> a_file, int a_fd) {
         }
         return -ENOMEM;
     }
-    else if(!fdOutRange(a_fd)) {
+    else {  // 明确要求在a_fd处分配
+        a_fd = -a_fd;
         if(files[a_fd] == nullptr) {
             files[a_fd] = a_file;
             return a_fd;
         }
-        else { return -EBADF; }
+        else { return -EINVAL; }
     }
-    else { return -EBADF; }  // 返回错误码
 }
 int Process::setUMask(mode_t a_mask) {
     mode_t ret = umask;
