@@ -61,7 +61,7 @@ Task* Process::newTask(const Task &other,bool allocStack){
 }
 xlen_t Process::brk(xlen_t addr){
     Log(info,"brk %lx",addr);
-    if(addr>=UserHeapTop||addr<=UserHeapBottom)return heapTop;
+    if(addr>=heapBottom+UserHeapSize||addr<=heapBottom)return heapTop;
     if(vmar.contains(addr))return heapTop=addr;
     else {
         /// @todo free redundant vmar
@@ -71,7 +71,9 @@ xlen_t Process::brk(xlen_t addr){
             destop=bytes2pages(addr),
             pages=destop-curtop;
         Log(info,"curtop=%x,destop=%x, needs to alloc %d pages",curtop,destop,pages);
-        auto vmo=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(pages),pages);
+        auto pager=make_shared<SwapPager>(nullptr);
+        pager->backingregion={0x0,pn2addr(pages)};
+        auto vmo=make_shared<VMOPaged>(pages,pager);
         using perm=PageTableEntry::fieldMasks;
         vmar.map(PageMapping{curtop,pages,0,vmo,perm::r|perm::w|perm::x|perm::u|perm::v,PageMapping::MappingType::anon,PageMapping::SharingType::privt});
         return heapTop=addr;

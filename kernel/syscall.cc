@@ -541,11 +541,11 @@ namespace syscall {
         // @bug 用户态读到的数据混乱
         return statcode::ok;
     }
-    // __attribute__((naked))
     xlen_t sync() {
         // 现阶段实现为write-through缓存，自动同步
         return statcode::ok;
     }
+    __attribute__((naked))
     void sleepSave(ptr_t gpr){
         saveContextTo(gpr);
         auto curtask=kHartObj().curtask;
@@ -950,8 +950,11 @@ namespace syscall {
         if(fd!=-1){
             auto file=curproc.ofile(fd);
             vmo=file->vmo();
+        } else {
+            auto pager=make_shared<SwapPager>(nullptr);
+            pager->backingregion={0x0,pn2addr(pages)};
+            vmo=make_shared<VMOPaged>(pages,pager);
         }
-        else vmo=make_shared<vm::VMOContiguous>(kGlobObjs->pageMgr->alloc(pages),pages);
         // actual map
         /// @todo fix flags
         auto mappingType= fd==-1 ?PageMapping::MappingType::file : PageMapping::MappingType::anon;
@@ -978,21 +981,21 @@ namespace syscall {
     int execve_(shared_ptr<fs::File> file,vector<klib::ByteArray> &args,char **envp){
         auto &ctx=kHartObj().curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
-        kHartObj().curtask->getProcess()->vmar.reset();
+        auto curproc=kHartObj().curtask->getProcess();
+        curproc->vmar.reset();
         /// @todo destroy other threads
         /// @todo reset curtask cpu context
         ctx=proc::Context();
         // static_cast<proc::Context>(kHartObj().curtask->kctx)=proc::Context();
         ctx.sp()=proc::UserStackDefault;
         /// load elf
-        auto [pc,brk]=ld::loadElf(file,kHartObj().curtask->getProcess()->vmar);
+        auto [pc,brk]=ld::loadElf(file,curproc->vmar);
         ctx.pc=pc;
-        kHartObj().curtask->getProcess()->heapTop=brk;
+        curproc->heapTop=curproc->heapBottom=brk;
         /// setup stack
-        auto &vmar=kHartObj().curtask->getProcess()->vmar;
         ArrayBuff<xlen_t> argv(args.size()+1);
         int argc=0;
-        auto ustream=vmar[ctx.sp()];
+        auto ustream=curproc->vmar[ctx.sp()];
         ustream.reverse=true;
         xlen_t endMarker=0x114514;
         ustream<<endMarker;
