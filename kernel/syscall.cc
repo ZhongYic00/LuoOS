@@ -811,6 +811,19 @@ namespace syscall {
 
         return 0;
     }
+    xlen_t setRLimit() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_rsrc = ctx.x(10);
+        const RLim *a_rlim = (const RLim*)ctx.x(11);
+        if(a_rlim==nullptr || a_rsrc<0 || a_rsrc>=RSrc::RLIMIT_NLIMITS) { return -EFAULT; }
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray rlimarr = curproc->vmar.copyin((xlen_t)a_rlim, sizeof(RLim));
+        const RLim *rlim = (const RLim*)rlimarr.buff;
+        if(rlim->rlim_cur > rlim->rlim_max) { return statcode::err; }
+        
+        return curproc->setRLimit(a_rsrc, rlim);
+    }
     xlen_t getTimeOfDay() {
         auto &ctx = kHartObj().curtask->ctx;
         auto a_ts = ctx.x(10);
@@ -1152,6 +1165,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::times,times);
         DECLSYSCALL(scnum::uname,uName);
         DECLSYSCALL(scnum::getrlimit,getRLimit);
+        DECLSYSCALL(scnum::setrlimit,setRLimit);
         DECLSYSCALL(scnum::umask,uMask);
         DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);
         DECLSYSCALL(scnum::getpid,getPid);

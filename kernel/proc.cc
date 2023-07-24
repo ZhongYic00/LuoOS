@@ -217,6 +217,17 @@ int Process::fdAlloc(shared_ptr<File> a_file, int a_fd) {
     }
     else { return -EBADF; }  // 返回错误码
 }
+int Process::setUMask(mode_t a_mask) {
+    mode_t ret = umask;
+    umask = a_mask & 0777 ;
+    return ret;
+}
+int Process::setRLimit(int a_rsrc, const RLim *a_rlim) {
+    if(a_rlim == nullptr) { return -1; }
+    if (m_euid!=0 && (a_rlim->rlim_cur>rlimits[a_rsrc].rlim_max || a_rlim->rlim_max>rlimits[a_rsrc].rlim_max)) { return -1; }
+    rlimits[a_rsrc] = *a_rlim;
+    return 0;
+}
 
 void Task::accept(){
     int sig=(pendingmask&~block).find_first();

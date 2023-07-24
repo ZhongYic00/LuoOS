@@ -78,6 +78,7 @@ namespace sys
         times=153,
         uname=160,
         getrlimit=163,
+        setrlimit=164,
         umask=166,
         gettimeofday=169,
         getpid=172,

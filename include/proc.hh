@@ -116,8 +116,9 @@ namespace proc
         inline int getGroupsNum() { return supgids.size(); }
         ByteArray getGroups(int a_size);
         void setGroups(ArrayBuff<gid_t> a_grps);
-        int setUMask(mode_t a_mask) { mode_t ret = umask; umask = a_mask & 0777 ; return ret; }
+        int setUMask(mode_t a_mask);
         inline ByteArray getRLimit(int a_rsrc) { return ByteArray((uint8*)(rlimits+a_rsrc), sizeof(rlimits)); }
+        int setRLimit(int a_rsrc, const RLim *a_rlim);
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
         shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围
