@@ -70,8 +70,7 @@ namespace proc
         UstackSize=0x4000,
         UstackBottom=UserStackDefault-UstackSize,
         TrapframePages=2,
-        UserHeapTop=(UserStackDefault-(1l<<29)),
-        UserHeapBottom=vm::ceil(UserHeapTop-(1l<<30));
+        UserHeapSize=0x100000;
     constexpr int MaxOpenFile = 101; // 官网测例往fd=100中写东西
     constexpr int FdCwd = 3;
 
@@ -79,7 +78,7 @@ namespace proc
 
         pid_t parent;
         VMAR vmar;
-        xlen_t heapTop=UserHeapBottom;
+        xlen_t heapTop,heapBottom;
         unordered_set<Task*> tasks;
         shared_ptr<File> files[MaxOpenFile];
         string name;

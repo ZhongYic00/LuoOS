@@ -226,6 +226,7 @@ void _strapexit(){
         csrWrite(sscratch,cur->kctx.gpr);
         if(cur->lastpriv==proc::Task::Priv::AlwaysKernel)csrSet(sstatus,BIT(csr::mstatus::spie))
         else csrClear(sstatus,BIT(csr::mstatus::spie))
+        assert(!cur->kctxs.empty());
         cur->kctx=cur->kctxs.top();cur->kctxs.pop();
         csrWrite(sepc,cur->kctx.pc);
         volatile register ptr_t t6 asm("t6")=cur->kctx.gpr;
