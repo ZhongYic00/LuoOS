@@ -63,7 +63,9 @@ namespace proc
             inline void uTick() { ++m_tms_utime; }
             inline void sTick() { ++m_tms_stime; }
     };
-    constexpr xlen_t UserStackDefault=0x7ffffff0,
+    constexpr xlen_t UserStackDefault=0x8000000,
+        UstackSize=0x4000,
+        UstackBottom=UserStackDefault-UstackSize,
         TrapframePages=2,
         UserHeapTop=(UserStackDefault-(1l<<29)),
         UserHeapBottom=vm::ceil(UserHeapTop-(1l<<30));
