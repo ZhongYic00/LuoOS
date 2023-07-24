@@ -54,6 +54,7 @@ namespace sys
         fstat=80,
         sync=81,
         exit=93,
+        exit_group=94,
         settidaddress=96,
         nanosleep=101,
         yield=124,

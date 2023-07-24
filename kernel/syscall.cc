@@ -432,6 +432,9 @@ namespace syscall {
         cur->getProcess()->exit(status);
         yield();
     }
+    xlen_t exitGroup() {
+        return exit();
+    }
     xlen_t sendFile() {
         auto &ctx=kHartObj().curtask->ctx;
         int a_outfd = ctx.x(10);
@@ -756,7 +759,7 @@ namespace syscall {
     xlen_t uMask() {
         auto &ctx = kHartObj().curtask->ctx;
         mode_t a_mask = ctx.x(10);
-        
+
         auto curproc = kHartObj().curtask->getProcess();
 
         return curproc->setUMask(a_mask);
@@ -1077,6 +1080,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::fstat,fStat);
         DECLSYSCALL(scnum::sync,sync);
         DECLSYSCALL(scnum::exit,exit);
+        DECLSYSCALL(scnum::exit_group,exitGroup);
         DECLSYSCALL(scnum::settidaddress,setTidAddress)
         DECLSYSCALL(scnum::nanosleep,nanoSleep);
         DECLSYSCALL(scnum::yield,sysyield);
