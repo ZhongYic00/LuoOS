@@ -384,25 +384,13 @@ int fs::rootFSInit() {
     return 0;
 }
 
+#include "scatterio.hh"
 namespace fs
 {
     void INode::readv(const memvec &src,const memvec &dst){
-        auto srcit=src.begin();
-        auto srcseg=*srcit;
-        auto dstit=dst.begin();
-        auto dstseg=*dstit;
-        auto totrdbytes=0u;
-        while(dstseg&&srcseg){
-            auto rdbytes=nodRead(false,dstseg.l,srcseg.l,dstseg.length());
-            srcseg.l+=rdbytes;dstseg.l+=rdbytes;
-            if(!srcseg||!rdbytes)srcseg=*++srcit;
-            if(!dstseg)dstseg=*++dstit;
-            totrdbytes+=rdbytes;
-        }
-        while(dstit!=dst.end()){
-            memset((ptr_t)dstseg.l,0,dstseg.length());
-            dstseg=*++dstit;
-        }
+        SingleFileScatteredReader fio(*this,src);
+        KMemScatteredIO mio(dst);
+        scatteredCopy(mio,fio);
     }
     void INode::readPages(const memvec &src,const memvec &dst){
         memvec src1,dst1;
@@ -421,5 +409,33 @@ namespace fs
             return rt;
         }
         return vnode->vmo.lock();
+    }
+    size_t File::readv(ScatteredIO &dst){
+        switch(type){
+        case FileType::entry:{
+            SingleFileScatteredReader fio(*obj.ep->getINode(),{{off,obj.ep->getINode()->rFileSize()}});
+            return scatteredCopy(dst,fio);
+        } break;
+        case FileType::stdin:
+        default:
+            ;
+        }
+        return -1;
+    }
+    size_t File::writev(ScatteredIO &dst){
+        switch(type){
+        case FileType::entry:{
+            SingleFileScatteredWriter fio(*obj.ep->getINode(),{{off,obj.ep->getINode()->rFileSize()}});
+            return scatteredCopy(dst,fio);
+            } break;
+        case FileType::stdout:
+        case FileType::stderr:{
+            PrintScatteredWriter pio;
+            return scatteredCopy(dst,pio);
+        } break;
+        default:
+            ;
+        }
+        return -1;
     }
 } // namespace fs

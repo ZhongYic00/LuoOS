@@ -458,6 +458,8 @@ namespace syscall {
         auto file=kHartObj().curtask->getProcess()->ofile(fd);
         return file->write(uva,len);
     }
+    sysrt_t readv(int fd, xlen_t iov, int iovcnt);
+    sysrt_t writev(int fd, xlen_t iov, int iovcnt);
     xlen_t exit(){
         auto cur=kHartObj().curtask;
         auto status=cur->ctx.a0();
@@ -1140,6 +1142,8 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::lseek,lSeek);
         DECLSYSCALL(scnum::read,read);
         DECLSYSCALL(scnum::write,write);
+        DECLSYSCALL(scnum::readv,readv);
+        DECLSYSCALL(scnum::writev,writev);
         DECLSYSCALL(scnum::sendfile,sendFile);
         DECLSYSCALL(scnum::readlinkat,readLinkAt);
         DECLSYSCALL(scnum::fstatat,fStatAt);

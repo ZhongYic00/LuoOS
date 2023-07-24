@@ -49,6 +49,8 @@ namespace sys
         lseek=62,
         read=63,
         write=64,
+        readv=65,
+        writev=66,
         sendfile=71,
         readlinkat=78,
         fstatat=79,
