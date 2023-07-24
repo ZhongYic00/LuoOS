@@ -931,6 +931,8 @@ namespace syscall {
         int argc=0;
         auto ustream=vmar[ctx.sp()];
         ustream.reverse=true;
+        xlen_t endMarker=0x114514;
+        ustream<<endMarker;
         for(auto arg:args){
             ustream<<arg;
             argv.buff[argc++]=ustream.addr();

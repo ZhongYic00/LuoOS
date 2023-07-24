@@ -10,11 +10,11 @@ Process::Process(pid_t pid,prior_t prior,pid_t parent):IdManagable(pid),Scheduab
 }
 Process::Process(prior_t prior,pid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
-    auto ustack=UserStackDefault;
+    auto ustack=UserStackDefault,ustackpages=vm::bytes2pages(UstackSize);
     using perm=vm::PageTableEntry::fieldMasks;
     using namespace vm;
-    auto vmo=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(1),1);
-    vmar.map(PageMapping{vm::addr2pn(ustack),1,0,vmo,perm::r|perm::w|perm::u|perm::v,PageMapping::MappingType::system,PageMapping::SharingType::privt});
+    auto vmo=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(ustackpages),ustackpages);
+    vmar.map(PageMapping{vm::addr2pn(UstackBottom),ustackpages,0,vmo,perm::r|perm::w|perm::u|perm::v,PageMapping::MappingType::system,PageMapping::SharingType::privt});
     return ustack;
 }
 auto Process::newTrapframe(){
