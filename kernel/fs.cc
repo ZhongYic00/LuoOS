@@ -21,25 +21,24 @@ static constexpr int SEEK_SET = 0;
 static constexpr int SEEK_CUR = 1;
 static constexpr int SEEK_END = 2;
 
-xlen_t File::write(xlen_t addr,size_t len){
+int File::write(ByteArray a_buf){
     xlen_t rt=sys::statcode::err;
-    if(!ops.fields.w)return rt;
-    auto bytes=kHartObj().curtask->getProcess()->vmar.copyin(addr,len);
-    Log(debug,"write(%d bytes)",bytes.len);
+    if(!ops.fields.w) { return rt; }
+    Log(debug,"write(%d bytes)",a_buf.len);
     switch(type){
         case FileType::stdout:
         case FileType::stderr:
-            FMT_PROC("%s",string(bytes.c_str(),len).c_str());
-            rt=bytes.len;
+            FMT_PROC("%s", string(a_buf.c_str(), a_buf.len).c_str());
+            rt = a_buf.len;
             break;
         case FileType::pipe:
-            obj.pipe->write(bytes);
-            rt=bytes.len;
+            obj.pipe->write(a_buf);
+            rt = a_buf.len;
             break;
         case FileType::entry:
-            if (obj.ep->getINode()->nodWrite(true, addr, off, len) == len) {
-                off += len;
-                rt = len;
+            if (obj.ep->getINode()->nodWrite(false, (xlen_t)a_buf.buff, off, a_buf.len) == a_buf.len) {
+                off += a_buf.len;
+                rt = a_buf.len;
             }
             else { rt = sys::statcode::err; }
         default:
@@ -47,7 +46,7 @@ xlen_t File::write(xlen_t addr,size_t len){
     }
     return rt;
 }
-ByteArray File::read(size_t len, long a_off, bool a_update){
+ByteArray File::read(size_t len, long a_off, bool a_update){  // @todo: 重构一下
     if(a_off < 0) { a_off = off; }
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.r) { return rt; }
@@ -121,9 +120,8 @@ ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len
     ssize_t nsend = 0;
     while (a_len > 0) {
         ssize_t rem = (ssize_t)(a_len > pageSize ? pageSize : a_len);
-        ByteArray buf = read(rem);
-        int ret = buf.len;
-        ret = a_outfile->write((xlen_t)buf.buff, ret);
+        ByteArray buf = read(rem);  // @todo: 安全检查
+        int ret = a_outfile->write(buf);
         if (ret < 0) { return ret; }
         nsend += ret;
         if (rem != ret) { break; } // EOF reached in in_fd or out_fd is full

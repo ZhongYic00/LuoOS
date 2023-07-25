@@ -517,10 +517,17 @@ namespace syscall {
         return bytes.len;
     }
     xlen_t write(){
-        auto &ctx=kHartObj().curtask->ctx;
-        xlen_t fd=ctx.x(10),uva=ctx.x(11),len=ctx.x(12);
-        auto file=kHartObj().curtask->getProcess()->ofile(fd);
-        return file->write(uva,len);
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_fd = ctx.x(10);
+        const char *a_src = (const char*)ctx.x(11);
+        size_t a_len = ctx.x(12);
+        if(a_src == nullptr) { return -EFAULT; }
+
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> file = curproc->ofile(a_fd);
+        if(file == nullptr) { return -EBADF; }
+
+        return file->write(curproc->vmar.copyin((xlen_t)a_src, a_len));
     }
     sysrt_t readv(int fd, xlen_t iov, int iovcnt);
     sysrt_t writev(int fd, xlen_t iov, int iovcnt);
@@ -544,11 +551,15 @@ namespace syscall {
         shared_ptr<File> outfile = curproc->ofile(a_outfd);
         shared_ptr<File> infile = curproc->ofile(a_infd);
         if(outfile==nullptr || infile==nullptr) { return -EBADF; }
-        ByteArray offsetarr = curproc->vmar.copyin((xlen_t)a_offset, sizeof(off_t));
+        off_t *offset = nullptr;
+        ByteArray offsetarr(sizeof(off_t));
+        if(a_offset != nullptr) {
+            offsetarr = curproc->vmar.copyin((xlen_t)a_offset, sizeof(off_t));
+            offset = (off_t*)offsetarr.buff;
+        }
 
-        ssize_t ret = infile->sendFile(outfile, (off_t*)offsetarr.buff, a_len);
-
-        curproc->vmar.copyout((xlen_t)a_offset, offsetarr);
+        ssize_t ret = infile->sendFile(outfile, offset, a_len);
+        if(a_offset != nullptr) { curproc->vmar.copyout((xlen_t)a_offset, offsetarr); }
         return ret;
     }
     xlen_t readLinkAt() {
