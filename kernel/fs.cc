@@ -52,13 +52,13 @@ ByteArray File::read(size_t len, long a_off, bool a_update){  // @todo: 重构�
     if(!ops.fields.r) { return rt; }
     switch(type){
         case FileType::stdin:
-            panic("unimplementd!");
+            panic("unimplementd read type stdin\n");
             break;
         case FileType::pipe:
             return obj.pipe->read(len);
             break;
         case FileType::dev:
-            panic("unimplementd!");
+            panic("unimplementd read type dev\n");
             break;
         case FileType::entry: {
             int rdbytes = 0;

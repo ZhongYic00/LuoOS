@@ -114,15 +114,6 @@ namespace syscall {
         curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)strcwd, len));
         return (xlen_t)a_buf;
     }
-    xlen_t dupArgsIn(int a_fd, int a_newfd=-1) {
-        auto curproc = kHartObj().curtask->getProcess();
-        shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
-        // dupArgsIn内部newfd<0时视作由操作系统分配描述符（同fdAlloc），因此对newfd非负的判断应在外层dup3中完成
-        int newfd = curproc->fdAlloc(file, a_newfd);
-
-        return newfd;  // 分配失败时，newfd即为错误码
-    }
     xlen_t dup() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
@@ -138,14 +129,13 @@ namespace syscall {
         int a_fd = ctx.x(10);
         int a_newfd = ctx.x(11);
         int a_flags = ctx.x(12);
-        if(fdOutRange(a_newfd)) { return -EBADF; }
-        if(a_fd == a_newfd) { return a_newfd; }
+        if(a_fd == a_newfd) { return -EINVAL; }
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
         if(file == nullptr) { return -EBADF; }
 
-        int newfd = curproc->fdAlloc(file, -a_newfd);  // -a_newfd要求fdAlloc准确地在a_newfd处分配文件描述符
+        int newfd = curproc->fdAlloc(file, a_newfd, true);
         if(newfd >= 0) {
             curproc->ofile(newfd)->flags &= ~O_CLOEXEC;
             curproc->ofile(newfd)->flags |= a_flags;
@@ -163,7 +153,7 @@ namespace syscall {
         shared_ptr<File> file = curproc->ofile(a_fd);
         if(file == nullptr) { return -EBADF; }
         switch(a_cmd) {
-            case F_DUPFD: { return curproc->fdAlloc(file, ((int)a_arg)<0 ? 0 : a_arg); }
+            case F_DUPFD: { return curproc->fdAlloc(file, a_arg); }
             // NOTE: file descripter flags and file status flags are not the same
             // GET/SETFD asked for file descripter flags
             // since file descripter flags only have FD_CLOEXEC, we can just return 0 or FD_CLOEXEC
@@ -186,7 +176,7 @@ namespace syscall {
                 return 0;
             }
             case F_DUPFD_CLOEXEC: {
-                int newfd = curproc->fdAlloc(file, ((int)a_arg)<0 ? 0 : a_arg);
+                int newfd = curproc->fdAlloc(file, a_arg);
                 if(newfd >= 0) {
                     curproc->ofile(newfd)->flags &= ~O_CLOEXEC;
                     curproc->ofile(newfd)->flags |= O_CLOEXEC;
