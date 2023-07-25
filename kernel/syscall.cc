@@ -1039,7 +1039,7 @@ namespace syscall {
             Log(warning,"munmap addr not aligned!");
             return statcode::err;
         }
-        auto region=vm::Segment{addr2pn(addr),addr2pn(addr+len)};
+        auto region=vm::Segment{addr2pn(addr),addr2pn(addr+len-1)};
         curproc.vmar.unmap(region);
     }
     sysrt_t mprotect(xlen_t addr,size_t len,int prot){
