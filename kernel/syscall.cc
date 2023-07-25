@@ -26,10 +26,10 @@ namespace syscall {
     using fs::StatFS;
     using proc::fdOutRange;
     using proc::FdCwd;
-    using signal::SignalAction;
+    using signal::SigAct;
     using signal::SigSet;
-    using signal::SignalInfo;
-    using signal::send;
+    using signal::SigInfo;
+    using signal::sigSend;
     using signal::doSigAction;
     using signal::doSigProcMask;
     using signal::doSigReturn;
@@ -658,8 +658,8 @@ namespace syscall {
             auto proc = (**kGlobObjs->procMgr)[a_pid];
             if(proc == nullptr) { statcode::err; }
             if(a_sig == 0) { statcode::ok; }
-            unique_ptr<SignalInfo> tmp(nullptr);
-            send(*proc, a_sig, tmp);
+            unique_ptr<SigInfo> tmp(nullptr);
+            sigSend(*proc, a_sig, tmp);
             return statcode::ok;
         }
         if(a_pid == -1) {
@@ -671,8 +671,8 @@ namespace syscall {
                 auto it = procs[i];
                 if (it->pid() != 1) {
                     success = true;
-                    unique_ptr<SignalInfo> tmp(nullptr);
-                    send(*it, a_sig, tmp);
+                    unique_ptr<SigInfo> tmp(nullptr);
+                    sigSend(*it, a_sig, tmp);
                 }
             }
             return success ? statcode::ok : statcode::err;
@@ -685,18 +685,18 @@ namespace syscall {
     xlen_t sigAction() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_sig = ctx.x(10);
-        SignalAction *a_nact = (SignalAction*)ctx.x(11);
-        SignalAction *a_oact = (SignalAction*)ctx.x(12);
+        SigAct *a_nact = (SigAct*)ctx.x(11);
+        SigAct *a_oact = (SigAct*)ctx.x(12);
         
         auto curproc = kHartObj().curtask->getProcess();
-        ByteArray nactarr(sizeof(SignalAction));
-        SignalAction *nact = nullptr;
+        ByteArray nactarr(sizeof(SigAct));
+        SigAct *nact = nullptr;
         if(a_nact != nullptr ) {
             nactarr = curproc->vmar.copyin((xlen_t)a_nact, nactarr.len);
-            nact = (SignalAction*)nactarr.buff;
+            nact = (SigAct*)nactarr.buff;
         }
-        ByteArray oactarr(sizeof(SignalAction));
-        SignalAction *oact = (SignalAction*)oactarr.buff;
+        ByteArray oactarr(sizeof(SigAct));
+        SigAct *oact = (SigAct*)oactarr.buff;
         if(a_oact == nullptr) { oact = nullptr; }
 
         int ret = doSigAction(a_sig, nact, oact);

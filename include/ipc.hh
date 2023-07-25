@@ -73,16 +73,16 @@ namespace signal{
 
     // constexpr static int numSignals=32;  // @todo: 检查一下是不是写错了
     constexpr static int numSignals = _NSIG;
-    typedef bitset<numSignals> SignalMask;
-    typedef sigaction SignalAction;
+    typedef bitset<numSignals> SigMask;
+    typedef sigaction SigAct;
     typedef sigset_t SigSet;
-    typedef siginfo_t SignalInfo;
-    typedef stack_t SignalStack;
-    typedef sigcontext SignalContext;
-    void send(Process &proc,int num,unique_ptr<SignalInfo>& info);
-    void send(Task &task,int num,unique_ptr<SignalInfo>& info);
-    inline SignalMask sigset2bitset(SigSet set){return set.sig[0];}
-    xlen_t doSigAction(int a_sig, SignalAction *a_act, SignalAction *a_oact);
+    typedef siginfo_t SigInfo;
+    typedef stack_t SigStack;
+    typedef sigcontext SigCtx;
+    void sigSend(Process &proc,int num,unique_ptr<SigInfo>& info);
+    void sigSend(Task &task,int num,unique_ptr<SigInfo>& info);
+    inline SigMask sigset2bitset(SigSet set){return set.sig[0];}
+    xlen_t doSigAction(int a_sig, SigAct *a_act, SigAct *a_oact);
     xlen_t doSigProcMask(int a_how, SigSet *a_nset, SigSet *a_oset, size_t a_sigsetsize);
     xlen_t doSigReturn();
 }

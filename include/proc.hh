@@ -85,7 +85,7 @@ namespace proc
         Tms ti;
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
-        SignalAction actions[numSignals];
+        SigAct sigacts[numSignals];
         pid_t m_pgid, m_sid;
         uid_t m_ruid, m_euid, m_suid;
         gid_t m_rgid, m_egid, m_sgid;
@@ -144,9 +144,9 @@ namespace proc
         stack<KContext> kctxs;
         const pid_t proc;
         Priv lastpriv;
-        SignalMask block,pendingmask;
-        unique_ptr<SignalInfo> pending[numSignals];
-        SignalStack signal_stack;
+        SigMask sigmasks, sigpendings;
+        unique_ptr<SigInfo> siginfos[numSignals];
+        SigStack sigstack;
         void accept();
         Process *getProcess();
         inline tid_t tid() { return id; }

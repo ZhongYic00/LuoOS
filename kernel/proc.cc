@@ -229,26 +229,26 @@ int Process::setRLimit(int a_rsrc, const RLim *a_rlim) {
 }
 
 void Task::accept(){
-    int sig=(pendingmask&~block).find_first();
-    if(sig==pendingmask.kSize)return ;
-    pendingmask[sig]=0;
-    auto info=std::move(pending[sig]);
+    int sig=(sigpendings&~sigmasks).find_first();
+    if(sig==sigpendings.kSize)return ;
+    sigpendings[sig]=0;
+    auto info=std::move(siginfos[sig]);
     /// @todo default kill handler
     if(sig==SIGKILL) return ;
     /// @todo default stop handler
     if(sig==SIGSTOP) return ;
-    auto action=getProcess()->actions[sig];
+    auto action=getProcess()->sigacts[sig];
     if(action.sa_handler==SIG_ERR);
     if(action.sa_handler==SIG_DFL);
     if(action.sa_handler==SIG_IGN) return ;
-    xlen_t signalstack;
+    xlen_t SigStack;
     /// @todo setup signal stack
 
     if(!action.sa_flags&SA_NODEFER){
         // prevent nested same signal
-        block[sig]=1;
+        sigmasks[sig]=1;
     }
-    block|=sigset2bitset(action.sa_mask);
+    sigmasks|=sigset2bitset(action.sa_mask);
 
     /// @todo put context
 
