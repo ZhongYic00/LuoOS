@@ -35,7 +35,10 @@ namespace eastl{
                 }
                 Log(trace,"bcache miss(%d)",key);
                 reserve();
-                auto rt=shared_ptr<V>(refill(),[this,key](V* val)->void{active.erase(key);});
+                auto rt=shared_ptr<V>(refill(),[this,key](V* val)->void{
+                    active.erase(key);
+                    delete val;
+                });
                 lru.push_front(pair{key,rt});
                 active[key]=pair{weak_ptr<V>(rt),lru.begin()};
                 return rt;
@@ -64,14 +67,9 @@ namespace bio{
         const BlockKey key;
         bool dirty;
         uint8_t *d;
-        BlockBuf(const BlockKey& key_):key(key_),d(reinterpret_cast<uint8_t*>(new AlignedBytes<>)){
-            reload();
-        }
+        BlockBuf(const BlockKey& key_);
         BlockBuf(const BlockBuf &other)=delete;
-        ~BlockBuf(){
-            flush();
-            delete reinterpret_cast<AlignedBytes<>*>(d);
-        }
+        ~BlockBuf();
         inline const uint32_t& operator[](off_t off) const {return at<uint32_t>(off);}
         inline uint32_t& operator[](off_t off){return at<uint32_t>(off);}
         template<typename T>
@@ -103,7 +101,7 @@ namespace bio{
     class BCacheMgr{
     eastl::shared_lru<BlockKey,BlockBuf> lru;
     public:
-        constexpr static size_t defaultSize=0x100;
+        constexpr static size_t defaultSize=0x80;
         BCacheMgr():lru(defaultSize){}
         BufRef operator[](const BlockKey &key){
             Log(debug,"bcache[{%d:%x}]",key.dev,key.secno);

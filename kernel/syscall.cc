@@ -484,17 +484,14 @@ namespace syscall {
 
         return sizeof(ds);
     }
-    xlen_t lSeek() {
+    xlen_t lSeek(int fd,off_t offset,int whence) {
         auto &ctx = kHartObj().curtask->ctx;
-        int a_fd = ctx.x(10);
-        off_t a_offset = ctx.x(11);
-        int a_whence = ctx.x(12);
 
         auto curproc = kHartObj().curtask->getProcess();
-        shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file = nullptr) { return -EBADF; }
+        shared_ptr<File> file = curproc->ofile(fd);
+        if(!file) { return -EBADF; }
 
-        return file->lSeek(a_offset, a_whence);
+        return file->lSeek(offset, whence);
     }
     xlen_t read(){
         auto &ctx=kHartObj().curtask->ctx;
@@ -656,8 +653,8 @@ namespace syscall {
         if(a_pid < -1) { a_pid = -a_pid; } // FIXME: process group
         if(a_pid > 0) {
             auto proc = (**kGlobObjs->procMgr)[a_pid];
-            if(proc == nullptr) { statcode::err; }
-            if(a_sig == 0) { statcode::ok; }
+            if(proc == nullptr) { return statcode::err; }
+            if(a_sig == 0) { return statcode::ok; }
             unique_ptr<SignalInfo> tmp(nullptr);
             send(*proc, a_sig, tmp);
             return statcode::ok;
