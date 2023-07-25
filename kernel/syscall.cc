@@ -1018,8 +1018,7 @@ namespace syscall {
             auto file=curproc.ofile(fd);
             vmo=file->vmo();
         } else {
-            auto pager=make_shared<SwapPager>(nullptr);
-            pager->backingregion={0x0,pn2addr(pages)};
+            auto pager=make_shared<SwapPager>(nullptr,Segment{0x0,pn2addr(pages)});
             vmo=make_shared<VMOPaged>(pages,pager);
         }
         // actual map

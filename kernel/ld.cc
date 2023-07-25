@@ -47,10 +47,9 @@ eastl::tuple<xlen_t,xlen_t> ld::loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar
         if(!perm&mask::w)
             vmar.map(vm::PageMapping{vm::addr2pn(entry.p_vaddr),pages,vm::addr2pn(entry.p_offset),vmo,perm,vm::PageMapping::MappingType::file,vm::PageMapping::SharingType::shared});
         else {
-            auto pager=make_shared<vm::SwapPager>(eastl::dynamic_pointer_cast<vm::VMOPaged>(vmo)->pager);
-            pager->backingregion={entry.p_offset,entry.p_offset+entry.p_filesz};
+            auto pager=make_shared<vm::SwapPager>(eastl::dynamic_pointer_cast<vm::VMOPaged>(vmo)->pager,vm::Segment{entry.p_offset,entry.p_offset+entry.p_filesz});
             auto shadow=make_shared<vm::VMOPaged>(pages,pager);
-            vmar.map(vm::PageMapping{vm::addr2pn(entry.p_vaddr),pages,0,shadow,perm,vm::PageMapping::MappingType::file,vm::PageMapping::SharingType::shared});
+            vmar.map(vm::PageMapping{vm::addr2pn(entry.p_vaddr),pages,0,shadow,perm,vm::PageMapping::MappingType::file,vm::PageMapping::SharingType::privt});
         }
         // Log(debug,"%x<=%x[%d pages@%x]",vm::addr2pn(entry.p_vaddr),ppn,pages,ld::elf::flags2perm(entry.p_flags));
     }
