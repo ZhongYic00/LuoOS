@@ -32,6 +32,7 @@ namespace vm{
         PageBuf(const PageKey key_);
         ~PageBuf();
         inline void fillzero(){memset((ptr_t)pn2addr(ppn),0,pageSize);}
+        inline void fillwith(PageBuf& other){memmove((ptr_t)pn2addr(ppn),(ptr_t)pn2addr(other.ppn),vm::pageSize);}
     };
     typedef Arc<PageBuf> PBufRef;
 

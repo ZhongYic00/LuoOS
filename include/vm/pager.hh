@@ -33,7 +33,8 @@ namespace vm
         Segment backingregion;
         SwapPager(Arc<Pager> other){
             if(auto swppager=eastl::dynamic_pointer_cast<SwapPager>(other)){
-                backing=swppager->backing;
+                if(swppager->backing)backing=swppager->backing;
+                else backing=swppager;
                 backingregion=swppager->backingregion;
             } else {
                 backing=other;
@@ -42,7 +43,14 @@ namespace vm
         PBufRef load(PageNum offset) override{
             if(inSwap(offset)){}
             if(!pages.count(offset)){
-                auto pbuf=pages[offset]=make_shared<PageBuf>(PageKey{.swp={this,(uint32_t)offset}});
+                auto pbuf=make_shared<PageBuf>(PageKey{.swp={this,(uint32_t)offset}});
+                loadTo(offset,pbuf);
+                pages[offset]=pbuf;
+            }
+            return pages[offset];
+        }
+        void loadTo(PageNum offset,PBufRef pbuf) override{
+            if(!pages.count(offset)){
                 auto backingoff=addr2pn(backingregion.l)+offset;
                 if(backing && backingoff<=addr2pn(backingregion.r)){
                     // fill from backing
@@ -59,8 +67,9 @@ namespace vm
                     // zero filled
                     pbuf->fillzero();
                 }
+            } else {
+                pbuf->fillwith(*pages[offset]);
             }
-            return pages[offset];
         }
         void put(PBufRef pbuf) override{
         }
