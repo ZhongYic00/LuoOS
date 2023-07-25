@@ -576,7 +576,7 @@ namespace syscall {
     xlen_t fStatAt() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
-        const char * a_path = (const char*)ctx.x(11);
+        const char *a_path = (const char*)ctx.x(11);
         KStat *a_kst = (KStat*)ctx.x(12);
         int a_flags = ctx.x(13);
         if(a_kst==nullptr || a_path==nullptr) { return -EFAULT; }
@@ -587,7 +587,7 @@ namespace syscall {
         shared_ptr<File> base = curproc->ofile(a_basefd);
         if(base == nullptr) { return -EBADF; }
 
-        shared_ptr<DEntry> entry = Path(a_path, base).pathSearch();
+        shared_ptr<DEntry> entry = Path(path, base).pathSearch();
         if(entry == nullptr) { return statcode::err; }
         KStat kst = entry;
         curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst, sizeof(kst)));
