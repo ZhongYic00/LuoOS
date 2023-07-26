@@ -59,7 +59,7 @@ namespace pipe{
         void sleep();
     };
 }
-namespace signal{
+namespace signal {
 
     #define SA_RESTORER 1
     #include <asm-generic/siginfo.h>

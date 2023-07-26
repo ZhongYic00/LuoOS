@@ -53,6 +53,7 @@ namespace sys
         readv=65,
         writev=66,
         sendfile=71,
+        ppoll=73,
         readlinkat=78,
         fstatat=79,
         fstat=80,
