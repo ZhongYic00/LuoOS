@@ -84,8 +84,9 @@ ByteArray File::readAll(){
     }
 }
 off_t File::lSeek(off_t a_offset, int a_whence) {
+    // if ((kst.st_mode&S_IFMT)==S_IFCHR || (kst.st_mode&S_IFMT)==S_IFIFO) { return 0; }
+    if(type!=FileType::entry)return -ESPIPE;
     KStat kst = obj.ep;
-    if ((kst.st_mode&S_IFMT)==S_IFCHR || (kst.st_mode&S_IFMT)==S_IFIFO) { return 0; }
     switch (a_whence) {  // @todo: st_size处是否越界？
         case SEEK_SET: {
             if(a_offset<0 || a_offset>kst.st_size) { return -EINVAL; }
