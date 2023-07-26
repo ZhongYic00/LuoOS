@@ -31,14 +31,16 @@ namespace vm
         bool inSwap(PageNum offset){return false;}
     public:
         Segment backingregion;
-        SwapPager(Arc<Pager> other){
-            if(auto swppager=eastl::dynamic_pointer_cast<SwapPager>(other)){
-                if(swppager->backing)backing=swppager->backing;
-                else backing=swppager;
-                backingregion=swppager->backingregion;
-            } else {
-                backing=other;
-            }
+        SwapPager(Arc<Pager> other,Segment region){
+            // if(auto swppager=eastl::dynamic_pointer_cast<SwapPager>(other)){
+            //     // if(swppager->backing)backing=swppager->backing;
+            //     backing=swppager;
+            //     backingregion=swppager->backingregion;
+            // } else {
+            //     backing=other;
+            // }
+            backing=other;
+            backingregion=region;
         }
         PBufRef load(PageNum offset) override{
             if(inSwap(offset)){}
