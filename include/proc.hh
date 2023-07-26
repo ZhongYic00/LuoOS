@@ -71,7 +71,7 @@ namespace proc
         UstackBottom=UserStackDefault-UstackSize,
         TrapframePages=2,
         UserHeapSize=0x100000;
-    constexpr int MaxOpenFile = 101; // 官网测例往fd=100中写东西
+    constexpr int mOFiles = 101; // 官网测例往fd=100中写东西
     constexpr int FdCwd = 3;
 
     struct Process:public IdManagable,public Scheduable{
@@ -80,12 +80,12 @@ namespace proc
         VMAR vmar;
         xlen_t heapTop,heapBottom;
         unordered_set<Task*> tasks;
-        shared_ptr<File> files[MaxOpenFile];
+        shared_ptr<File> files[mOFiles];
         string name;
         Tms ti;
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
-        SignalAction actions[numSignals];
+        shared_ptr<SigAct> sigacts[numSigs];
         pid_t m_pgid, m_sid;
         uid_t m_ruid, m_euid, m_suid;
         gid_t m_rgid, m_egid, m_sgid;
@@ -118,6 +118,7 @@ namespace proc
         int setUMask(mode_t a_mask);
         inline ByteArray getRLimit(int a_rsrc) { return ByteArray((uint8*)(rlimits+a_rsrc), sizeof(rlimits)); }
         int setRLimit(int a_rsrc, const RLim *a_rlim);
+        inline shared_ptr<SigAct> getSigAct(int a_sig) { return sigacts[a_sig]==nullptr ? defaultSigAct : sigacts[a_sig]; }
         inline prior_t priority(){return prior;}
         inline xlen_t satp(){return vmar.satp();}
         shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围
@@ -144,10 +145,11 @@ namespace proc
         stack<KContext> kctxs;
         const pid_t proc;
         Priv lastpriv;
-        SignalMask block,pendingmask;
-        unique_ptr<SignalInfo> pending[numSignals];
-        SignalStack signal_stack;
-        void accept();
+        SigMask sigmask, sigpending;
+        shared_ptr<SigInfo> siginfos[numSigs];
+        SigStack sigstack;
+        inline bool onSigStack() { return ctx.sp()-(xlen_t)sigstack.ss_sp < sigstack.ss_size; }
+        // void accept();
         Process *getProcess();
         inline tid_t tid() { return id; }
         inline Task(tid_t tid,prior_t pri,tid_t proc):IdManagable(tid),Scheduable(pri),proc(proc),lastpriv(Priv::User){
@@ -202,7 +204,7 @@ namespace proc
     Process* createProcess();
     Process* createKProcess(prior_t prior);
     pid_t clone(Task* task);
-    inline bool fdOutRange(int a_fd) { return (a_fd<0) || (a_fd>=proc::MaxOpenFile); }
+    inline bool fdOutRange(int a_fd) { return (a_fd<0) || (a_fd>=proc::mOFiles); }
 } // namespace proc
 
 

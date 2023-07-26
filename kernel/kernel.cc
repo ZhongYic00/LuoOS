@@ -214,6 +214,7 @@ void init(int hartid){
         Log(info,"virtio disk init over");
         bio::init();
         Log(info,"binit over");
+        signal::sigInit();
         std::atomic_thread_fence(std::memory_order_release);
         sbi_hsm_hart_start(hartid^1,(xlen_t)0x80200000,0);
         while(started<2){

@@ -4,6 +4,7 @@
 #include "sbi.hh"
 #include "kernel.hh"
 #include "virtio.hh"
+#include "ipc.hh"
 
 #define moduleLevel LogLevel::warning
 
@@ -61,6 +62,7 @@ void uecallHandler(){
         Log(error,"syscall num{%d} exceeds valid range",ecallId);
         rtval=1;
     }
+    signal::sigHandler();
     cur->lastpriv=proc::Task::Priv::User;
     Log(debug,"uecall exit(id=%d,rtval=%d)",ecallId,rtval);
 }
