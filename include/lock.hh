@@ -111,6 +111,19 @@ again:      atomic_base_t expected=0;
         explicit LockedObject(Ts&& ...args):object(args...),ObjectGuard<T,L>(object){}
     };
 } // namespace mutex
+namespace condition_variable
+{
+    class condition_variable{
+        list<proc::Task*> waiting;
+    public:
+        condition_variable(){}
+        void notify_one();
+        void notify_all();
+        void wait();
+        inline void wait_for(){panic("unimplemented!");}
+    };
+} // namespace condition_variable
+
 
 using namespace mutex;
 

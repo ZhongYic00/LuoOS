@@ -46,7 +46,7 @@ int File::write(ByteArray a_buf){
     }
     return rt;
 }
-ByteArray File::read(size_t len, long a_off, bool a_update){  // @todo: 重构一下
+int File::read(ByteArray buf, long a_off, bool a_update){  // @todo: 重构一下
     if(a_off < 0) { a_off = off; }
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.r) { return rt; }
@@ -55,25 +55,23 @@ ByteArray File::read(size_t len, long a_off, bool a_update){  // @todo: 重构�
             panic("unimplementd read type stdin\n");
             break;
         case FileType::pipe:
-            return obj.pipe->read(len);
+            return obj.pipe->read(buf);
             break;
         case FileType::dev:
             panic("unimplementd read type dev\n");
             break;
         case FileType::entry: {
-            int rdbytes = 0;
-            ByteArray buf(len);
-            if((rdbytes = obj.ep->getINode()->nodRead(false, (uint64)buf.buff, a_off, len)) > 0) {
+            if(auto rdbytes = obj.ep->getINode()->nodRead(false, (uint64)buf.buff, a_off, buf.len); rdbytes > 0) {
                 if(a_update) { off = a_off + rdbytes; }
+                return rdbytes;
             }
-            return ByteArray::from((xlen_t)buf.buff, rdbytes);
             break;
         }
         default:
             panic("File::read(): unknown file type");
             break;
     }
-    return ByteArray{0};
+    return 0;
 }
 ByteArray File::readAll(){
     switch(type){
@@ -120,8 +118,12 @@ ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len
     ssize_t nsend = 0;
     while (a_len > 0) {
         ssize_t rem = (ssize_t)(a_len > pageSize ? pageSize : a_len);
-        ByteArray buf = read(rem);  // @todo: 安全检查
-        int ret = a_outfile->write(buf);
+        auto buf_=(uint8_t*)vm::pn2addr(kGlobObjs->pageMgr->alloc(1));
+        ByteArray buf(buf_,rem);
+        rem=read(buf);  // @todo: 安全检查
+        if(rem==0) break;
+        int ret = a_outfile->write(ByteArray(buf_,rem));
+        kGlobObjs->pageMgr->free(vm::addr2pn((xlen_t)buf_),0);
         if (ret < 0) { return ret; }
         nsend += ret;
         if (rem != ret) { break; } // EOF reached in in_fd or out_fd is full

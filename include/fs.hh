@@ -160,7 +160,7 @@ namespace fs{
         File(shared_ptr<DEntry> a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags), flags(a_flags) {}
         ~File();
         int write(ByteArray a_buf);
-        ByteArray read(size_t len, long a_off = -1, bool a_update = true);
+        int read(ByteArray buf, long a_off = -1, bool a_update = true);
         ByteArray readAll();
         size_t readv(ScatteredIO &dst);
         size_t writev(ScatteredIO &dst);
