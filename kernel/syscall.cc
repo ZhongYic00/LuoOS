@@ -9,6 +9,7 @@
 #include <EASTL/chrono.h>
 #include <linux/reboot.h>
 #include <linux/unistd.h>
+#include <asm/poll.h>
 using nonstd::expected;
 
 #define moduleLevel LogLevel::info
@@ -546,6 +547,32 @@ namespace syscall {
             curproc->vmar.copyout((xlen_t)a_offset, offsetarr);
         }
         else { ret = infile->sendFile(outfile, offset, a_len); }
+
+        return ret;
+    }
+    xlen_t pPoll() {
+        auto &ctx=kHartObj().curtask->ctx;
+        pollfd *a_fds = (pollfd*)ctx.x(10);
+        xlen_t a_nfds = ctx.x(11);
+        timespec *a_tsp = (timespec*)ctx.x(12);
+        SigSet *a_sigmask = (SigSet*)ctx.x(13);
+        size_t a_sigsetsize = ctx.x(14);
+        if(a_fds==nullptr || a_nfds<0 || a_sigsetsize!=sizeof(SigSet)) { return -EINVAL; }
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray fdsarr = curproc->vmar.copyin((xlen_t)a_fds, a_nfds*sizeof(pollfd));
+        pollfd *fds = (pollfd*)fdsarr.buff;
+        // @todo: 处理信号阻塞
+        // @todo: 处理等待时间（类似nanoSleep）
+        int ret = 0;
+        for (xlen_t i = 0; i < a_nfds; ++i) {  // @todo: 需要完善
+            fds[i].revents = 0;
+            if (fds[i].fd < 0) { continue; }
+            if (fds[i].events & POLLIN) { fds[i].revents |= POLLIN; }  // @todo: we assume this is always available
+            if (fds[i].events & POLLOUT) { fds[i].revents |= POLLOUT; }  // @todo: we assume this is always available
+            ++ret;
+        }
+        curproc->vmar.copyout((xlen_t)a_fds, fdsarr);
 
         return ret;
     }
@@ -1209,6 +1236,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::readv,readv);
         DECLSYSCALL(scnum::writev,writev);
         DECLSYSCALL(scnum::sendfile,sendFile);
+        DECLSYSCALL(scnum::ppoll,pPoll);
         DECLSYSCALL(scnum::readlinkat,readLinkAt);
         DECLSYSCALL(scnum::fstatat,fStatAt);
         DECLSYSCALL(scnum::fstat,fStat);
