@@ -503,6 +503,7 @@ namespace syscall {
         ByteArray buf(buf_,len);
         auto rdbytes=file->read(buf);
         kHartObj().curtask->getProcess()->vmar[uva] << ByteArray(buf_,rdbytes);
+        delete[] buf_;
         return rdbytes;
     }
     xlen_t write(){

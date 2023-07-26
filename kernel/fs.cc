@@ -118,8 +118,11 @@ ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len
     ssize_t nsend = 0;
     while (a_len > 0) {
         ssize_t rem = (ssize_t)(a_len > pageSize ? pageSize : a_len);
-        ByteArray buf = read(rem);  // @todo: 安全检查
-        int ret = a_outfile->write(buf);
+        auto buf_=new uint8_t[rem];
+        ByteArray buf(buf_,rem);
+        rem=read(buf);  // @todo: 安全检查
+        int ret = a_outfile->write(ByteArray(buf_,rem));
+        delete[] buf_;
         if (ret < 0) { return ret; }
         nsend += ret;
         if (rem != ret) { break; } // EOF reached in in_fd or out_fd is full

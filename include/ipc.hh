@@ -34,15 +34,17 @@ namespace pipe{
         inline int write(ByteArray bytes){
             int off=0;
             for(;off<bytes.len;){
-                if(rcnt==0) break;
                 auto wbegin=buf+tail%bufSize;
                 auto wlen=klib::min(klib::min(head+bufSize-tail,bufSize-tail%bufSize),bytes.len-off);
                 assert(wlen>=0);
                 if(wlen==0){
+                    if(rcnt==0) break;
+                    canr.notify_one();
                     canw.wait();
                     continue;
                 }
                 memmove(wbegin,bytes.buff+off,wlen);
+                tail+=wlen;
                 off+=wlen;
             }
             tryWakeup();
@@ -52,14 +54,16 @@ namespace pipe{
             /// @todo error handling
             int off=0;
             for(;off<bytes.len;){
-                if(wcnt==0) break;
                 auto rbegin=buf+head%bufSize;
                 auto rlen=klib::min(klib::min(tail-head,bufSize-head%bufSize),bytes.len-off);
                 if(rlen==0){
+                    if(wcnt==0) break;
+                    canw.notify_one();
                     canr.wait();
                     continue;
                 }
                 memmove(bytes.buff+off,rbegin,rlen);
+                head+=rlen;
                 off+=rlen;
             }
             tryWakeup();
