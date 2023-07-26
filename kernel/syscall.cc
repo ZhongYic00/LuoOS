@@ -648,30 +648,32 @@ namespace syscall {
         yield();
         return statcode::ok;
     }
-    xlen_t kill() {
+    xlen_t kill() {  // @todo: 填充SigInfo？
         auto &ctx = kHartObj().curtask->ctx;
         pid_t a_pid = ctx.x(10);
         int a_sig = ctx.x(11);
 
-        if(a_pid == 0) { a_pid = kHartObj().curtask->getProcess()->pid(); } // FIXME: process group
-        if(a_pid < -1) { a_pid = -a_pid; } // FIXME: process group
+        auto curproc = kHartObj().curtask->getProcess();
+        if(a_pid == 0) { a_pid = curproc->pid(); }  // @todo: 进程组信号管理
+        if(a_pid < -1) { a_pid = -a_pid; }  // @todo: 进程组信号管理
         if(a_pid > 0) {
             auto proc = (**kGlobObjs->procMgr)[a_pid];
             if(proc == nullptr) { return statcode::err; }
             if(a_sig == 0) { return statcode::ok; }
-            sigSend(*proc, a_sig, nullptr);
+            sigSend(*proc, a_sig);
             return statcode::ok;
         }
         if(a_pid == -1) {
             if(a_sig == 0) { return statcode::ok; }
+            else if(a_sig==SIGKILL || a_sig==SIGSTOP) { return -EPERM; }
             bool success = false;
             auto procs = (**kGlobObjs->procMgr);
             int procsnum = procs.getObjNum();
             for (int i = 0; i < procsnum; ++i) {
                 auto it = procs[i];
-                if (it->pid() != 1) {
+                if(it!=nullptr && it!=curproc && it->pid()>2) {  // @todo: 内核进程写成宏
                     success = true;
-                    sigSend(*it, a_sig, nullptr);
+                    sigSend(*it, a_sig);
                 }
             }
             return success ? statcode::ok : statcode::err;

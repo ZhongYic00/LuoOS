@@ -142,8 +142,8 @@ namespace signal{
     typedef ucontext UCtx;
 
     void sigInit();
-    void sigSend(Process &proc,int a_sig, shared_ptr<SigInfo> a_info);
-    void sigSend(Task &task,int a_sig, shared_ptr<SigInfo> a_info);
+    void sigSend(Process &proc,int a_sig, shared_ptr<SigInfo> a_info = nullptr);
+    void sigSend(Task &task,int a_sig, shared_ptr<SigInfo> a_info = nullptr);
     // inline SigMask sigset2bitset(SigSet set){return set.sig[0];}
     inline bool sigMaskBit(SigMask a_mask, int a_bit) { return a_mask & (1UL<<a_bit); }
     inline void sigMaskBitSet(SigMask &a_mask, int a_bit, bool a_set) { a_set ? a_mask|=(1UL<<a_bit) : a_mask&=~(1UL<<a_bit); }
