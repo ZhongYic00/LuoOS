@@ -7,13 +7,13 @@
 namespace fat {
     using BlockBuf = struct bio::BlockBuf;
     using fs::File;
+    using fs::DEntry;
     class FileSystem;
     class DirEnt;
-    class DEntry;
 
     class SuperBlock:public fs::SuperBlock {
         private:
-            shared_ptr<DEntry> root;  //根目录
+            shared_ptr<fs::DEntry> root;  //根目录
             shared_ptr<fs::DEntry> mnt_point;  // 挂载点
             FileSystem *fsclass;
             bool valid;
@@ -202,14 +202,29 @@ namespace fat {
             ~INode() { nodRelse(); }
             inline INode& operator=(const INode& a_inode) { nodRelse(); inode_num = a_inode.inode_num; entry = a_inode.nodDup(); return *this; }
             inline INode& operator=(DirEnt *a_entry) { nodRelse(); inode_num = a_entry->first_clus; entry = nodDup(a_entry); return *this; }
-            inline void nodRemove() { nodPanic(); entry->entRemove(); }
+            inline void nodRemove() override { nodPanic(); entry->entRemove(); }
             inline int nodHardLink(INode *a_inode) { nodPanic(); return entry->entLink(a_inode->entry); }
-            inline int nodHardUnlink() { nodPanic(); return entry->entUnlink(); }
+            inline int nodHardUnlink() override { nodPanic(); return entry->entUnlink(); }
+            inline int entSymLink(string a_target) override { Log(error,"FAT32 does not support symlink\n"); return -EPERM; }
+            inline fs::INodeRef lookup(string a_dirname, uint *a_off = nullptr) override {
+                if(auto ptr=entry->entSearch(a_dirname,a_off))
+                    return make_shared<INode>(ptr);
+                return nullptr;
+            }
+            inline fs::INodeRef mknod(string a_name,int attr) override {
+                if(auto ptr=entry->entCreate(a_name,attr))
+                    return make_shared<INode>(ptr);
+                return nullptr;
+            }
+            inline bool isEmpty() override {return entry->isEmpty();}
+
+            inline int chMod(mode_t a_mode) { Log(error,"FAT32 does not support chmod\n"); return -EPERM; }
+            inline int chOwn(uid_t a_owner, gid_t a_group) { Log(error,"FAT32 does not support chown\n"); return -EPERM; }
             inline void nodTrunc() { nodPanic(); entry->entTrunc(); }
             inline int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) { nodPanic(); return entry->entRead(a_usrdst, a_dst, a_off, a_len); }
             inline int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) { nodPanic(); return entry->entWrite(a_usrsrc, a_src, a_off, a_len); }
             inline int readLink(char *a_buf, size_t a_bufsiz) { Log(error,"FAT32 does not support readlink\n"); return -EPERM; }
-            inline void setMntBlk(shared_ptr<fs::SuperBlock> a_spblk) { nodPanic(); entry->mntblk = a_spblk; }
+            
             inline void unInstall() { nodPanic(); entry->entRelse(); entry->spblk.reset(); entry->mntblk.reset(); entry = nullptr; }
             inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
             inline uint8 rDev() const { nodPanic(); return entry->spblk->rDev(); }
@@ -217,37 +232,6 @@ namespace fat {
             inline uint32 rINo() const { nodPanic(); return inode_num; }
             inline shared_ptr<fs::SuperBlock> getSpBlk() const { nodPanic(); return entry->mntblk==nullptr ? entry->spblk : entry->mntblk; }
             inline DirEnt *rawPtr() const { return nodDup(); }
-    };
-    class DEntry:public fs::DEntry {
-        private:
-            shared_ptr<INode> inode;
-            DirEnt *entry;
-            inline void dERelse() const { if(entry != nullptr) { entry->entRelse(); } }
-            inline void dEPanic() const { if(entry == nullptr) { panic("DEntry panic!\n"); } }
-        public:
-            DEntry():fs::DEntry(), inode(nullptr), entry(nullptr) {}
-            DEntry(const DEntry& a_dentry):fs::DEntry(), inode(a_dentry.inode), entry(a_dentry.inode->rawPtr()) {}
-            DEntry(shared_ptr<INode> a_inode):fs::DEntry(), inode(a_inode), entry(a_inode->rawPtr()) {}
-            DEntry(DirEnt *a_entry):fs::DEntry(), inode(make_shared<INode>(a_entry)), entry(inode->rawPtr()) {}
-            ~DEntry() { dERelse(); }
-            inline DEntry& operator=(const DEntry& a_dentry) { dERelse(); inode = a_dentry.inode; entry = a_dentry.inode->rawPtr(); return *this; }
-            inline DEntry& operator=(shared_ptr<INode> a_inode) { dERelse(); inode = a_inode; entry = a_inode->rawPtr(); return *this; }
-            inline DEntry& operator=(DirEnt *a_entry) { dERelse(); inode = make_shared<INode>(a_entry), entry = inode->rawPtr(); return *this; }
-            inline shared_ptr<fs::DEntry> entSearch(string a_dirname, uint *a_off = nullptr) { dEPanic(); DirEnt *ret = entry->entSearch(a_dirname, a_off); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
-            inline shared_ptr<fs::DEntry> entCreate(string a_name, int a_attr) { dEPanic(); DirEnt *ret = entry->entCreate(a_name, a_attr); return ret==nullptr ? nullptr : make_shared<DEntry>(ret); }
-            inline int entSymLink(string a_target) { Log(error,"FAT32 does not support symlink\n"); return -EPERM; }
-            inline void setMntPoint(const fs::FileSystem *a_fs) { dEPanic(); entry->mount_flag = true; inode->setMntBlk(a_fs->getSpBlk()); }
-            inline void clearMnt() { dEPanic(); entry->mount_flag = false; inode->setMntBlk(inode->rawPtr()->spblk); }
-            inline void unInstall() { dEPanic(); entry->entRelse(); entry = nullptr; inode->unInstall(); inode.reset(); }
-            inline int chMod(mode_t a_mode) { Log(error,"FAT32 does not support chmod\n"); return -EPERM; }
-            inline int chOwn(uid_t a_owner, gid_t a_group) { Log(error,"FAT32 does not support chown\n"); return -EPERM; }
-            inline const char *rName() const { dEPanic(); return entry->filename; }
-            inline shared_ptr<fs::DEntry> getParent() const { dEPanic(); return entry->parent==nullptr ? inode->getSpBlk()->getMntPoint() : make_shared<DEntry>(entry->parent); }
-            inline shared_ptr<fs::INode> getINode() const { return inode; }
-            inline bool isMntPoint() const { dEPanic(); return entry->mount_flag; }
-            inline bool isRoot() const { dEPanic(); return inode->rawPtr()->parent == nullptr; }
-            inline bool isEmpty() const { dEPanic(); return entry->isEmpty(); }
-            inline DirEnt *rawPtr() const { return inode==nullptr ? nullptr : inode->rawPtr(); }
     };
 }
 

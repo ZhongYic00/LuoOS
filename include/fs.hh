@@ -16,7 +16,10 @@ namespace fs{
     using pipe::Pipe;
     using klib::Segment;
     using memvec=eastl::vector<Segment<xlen_t>>;
+    template<typename T>
+    using Result=expected<T,xlen_t>;
 
+    class INode;
     class DEntry;
     class FileSystem;
     
@@ -56,6 +59,8 @@ namespace fs{
             virtual long rFreeFile() const = 0;  // 读空闲块允许的最大文件数量
             virtual long rNameLen() const = 0;  // 读最大文件名长度
     };
+    typedef shared_ptr<INode> INodeRef;
+    typedef shared_ptr<DEntry> DERef;
     class INode {
         public:
             weak_ptr<vm::VMO> vmo;
@@ -63,11 +68,18 @@ namespace fs{
             INode(const INode& a_inode) = default;
             virtual ~INode() = default;  // 需要保证脏数据落盘
             INode& operator=(const INode& a_inode) = default;
-            virtual void nodRemove() = 0;  // 删除该INode对应的磁盘文件内容
+
+            // directory ops
             // virtual int nodHardLink(shared_ptr<INode> a_inode);  // 硬链接，返回错误码，由pathHardLink识别各文件系统进行单独调用，不作为统一接口（参数类型不同）
             virtual int nodHardUnlink() = 0;  // 删除硬链接，返回错误码
-            // virtual int nodSoftLink(shared_ptr<INode> a_inode);  // @todo: 软链接，返回错误码
-            // virtual int nodSoftUnlink();  // @todo: 删除软链接，返回错误码
+            virtual INodeRef lookup(string a_dirname, uint *a_off = nullptr) = 0;
+            virtual INodeRef mknod(string a_name,int attr)=0;
+            virtual int entSymLink(string a_target)=0;
+
+            // file ops
+            virtual void nodRemove() = 0;  // 删除该INode对应的磁盘文件内容
+            virtual int chMod(mode_t a_mode) = 0;
+            virtual int chOwn(uid_t a_owner, gid_t a_group) = 0;
             virtual void nodTrunc() = 0;  // 清空该INode的元信息，并标志该INode为脏
             virtual int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) = 0;  // 从该文件的a_off偏移处开始，读取a_len字节的数据到a_dst处，返回实际读取的字节数
             virtual int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) = 0;  // 从a_src处开始，写入a_len字节的数据到该文件的a_off偏移处，返回实际写入的字节数
@@ -84,27 +96,30 @@ namespace fs{
             virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
             virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
             virtual uint32 rINo() const = 0;  // 返回该INode的ino
+            virtual bool isEmpty() = 0;
             virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该INode所属文件系统超级块的共享指针;
     };
     class DEntry {
+            shared_ptr<DEntry> parent;
+            shared_ptr<INode> nod;
+            string name;
+            unordered_map<string,weak_ptr<DEntry>> subs;
+            bool isMount;
         public:
             DEntry() = default;
-            DEntry(const DEntry& a_entry) = default;
-            virtual ~DEntry() = default;
-            DEntry& operator=(const DEntry& a_entry) = default;
-            virtual shared_ptr<DEntry> entSearch(string a_dirname, uint *a_off = nullptr) = 0;  // 在该目录项下(不包含子目录)搜索名为a_dirname的目录项，返回指向目标目录项的共享指针（找不到则返回nullptr）
-            virtual shared_ptr<DEntry> entCreate(string a_name, int a_attr) = 0;  // 在该目录项下以a_attr属性创建名为a_name的文件，返回指向该文件目录项的共享指针
-            virtual int entSymLink(string a_target) = 0;
-            virtual void setMntPoint(const FileSystem *a_fs) = 0;  // 设该目录项为a_fs文件系统的挂载点（不更新a_fs）
-            virtual void clearMnt() = 0;  // 清除该目录项的挂载点记录
-            virtual int chMod(mode_t a_mode) = 0;
-            virtual int chOwn(uid_t a_owner, gid_t a_group) = 0;
-            virtual const char *rName() const = 0;  // 返回该目录项的文件名
-            virtual shared_ptr<DEntry> getParent() const = 0;  // 返回指向该目录项父目录的共享指针
-            virtual shared_ptr<INode> getINode() const = 0;  // 返回指向该目录项对应INode的共享指针
-            virtual bool isMntPoint() const = 0;  // 返回该目录项是否为一个挂载点
-            virtual bool isEmpty() const = 0;  // 返回该目录项是否为空
-            virtual bool isRoot() const = 0;  // 返回该目录项是否为其所在文件系统的根目录
+            DEntry(const DEntry& a_entry) = delete;
+            DEntry& operator=(const DEntry& a_entry) = delete;
+            DEntry(DERef prnt,string name,INodeRef nod_):parent(prnt),nod(nod_){ assert(nod_.use_count()); }
+            Result<DERef> entSearch(DERef self,string a_dirname, uint *a_off = nullptr); // 在该目录项下(不包含子目录)搜索名为a_dirname的目录项，返回指向目标目录项的共享指针（找不到则返回nullptr）
+            Result<DERef> entCreate(DERef self,string a_name, int a_attr);  // 在该目录项下以a_attr属性创建名为a_name的文件，返回指向该文件目录项的共享指针
+            inline void setMntPoint() {isMount=true;}  // 设该目录项为a_fs文件系统的挂载点（不更新a_fs）
+            inline void clearMnt() {isMount=false;}  // 清除该目录项的挂载点记录
+            inline string rName() const {return name;}  // 返回该目录项的文件名
+            inline DERef getParent() {return parent;}  // 返回指向该目录项父目录的共享指针
+            inline INodeRef getINode() {return nod;}  // 返回指向该目录项对应INode的共享指针
+            inline bool isMntPoint() const {return isMount;}  // 返回该目录项是否为一个挂载点
+            /// @brief 返回该目录项是否为虚拟文件系统根目录
+            bool isRoot() const {return !parent;}
     };
     enum class FileOp:uint16_t { none=0,read=0x1,write=0x2,append=0x4, };
     union FileOps {
@@ -153,8 +168,8 @@ namespace fs{
         inline int readLink(char *a_buf, size_t a_bufsiz) { return obj.ep->getINode()->readLink(a_buf, a_bufsiz); }
         off_t lSeek(off_t a_offset, int a_whence);
         ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
-        inline int chMod(mode_t a_mode) { obj.ep->chMod(a_mode); }
-        inline int chOwn(uid_t a_owner, gid_t a_group) { return obj.ep->chOwn(a_owner, a_group); }
+        inline int chMod(mode_t a_mode) { obj.ep->getINode()->chMod(a_mode); }
+        inline int chOwn(uid_t a_owner, gid_t a_group) { return obj.ep->getINode()->chOwn(a_owner, a_group); }
     };
     class Path {
         private:
@@ -200,7 +215,7 @@ namespace fs{
         // public:
             DStat() = default;
             DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, STAT_MAX_NAME); }
-            DStat(shared_ptr<DEntry> a_entry):d_ino(a_entry->getINode()->rINo()), d_off(0), d_reclen(a_entry->getINode()->rFileSize()), d_type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry->rName(), STAT_MAX_NAME); }
+            DStat(shared_ptr<DEntry> a_entry):d_ino(a_entry->getINode()->rINo()), d_off(0), d_reclen(a_entry->getINode()->rFileSize()), d_type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry->rName().c_str(), STAT_MAX_NAME); }
             ~DStat() = default;
 	};
 	class Stat {
@@ -212,7 +227,7 @@ namespace fs{
         // public:
             Stat() = default;
             Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
-            Stat(shared_ptr<DEntry> a_entry):name(), dev(a_entry->getINode()->rDev()), type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry->getINode()->rFileSize()) { strncpy(name, a_entry->rName(), STAT_MAX_NAME); }
+            Stat(shared_ptr<DEntry> a_entry):name(), dev(a_entry->getINode()->rDev()), type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry->getINode()->rFileSize()) { strncpy(name, a_entry->rName().c_str(), STAT_MAX_NAME); }
             ~Stat() = default;
 	};
 	class KStat {

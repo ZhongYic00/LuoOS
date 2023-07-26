@@ -165,7 +165,7 @@ extern void _strapexit();
 
 FORCEDINLINE
 xlen_t irqStackOf(int hart){return kInfo.segments.kstack.first+hart*0x1000+0x1000;}
-
+namespace fs{extern list<shared_ptr<vm::VMO>> vmolru;}
 void init(int hartid){
     puts=IO::_sbiputs;
     puts("\n\n>>>Hello LuoOS<<<\n\n");
@@ -233,6 +233,8 @@ void init(int hartid){
         lock_guard<spinlock<>> guard(spin);
         printf("lock acquired! %d\n",hartid);
     }
+    
+    new (&fs::vmolru) list<shared_ptr<vm::VMO>>();
     assert(hartid==1||hartid==0);
     if(hartid == 0){
         timerInit();
