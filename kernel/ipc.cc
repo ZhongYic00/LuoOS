@@ -40,7 +40,12 @@ namespace signal
         //     // @todo: 如何处理？
         // }
     }
-    static void sigDumpHandler() { Log(error, "unimplemented: core dump\n"); }
+    static void sigDumpHandler(int a_sig) {
+        auto curproc = kHartObj().curtask->getProcess();
+        Log(error, "core dump, caused by proc %d, sig %d", curproc->pid(), a_sig);
+        sigSend(*curproc->parentProc(), SIGCHLD);
+        sigExitHandler(a_sig);
+    }
     
     void sigInit() { defaultSigAct = make_shared<SigAct>(); }
     void sigSend(Process &a_proc,int a_sig, shared_ptr<SigInfo> a_info) {
@@ -130,6 +135,7 @@ namespace signal
         if(sa->sa_handler == SIG_ERR) { sigExitHandler(signum); return; }
         if(sa->sa_handler == SIG_DFL) {
             switch (signum) {
+                // 终止当前进程
                 case SIGHUP:
                 case SIGINT:
                 case SIGKILL:
@@ -141,11 +147,46 @@ namespace signal
                 case SIGPOLL:
                 case SIGPROF:
                 case SIGVTALRM:
+                // @todo: 实时信号处理不完全
+                case SIGRTMIN:
+                case SIGRTMIN+1:
+                case SIGRTMIN+2:
+                case SIGRTMIN+3:
+                case SIGRTMIN+4:
+                case SIGRTMIN+5:
+                case SIGRTMIN+6:
+                case SIGRTMIN+7:
+                case SIGRTMIN+8:
+                case SIGRTMIN+9:
+                case SIGRTMIN+10:
+                case SIGRTMIN+11:
+                case SIGRTMIN+12:
+                case SIGRTMIN+13:
+                case SIGRTMIN+14:
+                case SIGRTMIN+15:
+                case SIGRTMAX-14:
+                case SIGRTMAX-13:
+                case SIGRTMAX-12:
+                case SIGRTMAX-11:
+                case SIGRTMAX-10:
+                case SIGRTMAX-9:
+                case SIGRTMAX-8:
+                case SIGRTMAX-7:
+                case SIGRTMAX-6:
+                case SIGRTMAX-5:
+                case SIGRTMAX-4:
+                case SIGRTMAX-3:
+                case SIGRTMAX-2:
+                case SIGRTMAX-1:
+                case SIGRTMAX:
                     sigExitHandler(signum);
                     break;
+                // 忽略
                 case SIGCHLD:
                 case SIGURG:
+                case SIGPWR:
                     break;
+                // 核心转储
                 case SIGQUIT:
                 case SIGILL:
                 case SIGABRT:
@@ -156,18 +197,20 @@ namespace signal
                 case SIGTRAP:
                 case SIGXCPU:
                 case SIGXFSZ:
-                    sigDumpHandler();
-                    sigExitHandler(signum);
+                    sigDumpHandler(signum);
                     break;
+                // 阻塞
                 case SIGSTOP:
                 case SIGTSTP:
                 case SIGTTIN:
                 case SIGTTOU:
                     sigStopHandler();
                     break;
+                // 恢复
                 case SIGCONT:
                     sigContHandler();
                     break;
+                // @todo: 其它系统调用
                 default:
                     Log(error, "unimplemented default signal handler: %d\n", signum);
                     sigExitHandler(signum);
@@ -179,7 +222,10 @@ namespace signal
         uintptr_t sigstack = ctx.sp();
         // 启用备用信号堆栈（如果需要）
         bool switch_stack = (sa->sa_flags&SA_ONSTACK) && !cur->onSigStack();
-        if(switch_stack) { sigstack = (uintptr_t)cur->sigstack.ss_sp; }
+        if(switch_stack) {
+            sigstack = (uintptr_t)cur->sigstack.ss_sp;
+            Log(error, "SigAltStack enabled at 0x%lx", sigstack);
+        }  // @todo: 如果事先未设置sigaltstack，则行为未定义
         else {  // 默认堆栈
             sigstack &= ~0xf;  // 对齐
             sigstack -= 0x80;  // red zone
@@ -199,9 +245,9 @@ namespace signal
         // for (size_t i = 1; i < NGREG; i++) context->gregs[i] = ctx->gpr[i];
         memmove((void*)(((xlen_t)&(ksigctx.sc_regs))+sizeof(xlen_t)), (void*)ctx.gpr, sizeof(ctx.gpr));
         // context->gregs[0] = ctx->sepc;
-        ksigctx.sc_regs.pc = ctx.pc;
+        ksigctx.sc_regs.pc = ctx.pc;  // pret_code
         curproc->vmar.copyout((xlen_t)context, ByteArray((uint8*)&ksigctx, sizeof(SigCtx)));
-        // 设置UCtx
+        // 设置UCtx（意义不明）
         SigInfo *info = nullptr;
         UCtx *ucontext = nullptr;
         if (sa->sa_flags & SA_SIGINFO) {
@@ -225,14 +271,17 @@ namespace signal
             ucontext = reinterpret_cast<UCtx*>(sigstack);
             UCtx kuctx;
             kuctx.uc_flags = 0;
-            kuctx.uc_link = nullptr;  // @todo: uc_link
+            kuctx.uc_link = nullptr; 
             // FIXME: Is user stack size limited to LARGE_PAGE_SIZE ?
             // FIXME: Alt stack size ?
             // ucontext->uc_stack = SigStack { reinterpret_cast<void *>(sigstack), 0, cur->sigstack.ss_onstack ? sigstack-(reinterpret_cast<uintptr_t>(cur->sigstack.ss_sp)-vm::pageSize) : cur->kernel_sp - (USER_STACK - LARGE_PAGE_SIZE) };
-            kuctx.uc_stack = switch_stack ? cur->sigstack : SigStack({ nullptr, 0, sigStackSiz });
-            kuctx.uc_stack.ss_sp = reinterpret_cast<void*>(sigstack);
+            kuctx.uc_stack = switch_stack ? cur->sigstack : SigStack({ (void*)signal_stack_base, 0, sigStackSiz });
+            // kuctx.uc_stack.ss_sp = reinterpret_cast<void*>(sigstack); ？？
             kuctx.uc_sigmask.sig[0] = cur->sigmask;
-            Log(error, "unimplemented: siginfos.ucontext.uc_context\n");  // @todo: uc_context
+            // Log(error, "unimplemented: siginfos.ucontext.uc_context\n");
+            memmove((void*)(((xlen_t)&(kuctx.uc_mcontext.sc_regs))+sizeof(xlen_t)), (void*)ctx.gpr, sizeof(ctx.gpr));
+            kuctx.uc_mcontext.sc_regs.pc = ctx.pc;  // pret_code
+            curproc->vmar.copyout((xlen_t)ucontext, ByteArray((uint8*)&kuctx, sizeof(UCtx)));
         }
         else {
             if (cur->siginfos[signum-1] != nullptr) { cur->siginfos[signum-1].reset(); }
@@ -246,6 +295,7 @@ namespace signal
         // 切换信号处理上下文
         if(sa->sa_restorer != nullptr) { ctx.x(REG_RA) = reinterpret_cast<long>(sa->sa_restorer); }  // @todo: 设置了SA_SIGINFO时restorer发生改变
         // else { ctx.x(REG_RA) = VSDO_ADDR | ((uintptr_t)__sigreturn & 0xfff); }  // @todo: VSDO
+        else { panic("unimplemented: VSDO"); }
         ctx.x(REG_SP) = sigstack;
         ctx.x(REG_A0) = signum;
         if(sa->sa_flags & SA_SIGINFO) {

@@ -145,9 +145,9 @@ namespace proc
         stack<KContext> kctxs;
         const pid_t proc;
         Priv lastpriv;
-        SigMask sigmask, sigpending;
-        shared_ptr<SigInfo> siginfos[numSigs];
-        SigStack sigstack;
+        SigMask sigmask = 0, sigpending = 0;
+        shared_ptr<SigInfo> siginfos[numSigs] = { nullptr };
+        SigStack sigstack = {};
         inline bool onSigStack() { return ctx.sp()-(xlen_t)sigstack.ss_sp < sigstack.ss_size; }
         // void accept();
         Process *getProcess();
