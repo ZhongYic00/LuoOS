@@ -61,7 +61,7 @@ namespace vm
     };
 
     constexpr xlen_t pageShift=12;
-    constexpr xlen_t pageSize=1L<<pageShift;
+    constexpr xlen_t pageSize=1UL<<pageShift;
     constexpr xlen_t pageEntriesPerPage=pageSize/sizeof(PageTableEntry);
     constexpr xlen_t vpnMask=0x1ff;
     constexpr xlen_t vaddrOffsetMask=pageSize-1;

@@ -30,9 +30,9 @@ namespace syscall {
     using signal::SigSet;
     using signal::SigInfo;
     using signal::sigSend;
-    using signal::doSigAction;
-    using signal::doSigProcMask;
-    using signal::doSigReturn;
+    // using signal::sigAction;
+    // using signal::sigProcMask;
+    // using signal::sigReturn;
     using resource::RLim;
     using resource::RSrc;
     // 前向引用
@@ -542,14 +542,15 @@ namespace syscall {
         shared_ptr<File> infile = curproc->ofile(a_infd);
         if(outfile==nullptr || infile==nullptr) { return -EBADF; }
         off_t *offset = nullptr;
-        ByteArray offsetarr(sizeof(off_t));
+        ssize_t ret = statcode::err;
         if(a_offset != nullptr) {
-            offsetarr = curproc->vmar.copyin((xlen_t)a_offset, sizeof(off_t));
+            ByteArray offsetarr = curproc->vmar.copyin((xlen_t)a_offset, sizeof(off_t));
             offset = (off_t*)offsetarr.buff;
+            ret = infile->sendFile(outfile, offset, a_len);
+            curproc->vmar.copyout((xlen_t)a_offset, offsetarr);
         }
+        else { ret = infile->sendFile(outfile, offset, a_len); }
 
-        ssize_t ret = infile->sendFile(outfile, offset, a_len);
-        if(a_offset != nullptr) { curproc->vmar.copyout((xlen_t)a_offset, offsetarr); }
         return ret;
     }
     xlen_t readLinkAt() {
@@ -656,10 +657,9 @@ namespace syscall {
         if(a_pid < -1) { a_pid = -a_pid; } // FIXME: process group
         if(a_pid > 0) {
             auto proc = (**kGlobObjs->procMgr)[a_pid];
-            if(proc == nullptr) { statcode::err; }
-            if(a_sig == 0) { statcode::ok; }
-            unique_ptr<SigInfo> tmp(nullptr);
-            sigSend(*proc, a_sig, tmp);
+            if(proc == nullptr) { return statcode::err; }
+            if(a_sig == 0) { return statcode::ok; }
+            sigSend(*proc, a_sig, nullptr);
             return statcode::ok;
         }
         if(a_pid == -1) {
@@ -671,8 +671,7 @@ namespace syscall {
                 auto it = procs[i];
                 if (it->pid() != 1) {
                     success = true;
-                    unique_ptr<SigInfo> tmp(nullptr);
-                    sigSend(*it, a_sig, tmp);
+                    sigSend(*it, a_sig, nullptr);
                 }
             }
             return success ? statcode::ok : statcode::err;
@@ -689,18 +688,19 @@ namespace syscall {
         SigAct *a_oact = (SigAct*)ctx.x(12);
         
         auto curproc = kHartObj().curtask->getProcess();
-        ByteArray nactarr(sizeof(SigAct));
-        SigAct *nact = nullptr;
-        if(a_nact != nullptr ) {
-            nactarr = curproc->vmar.copyin((xlen_t)a_nact, nactarr.len);
-            nact = (SigAct*)nactarr.buff;
-        }
         ByteArray oactarr(sizeof(SigAct));
         SigAct *oact = (SigAct*)oactarr.buff;
         if(a_oact == nullptr) { oact = nullptr; }
-
-        int ret = doSigAction(a_sig, nact, oact);
+        SigAct *nact = nullptr;
+        int ret = statcode::err;
+        if(a_nact != nullptr ) {
+            ByteArray nactarr = curproc->vmar.copyin((xlen_t)a_nact, sizeof(SigAct));
+            nact = (SigAct*)nactarr.buff;
+            ret = signal::sigAction(a_sig, nact, oact);
+        }
+        else { ret = signal::sigAction(a_sig, nact, oact); }
         if(ret==0 && a_oact!=nullptr) { curproc->vmar.copyout((xlen_t)a_oact, oactarr); }
+
         return ret;
     }
     xlen_t sigProcMask() {
@@ -717,12 +717,13 @@ namespace syscall {
         SigSet *oset = (SigSet*)osetarr.buff;
         if(a_oset == nullptr) { oset = nullptr; }
 
-        int ret = doSigProcMask(a_how, nset, oset, a_sigsetsize);
+        int ret = signal::sigProcMask(a_how, nset, oset, a_sigsetsize);
         if(ret==0 && oset!=nullptr) { curproc->vmar.copyout((xlen_t)a_oset, osetarr); }
         return ret;
     }
     xlen_t sigReturn() {
-        return doSigReturn();
+        // should never be called
+        return signal::sigReturn();
     }
     xlen_t times(void) {
         auto &ctx = kHartObj().curtask->ctx;

@@ -168,7 +168,7 @@ pid_t proc::clone(Task *task){
 }
 
 Process::Process(const Process &other,pid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd){
-    for(int i=0;i<MaxOpenFile;i++)files[i]=other.files[i];
+    for(int i=0;i<mOFiles;i++)files[i]=other.files[i];
 }
 void Process::exit(int status){
     Log(info,"Proc[%d] exit(%d)",pid(),status);
@@ -202,7 +202,7 @@ shared_ptr<File> Process::ofile(int a_fd) {
 }
 int Process::fdAlloc(shared_ptr<File> a_file, int a_fd, bool a_appoint) {
     if(!a_appoint) {  // 在不小于a_fd的文件描述符中分配一个
-        for(int fd = (a_fd<0 ? 0 : a_fd); fd < MaxOpenFile; ++fd) {
+        for(int fd = (a_fd<0 ? 0 : a_fd); fd < mOFiles; ++fd) {
             if(files[fd] == nullptr) {
                 files[fd] = a_file;
                 return fd;
@@ -228,46 +228,46 @@ int Process::setRLimit(int a_rsrc, const RLim *a_rlim) {
     return 0;
 }
 
-void Task::accept(){
-    int sig=(sigpendings&~sigmasks).find_first();
-    if(sig==sigpendings.kSize)return ;
-    sigpendings[sig]=0;
-    auto info=std::move(siginfos[sig]);
-    /// @todo default kill handler
-    if(sig==SIGKILL) return ;
-    /// @todo default stop handler
-    if(sig==SIGSTOP) return ;
-    auto action=getProcess()->sigacts[sig];
-    if(action.sa_handler==SIG_ERR);
-    if(action.sa_handler==SIG_DFL);
-    if(action.sa_handler==SIG_IGN) return ;
-    xlen_t SigStack;
-    /// @todo setup signal stack
+// void Task::accept(){
+//     int sig=(sigpending&~sigmask).find_first();
+//     if(sig==sigpending.kSize)return ;
+//     sigpending[sig]=0;
+//     auto info=std::move(siginfos[sig]);
+//     /// @todo default kill handler
+//     if(sig==SIGKILL) return ;
+//     /// @todo default stop handler
+//     if(sig==SIGSTOP) return ;
+//     auto action=getProcess()->sigacts[sig];
+//     if(action.sa_handler==SIG_ERR);
+//     if(action.sa_handler==SIG_DFL);
+//     if(action.sa_handler==SIG_IGN) return ;
+//     xlen_t SigStack;
+//     /// @todo setup signal stack
 
-    if(!action.sa_flags&SA_NODEFER){
-        // prevent nested same signal
-        sigmasks[sig]=1;
-    }
-    sigmasks|=sigset2bitset(action.sa_mask);
+//     if(!action.sa_flags&SA_NODEFER){
+//         // prevent nested same signal
+//         sigmask[sig]=1;
+//     }
+//     sigmask|=sigset2bitset(action.sa_mask);
 
-    /// @todo put context
+//     /// @todo put context
 
-    // handle 
-    if(action.sa_flags&SA_SIGINFO){
-        /// @todo put siginfo
+//     // handle 
+//     if(action.sa_flags&SA_SIGINFO){
+//         /// @todo put siginfo
 
-        /// @todo put ucontext
-    }
-#ifdef SA_RESTORER
-    if(action.sa_restorer){
-        ctx.ra()=reinterpret_cast<xlen_t>(action.sa_restorer);
-    } else {
-        /// @todo vDSO sigreturn wrapper
-    }
-#endif
-    // setup args
-    ctx.a0()=sig;
-    if(action.sa_flags&SA_SIGINFO){
-        // args: sig, info, ucontext
-    } else ;// only signum arg
-}
+//         /// @todo put ucontext
+//     }
+// #ifdef SA_RESTORER
+//     if(action.sa_restorer){
+//         ctx.ra()=reinterpret_cast<xlen_t>(action.sa_restorer);
+//     } else {
+//         /// @todo vDSO sigreturn wrapper
+//     }
+// #endif
+//     // setup args
+//     ctx.a0()=sig;
+//     if(action.sa_flags&SA_SIGINFO){
+//         // args: sig, info, ucontext
+//     } else ;// only signum arg
+// }
