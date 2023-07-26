@@ -22,11 +22,6 @@ namespace fs{
     class INode;
     class DEntry;
     class FileSystem;
-    
-    constexpr int F_OK = 0x000;
-    constexpr int X_OK = 0x001;
-    constexpr int W_OK = 0x010;
-    constexpr int R_OK = 0x100;
 
     class SuperBlock {
         public:
@@ -106,7 +101,7 @@ namespace fs{
             unordered_map<string,weak_ptr<DEntry>> subs;
             bool isMount;
         public:
-            DEntry() = default;
+            DEntry() = delete;
             DEntry(const DEntry& a_entry) = delete;
             DEntry& operator=(const DEntry& a_entry) = delete;
             DEntry(DERef prnt,string name,INodeRef nod_):parent(prnt),nod(nod_){ assert(nod_.use_count()); }

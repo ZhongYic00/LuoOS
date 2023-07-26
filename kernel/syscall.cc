@@ -3,11 +3,12 @@
 #include "fs.hh"
 #include "ld.hh"
 #include "sbi.hh"
-#include "linux/reboot.h"
-#include "thirdparty/expected.hpp"
-#include <EASTL/chrono.h>
 #include "bio.hh"
 #include "vm/vmo.hh"
+#include "thirdparty/expected.hpp"
+#include <EASTL/chrono.h>
+#include <linux/reboot.h>
+#include <linux/unistd.h>
 using nonstd::expected;
 
 #define moduleLevel LogLevel::info
@@ -314,11 +315,6 @@ namespace syscall {
         int a_mode = ctx.x(12);
         int a_flags = ctx.x(13);
         if(a_path == nullptr) { return -EFAULT; }
-
-        using fs::F_OK;
-        using fs::R_OK;
-        using fs::W_OK;
-        using fs::X_OK;
 
         int flags = 0;
         if ((a_mode & (R_OK | X_OK)) && (a_mode & W_OK)) { flags = O_RDWR; }
