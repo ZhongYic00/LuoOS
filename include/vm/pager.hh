@@ -9,15 +9,20 @@ namespace vm
     class VnodePager:public Pager{
         Arc<fs::INode> vnode;
         eastl::unordered_map<PageNum,PBufRef> pages;
+        xlen_t reloadcount;
     public:
-        VnodePager(Arc<fs::INode> vnode):vnode(vnode){}
+        VnodePager(Arc<fs::INode> vnode):vnode(vnode),reloadcount(0){}
         void loadTo(PageNum offset,PBufRef pbuf) override{
-            vnode->readPages(fs::memvec{Segment{offset,offset}},fs::memvec{Segment{pbuf->ppn,pbuf->ppn}});
+            ++reloadcount;
+            if(!pages.count(offset))
+                load(offset);
+            pbuf->fillwith(*pages[offset]);
         }
         PBufRef load(PageNum offset) override{
             if(!pages.count(offset)){
-                auto pbuf=pages[offset]=make_shared<PageBuf>(PageKey{.dev={0,(uint32_t)offset}});
-                loadTo(offset,pbuf);
+                auto pbuf=make_shared<PageBuf>(PageKey{.dev={0,(uint32_t)offset}});
+                vnode->readPages(fs::memvec{Segment{offset,offset}},fs::memvec{Segment{pbuf->ppn,pbuf->ppn}});
+                pages[offset]=pbuf;
             }
             return pages[offset];
         }

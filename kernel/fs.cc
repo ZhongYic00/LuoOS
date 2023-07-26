@@ -219,13 +219,16 @@ shared_ptr<DEntry> Path::pathSearch(bool a_parent) {
     // else if(pathname[0] == '/') { entry = mnt_table["/"]->getSpBlk()->getRoot(); }  // 绝对路径
     else { entry = base; }  // 相对路径
     for(int i = 0; i < dirnum; ++i) {
-        while(entry->isMntPoint()) { entry = entry->getINode()->getSpBlk()->getRoot(); }
+        while(entry->isMntPoint()) panic("should be processed above");
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
         if (a_parent && i == dirnum-1) { return entry; }
         if(dirname[i] == ".") { next = entry; }
         else if(dirname[i] == "..") { next = entry->getParent(); }
-        else { next = entry->entSearch(dirname[i]); }
-        if (next == nullptr) { return nullptr; }
+        else {
+            if(auto sub=entry->entSearch(entry,dirname[i]))
+                next=sub.value();
+            else return nullptr;
+        }
         entry = next;
     }
     return entry;
@@ -239,15 +242,16 @@ shared_ptr<DEntry> Path::pathCreate(short a_type, int a_mode) {  // @todo 改成
     if (a_type == T_DIR) { a_mode = ATTR_DIRECTORY; }
     else if (a_mode & O_RDONLY) { a_mode = ATTR_READ_ONLY; }
     else { a_mode = 0; }
-    shared_ptr<DEntry> ep = dp->entCreate(dirname.back(), a_mode);
-    if (ep == nullptr) { return nullptr; }
-    if ((a_type==T_DIR && !(ep->getINode()->rAttr()&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->getINode()->rAttr()&ATTR_DIRECTORY))) { return nullptr; }
-    return ep;
+    if(auto rt = dp->entCreate(dp,dirname.back(), a_mode)){
+        auto ep=rt.value();
+        if ((a_type==T_DIR && !(ep->getINode()->rAttr()&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->getINode()->rAttr()&ATTR_DIRECTORY))) { return nullptr; }
+        return ep;
+    } else return nullptr;
 }
 int Path::pathRemove() {
     shared_ptr<DEntry> ep = pathSearch();
     if(ep == nullptr) { return -1; }
-    if((ep->getINode()->rAttr() & ATTR_DIRECTORY) && !ep->isEmpty()) { return -1; }
+    if((ep->getINode()->rAttr() & ATTR_DIRECTORY) && !ep->getINode()->isEmpty()) { return -1; }
     ep->getINode()->nodRemove();
     return 0;
 }
@@ -369,7 +373,7 @@ int Path::pathSymLink(string a_target) {
         Log(error, "parent not dir\n");
         return -1;
     }
-    return entry->entSymLink(a_target);
+    return entry->getINode()->entSymLink(a_target);
 }
 int fs::rootFSInit() {
     new ((void*)&mnt_table) unordered_map<string, shared_ptr<FileSystem>>();
@@ -399,11 +403,36 @@ namespace fs
         return readv(src1,dst1);
     }
 
+    Result<DERef> DEntry::entSearch(DERef self,string a_dirname, uint *a_off){
+        if(auto it=subs.find(a_dirname); it!=subs.end() && !it->second.expired())
+            return it->second.lock();
+        if(auto subnod=nod->lookup(a_dirname,a_off)){
+            auto sub=make_shared<DEntry>(self,a_dirname,subnod);
+            subs[a_dirname]=weak_ptr<DEntry>(sub);
+            return sub;
+        }
+        return make_unexpected(-1);
+    }
+    Result<DERef> DEntry::entCreate(DERef self,string a_name, int a_attr){
+        if(auto it=subs.find(a_name); it!=subs.end())
+            return make_unexpected(-1);
+        if(auto subnod=nod->mknod(a_name,a_attr)){
+            auto sub=make_shared<DEntry>(self,a_name,subnod);
+            subs[a_name]=weak_ptr<DEntry>(sub);
+            return sub;
+        }
+        return make_unexpected(-1);
+    }
+
+list<shared_ptr<vm::VMO>> vmolru;
+
     shared_ptr<vm::VMO> File::vmo(){
         auto vnode=obj.ep->getINode();
         if(vnode->vmo.expired()){
             auto rt=make_shared<vm::VMOPaged>(vm::bytes2pages(vnode->rFileSize()),eastl::dynamic_pointer_cast<vm::Pager>(make_shared<vm::VnodePager>(vnode)));
             vnode->vmo=eastl::weak_ptr<vm::VMOPaged>(rt);
+            if(vmolru.size()>10)vmolru.pop_front();
+            vmolru.push_back(rt);
             return rt;
         }
         return vnode->vmo.lock();

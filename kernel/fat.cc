@@ -7,7 +7,7 @@ using fs::File;
 
 static struct entry_cache { DirEnt entries[ENTRY_CACHE_NUM]; } ecache; // 目录缓冲区
 static int bufCopyOut(int user_dst, uint64 dst, void *src, uint64 len) {
-    if(user_dst) { kHartObj().curtask->getProcess()->vmar.copyout(dst, ByteArray((uint8_t*)src, len)); }
+    if(user_dst) { kHartObj().curtask->getProcess()->vmar.copyout(dst, klib::ByteArray((uint8_t*)src, len)); }
     else { memmove((void*)dst, src, len); }
     return 0;
 }
@@ -650,10 +650,10 @@ int SuperBlock::fatWrite(uint32 a_cluster, uint32 a_content) const {
 }
 inline fs::FileSystem *SuperBlock::getFS() const { return fsclass; }
 inline shared_ptr<fs::DEntry> SuperBlock::getRoot() const { return root; }
-inline DirEnt *SuperBlock::getFATRoot() const { return root->rawPtr(); }
+inline DirEnt *SuperBlock::getFATRoot() const { return eastl::dynamic_pointer_cast<INode>(root->getINode())->rawPtr(); }
 void SuperBlock::unInstall() {
     valid = false;
-    root->unInstall();
+    /// @bug dirent needs futher reset
     root.reset();
     mnt_point->clearMnt();
     mnt_point.reset();
@@ -667,14 +667,14 @@ int FileSystem::ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) {
     }
     DirEnt *fatroot = eCacheAlloc();
     *fatroot = DirEnt("/", ATTR_DIRECTORY|ATTR_SYSTEM, 0, nullptr, fatroot->next, fatroot->prev);
-    shared_ptr<DEntry> fsroot = make_shared<DEntry>(fatroot);
+    shared_ptr<DEntry> fsroot = make_shared<DEntry>(nullptr,"/",make_shared<INode>(fatroot));
     {  // eliminate lifecycle
         auto buf = bcache[{ a_dev, 0 }];
         fatroot->spblk = spblk = make_shared<SuperBlock>(fsroot, a_mnt==nullptr ? fsroot : a_mnt, this, a_dev, *buf);
     }
     if (BlockBuf::blockSize != spblk->rBPS()) { panic("byts_per_sec != BlockBuf::blockSize"); }
     fatroot->first_clus = fatroot->cur_clus = spblk->rRC();
-    if(a_mnt != nullptr) { a_mnt->setMntPoint(this); }
+    if(a_mnt != nullptr) { a_mnt->setMntPoint(); }
     return 0;
 }
 void FileSystem::unInstall() {
