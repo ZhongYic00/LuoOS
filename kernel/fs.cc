@@ -118,11 +118,12 @@ ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len
     ssize_t nsend = 0;
     while (a_len > 0) {
         ssize_t rem = (ssize_t)(a_len > pageSize ? pageSize : a_len);
-        auto buf_=new uint8_t[rem];
+        auto buf_=(uint8_t*)vm::pn2addr(kGlobObjs->pageMgr->alloc(1));
         ByteArray buf(buf_,rem);
         rem=read(buf);  // @todo: 安全检查
+        if(rem==0) break;
         int ret = a_outfile->write(ByteArray(buf_,rem));
-        delete[] buf_;
+        kGlobObjs->pageMgr->free(vm::addr2pn((xlen_t)buf_),0);
         if (ret < 0) { return ret; }
         nsend += ret;
         if (rem != ret) { break; } // EOF reached in in_fd or out_fd is full
