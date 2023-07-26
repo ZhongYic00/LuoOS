@@ -30,7 +30,7 @@ namespace vm
         // }
         inline Arc<VMO> clone() const override{
             auto rt=make_shared<VMOPaged>(*this);
-            rt->pager=make_shared<SwapPager>(pager);
+            rt->pager=make_shared<SwapPager>(pager,Segment{0,pn2addr(len())});
             return rt;
         }
     };

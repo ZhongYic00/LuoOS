@@ -101,10 +101,16 @@ void PageMgr::freeUnaligned(PageNum ppn,PageNum pages){
     }
 }
 PageMgr::~PageMgr(){ delete[] buddyNodes; }
-
+xlen_t pagesAllocated,pagesFreed;
 PageNum PageMgr::alloc(size_t pages){
     int rounded=klib::log2up(pages)+1; //biased size
-    if(buddyNodes[0]<rounded) return 0;
+    if(buddyNodes[0]<rounded) {
+        Log(error,"cannot alloc any more page!");
+        panic("");
+        return 0;
+    }
+    pagesAllocated+=1<<(rounded-1);
+    
     xlen_t node=0;
     for(xlen_t nd=0,size=rootOrder+1;rounded<=size;size-=1){ // find suitable node; size is biased size
         Log(trace,"nd=%ld(%d) ",nd,buddyNodes[nd]);
@@ -130,12 +136,14 @@ PageNum PageMgr::alloc(size_t pages){
     PageNum ppn=start+(node+1-(1l<<(rootOrder+1-rounded)))*(1l<<(rounded-1));//((node+1)*rounded-(1l<<rootOrder));
     Log(debug,"node=0x%x ppn=0x%x\n",node,ppn);
     assert(ppn<end);
+    assert(ppn>0);
     return ppn;
 }
 void PageMgr::free(PageNum ppn,int order){
+    pagesFreed+=1<<order;
     int idx=pos2node(ppn-start,order);
     DBG(Log(debug,"PageMgr::free(ppn=%x pos=%ld order=%d) idx=0x%lx\n",ppn,ppn-start,order,idx);)
-    // xlen_t idx=ppn-start+(1l<<rootOrder);
+    assert(buddyNodes[idx]==0);
     buddyNodes[idx]=++order;
     for(idx=prnt(idx);idx>0;idx=prnt(idx),order++){
         buddyNodes[idx]=(buddyNodes[lsub(idx)]==buddyNodes[rsub(idx)]&&buddyNodes[lsub(idx)]==order)?buddyNodes[lsub(idx)]+1:klib::max(buddyNodes[lsub(idx)],buddyNodes[rsub(idx)]); // the free'd leaf node ensures lsub or rsub being not null

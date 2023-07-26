@@ -71,8 +71,7 @@ xlen_t Process::brk(xlen_t addr){
             destop=bytes2pages(addr),
             pages=destop-curtop;
         Log(info,"curtop=%x,destop=%x, needs to alloc %d pages",curtop,destop,pages);
-        auto pager=make_shared<SwapPager>(nullptr);
-        pager->backingregion={0x0,pn2addr(pages)};
+        auto pager=make_shared<SwapPager>(nullptr,Segment{0x0,pn2addr(pages)});
         auto vmo=make_shared<VMOPaged>(pages,pager);
         using perm=PageTableEntry::fieldMasks;
         vmar.map(PageMapping{curtop,pages,0,vmo,perm::r|perm::w|perm::x|perm::u|perm::v,PageMapping::MappingType::anon,PageMapping::SharingType::privt});

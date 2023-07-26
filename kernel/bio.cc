@@ -20,7 +20,7 @@
 // #include "disk.h"
 #include "virtio.hh"
 #include "alloc.hh"
-// #include "include/proc.h"
+#include "kernel.hh"
 #include "klib.h"
 #include <EASTL/bonus/lru_cache.h>
 #include "bio.hh"
@@ -46,6 +46,7 @@ void bio::init(void)
     new ((ptr_t)&freecache.sema) semaphore::Semaphore(bio::BCacheMgr::defaultSize);
 }
 
+xlen_t bufsCreated,bufsDestructed;
 // Look through buffer cache for block on device dev.
 // If not found, allocate a buffer.
 // In either case, return locked buffer.
@@ -53,6 +54,16 @@ namespace bio{
     void BlockBuf::reload(){
         /// @todo should use devmgr, <blockdev>(devmgr[dev]).read(sec)
         virtio_disk_rw(*this,0);
+    }
+    BlockBuf::BlockBuf(const BlockKey& key_):key(key_),d(reinterpret_cast<uint8_t*>(vm::pn2addr(kGlobObjs->pageMgr->alloc(1)))){
+        ++bufsCreated;
+        reload();
+    }
+    BlockBuf::~BlockBuf(){
+        ++bufsDestructed;
+        flush();
+        // delete reinterpret_cast<AlignedBytes<>*>(d);
+        kGlobObjs->pageMgr->free(vm::addr2pn((xlen_t)d),0);
     }
     void BlockBuf::flush(){
         Log(debug,"blockbuf flush");
