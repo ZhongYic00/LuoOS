@@ -499,9 +499,11 @@ namespace syscall {
         xlen_t uva = ctx.x(11), len = ctx.x(12);
         auto file = kHartObj().curtask->getProcess()->ofile(fd);
         if(file == nullptr) { return -EBADF; }
-        auto bytes = file->read(len);
-        kHartObj().curtask->getProcess()->vmar[uva] << bytes;
-        return bytes.len;
+        auto buf_=new uint8_t[len];
+        ByteArray buf(buf_,len);
+        auto rdbytes=file->read(buf);
+        kHartObj().curtask->getProcess()->vmar[uva] << ByteArray(buf_,rdbytes);
+        return rdbytes;
     }
     xlen_t write(){
         auto &ctx = kHartObj().curtask->ctx;

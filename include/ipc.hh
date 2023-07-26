@@ -15,49 +15,68 @@ namespace pipe{
     using proc::Task;
     struct Pipe{
         klib::ringbuf<uint8_t> buff;
-        semaphore::Semaphore wsem,rsem;
-        list<Task*> waiting;
+        static const size_t bufSize=64;
+        uint8_t buf[bufSize];
+        xlen_t head,tail;
+        condition_variable::condition_variable canr,canw;
         int wcnt,rcnt;
-        Pipe():wsem(64),rsem(0),wcnt(0),rcnt(0){}
+        Pipe():head(0),tail(0),wcnt(0),rcnt(0){}
         inline void addReader(){rcnt++;}
-        inline void decReader(){rcnt--;}
+        inline void decReader(){rcnt--; if(rcnt==0)canw.notify_all();}
         inline void addWriter(){wcnt++;}
-        inline void decWriter(){wcnt--;}
-        inline void write(ByteArray bytes){
-            auto n=bytes.len;
-            if(rcnt==0)return ;
-            // TODO parallelize, copy avai bytes at once
-            for(auto b:bytes){
-                wsem.req();
-                // while(buff.full()){
-                //     Log(info,"Pipe::write blocked, %d bytes remains\n",n);
-                //     //sleep and wakeup
-                //     wakeup();
-                //     sleep();
-                // }
-                buff.put(b);
-                rsem.rel();
-                n--;
-            }
-            // wakeup();
+        inline void decWriter(){wcnt--; if(wcnt==0)canr.notify_all();}
+        bool full(){return tail==head+bufSize;}
+        bool empty(){return head==tail;}
+        inline void tryWakeup(){
+            if(!empty())canr.notify_one();
+            if(!full())canw.notify_one();
         }
-        inline ByteArray read(int n){
-            ByteArray bytes(n);
-            // while(buff.empty())sleep();
+        inline int write(ByteArray bytes){
+            int off=0;
+            for(;off<bytes.len;){
+                if(rcnt==0) break;
+                auto wbegin=buf+tail%bufSize;
+                auto wlen=klib::min(klib::min(head+bufSize-tail,bufSize-tail%bufSize),bytes.len-off);
+                assert(wlen>=0);
+                if(wlen==0){
+                    canw.wait();
+                    continue;
+                }
+                memmove(wbegin,bytes.buff+off,wlen);
+                off+=wlen;
+            }
+            tryWakeup();
+            return off;
+        }
+        inline int read(ByteArray bytes){
             /// @todo error handling
-            if(buff.empty()&&wcnt==0)return 0;
-            for(auto i=bytes.begin();n;n--,i++){
-                rsem.req();
-                *i=buff.get();buff.pop();
-                wsem.rel();
-                if(buff.empty())break;
+            int off=0;
+            for(;off<bytes.len;){
+                if(wcnt==0) break;
+                auto rbegin=buf+head%bufSize;
+                auto rlen=klib::min(klib::min(tail-head,bufSize-head%bufSize),bytes.len-off);
+                if(rlen==0){
+                    canr.wait();
+                    continue;
+                }
+                memmove(bytes.buff+off,rbegin,rlen);
+                off+=rlen;
             }
-            // wakeup();
-            return bytes;
+            tryWakeup();
+            return off;
         }
-        void wakeup();
-        void sleep();
     };
+    // class PipeScatteredWriter:public ScatteredIO{
+    //     Pipe& pipe;
+    // public:
+    //     bool avail() const override{return !pipe.full();}
+    //     Slice next(size_t bytes){
+    //         pipe.tail+=bytes;
+    //         auto wbegin=pipe.buf+pipe.tail%pipe.bufSize;
+    //         auto wend=pipe.buf;
+    //         return Slice{(xlen_t)wbegin,(xlen_t)wbegin+klib::min(pipe.head+pipe.bufSize-pipe.tail,pipe.bufSize-pipe.tail%pipe.bufSize)};
+    //     }
+    // };
 }
 namespace signal{
 
