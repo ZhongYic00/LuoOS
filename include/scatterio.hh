@@ -5,6 +5,7 @@
 #include "klib.hh"
 #include "vm.hh"
 #include "fs.hh"
+#include "ipc.hh"
 
 typedef klib::Segment<xlen_t> Slice;
 using memvec=eastl::vector<Slice>;
@@ -122,4 +123,13 @@ public:
     }
 };
 
+class PipeScatteredWriter:public ScatteredIO{
+    pipe::Pipe& pipe;
+public:
+    PipeScatteredWriter(pipe::Pipe& pipe_):pipe(pipe_){}
+    bool avail() const override{return pipe.writable();}
+    size_t contConsume(Slice slice) override {
+        return pipe.write(ByteArray((uint8_t*)slice.l,slice.length()));
+    }
+};
 #endif
