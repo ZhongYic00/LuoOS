@@ -6,7 +6,7 @@
 #include "kernel.hh"
 // #include "klib.h"
 
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::trace
 
 // #define FMT_PROC(fmt,...) Log(info,"Proc[%d]::\n\"\n" fmt "\n\"",kHartObj().curtask->getProcess()->pid(),__VA_ARGS__)
 #define FMT_PROC(fmt,...) printf(fmt,__VA_ARGS__)
@@ -222,6 +222,7 @@ shared_ptr<DEntry> Path::pathSearch(bool a_parent) {
     // else if(pathname[0] == '/') { entry = mnt_table["/"]->getSpBlk()->getRoot(); }  // 绝对路径
     else { entry = base; }  // 相对路径
     for(int i = 0; i < dirnum; ++i) {
+        Log(trace,"entry=",entry->rName().c_str());
         while(entry->isMntPoint()) panic("should be processed above");
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
         if (a_parent && i == dirnum-1) { return entry; }
@@ -337,21 +338,18 @@ int Path::pathUnmount() const {
     return 0;
 }
 int Path::pathOpen(int a_flags, mode_t a_mode) {  // @todo: 添加不打开额外文件的工作方式
-    shared_ptr<DEntry> entry;
-    if(a_flags & O_CREAT) {
-        entry = pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags);
-        if(entry == nullptr) { return -1; }
+    auto entry=pathSearch();
+    if(!entry && a_flags & O_CREAT)
+        entry=pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags);
+    if(!entry)
+        return -1;
+    if((entry->getINode()->rAttr()&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
+        Log(error, "try to open a dir as writable\n");
+        return -EISDIR;
     }
-    else {
-        if((entry = pathSearch()) == nullptr) { return -1; }
-        if((entry->getINode()->rAttr()&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
-            Log(error, "try to open a dir as writable\n");
-            return -EISDIR;
-        }
-        if((a_flags&O_DIRECTORY) && !(entry->getINode()->rAttr()&ATTR_DIRECTORY)) {
-            Log(error, "try to open a not dir file as dir\n");
-            return -ENOTDIR;
-        }
+    if((a_flags&O_DIRECTORY) && !(entry->getINode()->rAttr()&ATTR_DIRECTORY)) {
+        Log(error, "try to open a not dir file as dir\n");
+        return -ENOTDIR;
     }
     shared_ptr<File> file = make_shared<File>(entry, a_flags);
     file->off = (a_flags&O_APPEND) ? entry->getINode()->rFileSize() : 0;
@@ -407,9 +405,11 @@ namespace fs
     }
 
     Result<DERef> DEntry::entSearch(DERef self,string a_dirname, uint *a_off){
+        Log(debug,"lookup(%s)",a_dirname.c_str());
         if(auto it=subs.find(a_dirname); it!=subs.end() && !it->second.expired())
             return it->second.lock();
         if(auto subnod=nod->lookup(a_dirname,a_off)){
+            Log(trace,"dentry caching %s",a_dirname.c_str());
             auto sub=make_shared<DEntry>(self,a_dirname,subnod);
             subs[a_dirname]=weak_ptr<DEntry>(sub);
             return sub;
@@ -458,6 +458,10 @@ list<shared_ptr<vm::VMO>> vmolru;
             SingleFileScatteredWriter fio(*obj.ep->getINode(),{{off,obj.ep->getINode()->rFileSize()}});
             return scatteredCopy(dst,fio);
             } break;
+        case FileType::pipe:{
+            PipeScatteredWriter pio(*obj.pipe);
+            return scatteredCopy(dst,pio);
+        } break;
         case FileType::stdout:
         case FileType::stderr:{
             PrintScatteredWriter pio;

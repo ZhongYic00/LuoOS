@@ -3,7 +3,7 @@
 #include "kernel.hh"
 #include "rvcsr.hh"
 
-#define moduleLevel LogLevel::debug
+// #define moduleLevel LogLevel::debug
 
 using namespace vm;
 PageBuf::PageBuf(const PageKey key_):key(key),ppn(kGlobObjs->pageMgr->alloc(1)){}

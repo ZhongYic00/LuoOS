@@ -27,6 +27,8 @@ namespace pipe{
         inline void decWriter(){wcnt--; if(wcnt==0)canr.notify_all();}
         bool full(){return tail==head+bufSize;}
         bool empty(){return head==tail;}
+        bool writable(){return !full()||rcnt;}
+        bool readable(){return !empty()||wcnt;}
         inline void tryWakeup(){
             if(!empty())canr.notify_one();
             if(!full())canw.notify_one();
@@ -70,17 +72,6 @@ namespace pipe{
             return off;
         }
     };
-    // class PipeScatteredWriter:public ScatteredIO{
-    //     Pipe& pipe;
-    // public:
-    //     bool avail() const override{return !pipe.full();}
-    //     Slice next(size_t bytes){
-    //         pipe.tail+=bytes;
-    //         auto wbegin=pipe.buf+pipe.tail%pipe.bufSize;
-    //         auto wend=pipe.buf;
-    //         return Slice{(xlen_t)wbegin,(xlen_t)wbegin+klib::min(pipe.head+pipe.bufSize-pipe.tail,pipe.bufSize-pipe.tail%pipe.bufSize)};
-    //     }
-    // };
 }
 namespace signal {
 
