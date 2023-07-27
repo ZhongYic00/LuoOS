@@ -87,12 +87,10 @@ namespace syscall {
         // curproc->cwd = fs::entEnter("/");
         curproc->cwd = Path("/").pathSearch();
         curproc->files[FdCwd] = make_shared<File>(curproc->cwd,0);
-        // DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
-        shared_ptr<DEntry> ep = Path("/dev").pathCreate(T_DIR, 0);
+        shared_ptr<DEntry> ep = Path("/proc").pathCreate(T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
-        // ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
-        ep = Path("/dev/vda2").pathCreate(T_DIR, 0);
-        if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
+        ep = Path("/proc/mounts").pathCreate(T_DIR, 0);
+        if(ep == nullptr) { panic("create /proc/mounts failed\n"); }
         Log(info,"fat initialize ok");
         return statcode::ok;
     }
@@ -358,8 +356,8 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> nwd = curproc->ofile(a_fd);
         if(nwd == nullptr) { return -EBADF; }
-        if(!(nwd->obj.ep->getINode()->rAttr() & ATTR_DIRECTORY)) { return -ENOTDIR; }
-        curproc->cwd = nwd->obj.ep;
+        if(!(nwd->obj.getEntry()->getINode()->rAttr() & ATTR_DIRECTORY)) { return -ENOTDIR; }
+        curproc->cwd = nwd->obj.getEntry();
         curproc->files[FdCwd] = nwd;
 
         return statcode::ok;
@@ -476,7 +474,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
         if(file == nullptr) { return -EBADF; }
-        DStat ds = file->obj.ep;
+        DStat ds = file->obj.getEntry();
         curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)&ds,sizeof(ds)));
 
         return sizeof(ds);
@@ -627,7 +625,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
         if(file == nullptr) { return -EBADF; }
-        KStat kst = file->obj.ep;
+        KStat kst = file->obj.getEntry();
         curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst,sizeof(kst)));
         // @bug 用户态读到的数据混乱
         return statcode::ok;

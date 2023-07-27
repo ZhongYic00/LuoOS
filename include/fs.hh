@@ -33,6 +33,7 @@ namespace fs{
             virtual shared_ptr<DEntry> getMntPoint() const = 0;  // 返回文件系统在父文件系统上的挂载点，如果是根文件系统则返回根目录
             virtual FileSystem *getFS() const = 0;  // 返回指向该文件系统对象的共享指针
             virtual bool isValid() const = 0;  // 返回该超级块是否有效（Unmount后失效）
+            virtual mode_t rDefaultMod() const = 0;
     };
     class FileSystem {
         public:
@@ -91,6 +92,9 @@ namespace fs{
             virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
             virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
             virtual uint32 rINo() const = 0;  // 返回该INode的ino
+            virtual const timespec& rCTime() const = 0;
+            virtual const timespec& rMTime() const = 0;
+            virtual const timespec& rATime() const = 0;
             virtual bool isEmpty() = 0;
             virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该INode所属文件系统超级块的共享指针;
     };
@@ -133,26 +137,66 @@ namespace fs{
             fields.a = a_flags & O_APPEND;
         }
     };
+	class KStat {
+        public:
+            dev_t st_dev;  			/* ID of device containing file */
+            ino_t st_ino;  			/* Inode number */
+            mode_t st_mode;  		/* File type and mode */
+            nlink_t st_nlink;  		/* Number of hard links */
+            uid_t st_uid;			/* User ID of owner */
+            gid_t st_gid;			/* Group ID of owner */
+            dev_t st_rdev;			/* Device ID (if special file) */
+            unsigned long __pad;	
+            size_t st_size;			/* Total size, in bytes */
+            blksize_t st_blksize;	/* Block size for filesystem I/O */
+            int __pad2; 			
+            blkcnt_t st_blocks;		/* Number of 512B blocks allocated */
+            long st_atime_sec;		/* Time of last access */
+            long st_atime_nsec;		
+            long st_mtime_sec;		/* Time of last modification */
+            long st_mtime_nsec;
+            long st_ctime_sec;		/* Time of last status change */
+            long st_ctime_nsec;
+            // unsigned __unused[2];
+            unsigned _unused[2]; // @todo 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
+        // public:
+            KStat() = default;
+            KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
+            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode(((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG) | a_entry->getINode()->getSpBlk()->rDefaultMod()), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->getFS()->rBlkSiz()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
+            ~KStat() = default;
+
+	};
     struct File {
         enum FileType { none, pipe, entry, dev, stdin, stdout, stderr };
         FileOps ops;
-        const FileType type;
-        int flags;
+        // const FileType type;
+        int flags = 0;
         uint off = 0;
         union Data {
-            shared_ptr<Pipe> pipe;
-            shared_ptr<DEntry> ep;
-            Data(FileType a_type){ assert(a_type==none || a_type==stdin || a_type==stdout || a_type==stderr); }
-            Data(const shared_ptr<Pipe> &a_pipe): pipe(a_pipe) {}
-            Data(shared_ptr<DEntry> a_ep): ep(a_ep) {}
-            ~Data() {}
+            private:
+                struct { const FileType objtype; }un;
+                struct { const FileType objtype; shared_ptr<Pipe> pipe; }pp;
+                // shared_ptr<DEntry> ep;
+                struct { const FileType objtype; shared_ptr<DEntry> de; off_t off; KStat kst; }ep;  // @todo: 随File使用更新kst时间戳
+                inline void ensurePipe() const { assert(pp.objtype == FileType::pipe); }
+                inline void ensureEntry() const { assert(ep.objtype == FileType::entry); }
+            public:
+                Data(FileType a_type):un({ a_type }) { assert(a_type==none || a_type==stdin || a_type==stdout || a_type==stderr); }
+                Data(const shared_ptr<Pipe> &a_pipe): pp({ FileType::pipe, a_pipe }) {}
+                Data(shared_ptr<DEntry> a_de): ep({ FileType::entry, a_de, 0, a_de }) {}
+                ~Data() {}
+                inline shared_ptr<Pipe> getPipe() const { ensurePipe(); return pp.pipe; }
+                inline shared_ptr<DEntry> getEntry() const { ensureEntry(); return ep.de; }
+                inline KStat& kst() { ensureEntry(); return ep.kst; }
+                inline off_t& off() { ensureEntry(); return ep.off; }
+                inline FileType rType() { return un.objtype; }
         }obj;
-        File(FileType a_type): type(a_type), obj(a_type) {}
-        File(FileType a_type, FileOp a_ops = FileOp::none): type(a_type), obj(a_type), ops(a_ops) {}
-        File(FileType a_type, int a_flags): type(a_type), obj(a_type), ops(a_flags), flags(a_flags) {}
-        File(const shared_ptr<Pipe> &a_pipe, FileOp a_ops): type(FileType::pipe), obj(a_pipe), ops(a_ops) { if(ops.fields.r)obj.pipe->addReader(); if(ops.fields.w)obj.pipe->addWriter(); }
-        File(shared_ptr<DEntry> a_ep, FileOp a_ops): type(FileType::entry), obj(a_ep), ops(a_ops) {}
-        File(shared_ptr<DEntry> a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags), flags(a_flags) {}
+        File(FileType a_type):obj(a_type) {}
+        File(FileType a_type, FileOp a_ops = FileOp::none):obj(a_type), ops(a_ops) {}
+        File(FileType a_type, int a_flags):obj(a_type), ops(a_flags), flags(a_flags) {}
+        File(const shared_ptr<Pipe> &a_pipe, FileOp a_ops):obj(a_pipe), ops(a_ops) { if(ops.fields.r)obj.getPipe()->addReader(); if(ops.fields.w)obj.getPipe()->addWriter(); }
+        File(shared_ptr<DEntry> a_de, FileOp a_ops):obj(a_de), ops(a_ops) {}
+        File(shared_ptr<DEntry> a_de, int a_flags):obj(a_de), ops(a_flags), flags(a_flags) {}
         ~File();
         int write(ByteArray a_buf);
         int read(ByteArray buf, long a_off = -1, bool a_update = true);
@@ -160,11 +204,11 @@ namespace fs{
         size_t readv(ScatteredIO &dst);
         size_t writev(ScatteredIO &dst);
         shared_ptr<vm::VMO> vmo();
-        inline int readLink(char *a_buf, size_t a_bufsiz) { return obj.ep->getINode()->readLink(a_buf, a_bufsiz); }
+        inline int readLink(char *a_buf, size_t a_bufsiz) { return obj.getEntry()->getINode()->readLink(a_buf, a_bufsiz); }
         off_t lSeek(off_t a_offset, int a_whence);
         ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
-        inline int chMod(mode_t a_mode) { obj.ep->getINode()->chMod(a_mode); }
-        inline int chOwn(uid_t a_owner, gid_t a_group) { return obj.ep->getINode()->chOwn(a_owner, a_group); }
+        inline int chMod(mode_t a_mode) { obj.getEntry()->getINode()->chMod(a_mode); }
+        inline int chOwn(uid_t a_owner, gid_t a_group) { return obj.getEntry()->getINode()->chOwn(a_owner, a_group); }
     };
     class Path {
         private:
@@ -174,13 +218,13 @@ namespace fs{
         public:
             Path() = default;
             Path(const Path& a_path) = default;
-            Path(const string& a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.ep) { pathBuild(); }
+            Path(const string& a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.getEntry()) { pathBuild(); }
             Path(const string& a_str, shared_ptr<DEntry> a_base):pathname(a_str), dirname(), base(a_base) { pathBuild(); }
             Path(const string& a_str):pathname(a_str), dirname(), base(nullptr) { pathBuild(); }
-            Path(const char *a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.ep) { pathBuild(); }
+            Path(const char *a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.getEntry()) { pathBuild(); }
             Path(const char *a_str, shared_ptr<DEntry> a_base):pathname(a_str), dirname(), base(a_base) { pathBuild(); }
             Path(const char *a_str):pathname(a_str), dirname(), base(nullptr) { pathBuild(); }
-            Path(shared_ptr<File> a_base):pathname(), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.ep) { pathBuild(); }
+            Path(shared_ptr<File> a_base):pathname(), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.getEntry()) { pathBuild(); }
             Path(shared_ptr<DEntry> a_base):pathname(), dirname(), base(a_base) { pathBuild(); }
             ~Path() = default;
             Path& operator=(const Path& a_path) = default;
@@ -224,35 +268,6 @@ namespace fs{
             Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
             Stat(shared_ptr<DEntry> a_entry):name(), dev(a_entry->getINode()->rDev()), type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry->getINode()->rFileSize()) { strncpy(name, a_entry->rName().c_str(), STAT_MAX_NAME); }
             ~Stat() = default;
-	};
-	class KStat {
-        public:
-            dev_t st_dev;  			/* ID of device containing file */
-            ino_t st_ino;  			/* Inode number */
-            mode_t st_mode;  		/* File type and mode */
-            nlink_t st_nlink;  		/* Number of hard links */
-            uid_t st_uid;			/* User ID of owner */
-            gid_t st_gid;			/* Group ID of owner */
-            dev_t st_rdev;			/* Device ID (if special file) */
-            unsigned long __pad;	
-            size_t st_size;			/* Total size, in bytes */
-            blksize_t st_blksize;	/* Block size for filesystem I/O */
-            int __pad2; 			
-            blkcnt_t st_blocks;		/* Number of 512B blocks allocated */
-            long st_atime_sec;		/* Time of last access */
-            long st_atime_nsec;		
-            long st_mtime_sec;		/* Time of last modification */
-            long st_mtime_nsec;
-            long st_ctime_sec;		/* Time of last status change */
-            long st_ctime_nsec;
-            // unsigned __unused[2];
-            unsigned _unused[2]; // @todo 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
-        // public:
-            KStat() = default;
-            KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
-            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->getFS()->rBlkSiz()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
-            ~KStat() = default;
-
 	};
     class StatFS {
         private:
