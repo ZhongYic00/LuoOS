@@ -117,7 +117,7 @@ public:
     size_t contConsume(Slice slice) override {
         auto availbytes=slice.length();
         auto str=reinterpret_cast<char*>(slice.l);
-        puts(str);
+        for(int i=0;i<availbytes;i++)putchar(str[i]);
         return availbytes;
     }
 };

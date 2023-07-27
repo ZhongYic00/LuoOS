@@ -67,7 +67,7 @@ namespace bio{
     }
     void BlockBuf::flush(){
         Log(debug,"blockbuf flush");
-        // virtio_disk_rw(*this,1);
+        virtio_disk_rw(*this,1);
         dirty=false;
     }
 }
