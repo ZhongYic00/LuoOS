@@ -19,6 +19,11 @@ namespace fs{
     template<typename T>
     using Result=expected<T,xlen_t>;
 
+    constexpr dev_t STDIN_DEV = 0;
+    constexpr dev_t STDOUT_DEV = (0x01<<10) | 0x01;
+    constexpr dev_t STDERR_DEV = (0x02<<10) | 0x02;
+    constexpr dev_t UNIMPL_DEV = -1;
+
     class INode;
     class DEntry;
     class FileSystem;
@@ -137,6 +142,7 @@ namespace fs{
             fields.a = a_flags & O_APPEND;
         }
     };
+    enum FileType { none, pipe, entry, dev, stdin, stdout, stderr };
 	class KStat {
         public:
             dev_t st_dev;  			/* ID of device containing file */
@@ -160,36 +166,42 @@ namespace fs{
             // unsigned __unused[2];
             unsigned _unused[2]; // @todo 上面的写法在未实际使用的情况下过不了编译，最后要确定这个字段在我们的项目中是否有用，是否保留
         // public:
+            // @todo: 转换不完全对
             KStat() = default;
             KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
-            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode(((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG) | a_entry->getINode()->getSpBlk()->rDefaultMod()), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->getFS()->rBlkSiz()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
+            KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode(((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG) | a_entry->getINode()->getSpBlk()->rDefaultMod()), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->getFS()->rBlkSiz()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(a_entry->getINode()->rATime().tv_sec), st_atime_nsec(a_entry->getINode()->rATime().tv_nsec), st_mtime_sec(a_entry->getINode()->rMTime().tv_sec), st_mtime_nsec(a_entry->getINode()->rMTime().tv_nsec), st_ctime_sec(a_entry->getINode()->rCTime().tv_sec), st_ctime_nsec(a_entry->getINode()->rATime().tv_nsec), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
+            // @todo: 无inode
+            KStat(FileType a_type):st_dev(0), st_ino(0), st_mode(S_IFCHR), st_nlink(1), st_uid(0), st_gid(0), st_rdev(a_type==stdin ? STDIN_DEV : (a_type==stdout ? STDOUT_DEV : (a_type==stderr ? STDERR_DEV : UNIMPL_DEV))), __pad(0), st_size(0), st_blksize(0), __pad2(0), st_blocks(0), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) {}
+            // @todo: 无inode
+            KStat(shared_ptr<Pipe> a_pipe):st_dev(0), st_ino(0), st_mode(S_IFIFO), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(0), st_blksize(0), __pad2(0), st_blocks(0), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) {}
             ~KStat() = default;
 
 	};
     struct File {
-        enum FileType { none, pipe, entry, dev, stdin, stdout, stderr };
         FileOps ops;
         // const FileType type;
         int flags = 0;
         uint off = 0;
         union Data {
             private:
-                struct { const FileType objtype; }un;
-                struct { const FileType objtype; shared_ptr<Pipe> pipe; }pp;
+                // 在所有类型的struct中，objtype和kst的位置必须相同
+                struct { const FileType objtype; KStat kst; }dv;
+                struct { const FileType objtype; KStat kst; shared_ptr<Pipe> pipe; }pp;
                 // shared_ptr<DEntry> ep;
-                struct { const FileType objtype; shared_ptr<DEntry> de; off_t off; KStat kst; }ep;  // @todo: 随File使用更新kst时间戳
-                inline void ensurePipe() const { assert(pp.objtype == FileType::pipe); }
-                inline void ensureEntry() const { assert(ep.objtype == FileType::entry); }
+                struct { const FileType objtype; KStat kst; shared_ptr<DEntry> de; off_t off; }ep;  // @todo: 随File使用更新kst时间戳
+                inline void ensureDev() const { assert(dv.objtype==none || dv.objtype==stdin || dv.objtype==stdout || dv.objtype==stderr || dv.objtype==dev); }
+                inline void ensurePipe() const { assert(pp.objtype == pipe); }
+                inline void ensureEntry() const { assert(ep.objtype == entry); }
             public:
-                Data(FileType a_type):un({ a_type }) { assert(a_type==none || a_type==stdin || a_type==stdout || a_type==stderr); }
-                Data(const shared_ptr<Pipe> &a_pipe): pp({ FileType::pipe, a_pipe }) {}
-                Data(shared_ptr<DEntry> a_de): ep({ FileType::entry, a_de, 0, a_de }) {}
+                Data(FileType a_type):dv({ a_type, a_type }) { ensureDev(); }
+                Data(const shared_ptr<Pipe> &a_pipe): pp({ FileType::pipe, a_pipe, a_pipe }) {}
+                Data(shared_ptr<DEntry> a_de): ep({ FileType::entry, a_de, a_de, 0 }) {}
                 ~Data() {}
                 inline shared_ptr<Pipe> getPipe() const { ensurePipe(); return pp.pipe; }
                 inline shared_ptr<DEntry> getEntry() const { ensureEntry(); return ep.de; }
-                inline KStat& kst() { ensureEntry(); return ep.kst; }
+                inline KStat& kst() { return ep.kst; }
                 inline off_t& off() { ensureEntry(); return ep.off; }
-                inline FileType rType() { return un.objtype; }
+                inline FileType rType() { return dv.objtype; }
         }obj;
         File(FileType a_type):obj(a_type) {}
         File(FileType a_type, FileOp a_ops = FileOp::none):obj(a_type), ops(a_ops) {}

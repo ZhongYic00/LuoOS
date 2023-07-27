@@ -80,6 +80,7 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t testFATInit() {
+        // @todo: 处理/proc/mounts
         Log(info, "initializing fat\n");
         int init = fs::rootFSInit();
         if(init != 0) { panic("fat init failed\n"); }
@@ -190,6 +191,22 @@ namespace syscall {
         }
 
         return -EINVAL;  // should never reach here
+    }
+    xlen_t ioCtl() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_fd = ctx.x(10);
+        xlen_t a_request = ctx.x(11);
+        void *a_arg = (void*)ctx.x(12); // @todo 还没用上
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> file = curproc->ofile(a_fd);
+        if (!(file->obj.kst().st_mode & S_IFCHR)) { return -ENOTTY; }
+        // if (file->obj.kst().st_dev == DEV_TTY) { return fs_ioctl_tty(fd, request, argp); }
+        // else if (file->obj.kst().st_dev == DEV_RTC) { return fs_ioctl_rtc(fd, request, argp); }
+        else {
+            Log(error, "ioctl: unimplemented device 0x%x", file->obj.kst().st_rdev);
+            return -ENODEV;
+        }
     }
     xlen_t mkDirAt(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -625,8 +642,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
         if(file == nullptr) { return -EBADF; }
-        KStat kst = file->obj.getEntry();
-        curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst,sizeof(kst)));
+        curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&file->obj.kst(), sizeof(KStat)));
         // @bug 用户态读到的数据混乱
         return statcode::ok;
     }
@@ -1210,6 +1226,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::dup,dup);
         DECLSYSCALL(scnum::dup3,dup3);
         DECLSYSCALL(scnum::fcntl,fCntl);
+        DECLSYSCALL(scnum::ioctl,ioCtl);
         DECLSYSCALL(scnum::mkdirat,mkDirAt);
         DECLSYSCALL(scnum::linkat,linkAt);
         DECLSYSCALL(scnum::unlinkat,unlinkAt);

@@ -84,7 +84,7 @@ ByteArray File::readAll(){
     }
 }
 off_t File::lSeek(off_t a_offset, int a_whence) {
-    // if ((kst.st_mode&S_IFMT)==S_IFCHR || (kst.st_mode&S_IFMT)==S_IFIFO) { return 0; }
+    if ((obj.kst().st_mode&S_IFMT)==S_IFCHR || (obj.kst().st_mode&S_IFMT)==S_IFIFO) { return 0; }
     // if(type!=FileType::entry)return -ESPIPE;
     KStat kst = obj.getEntry();
     switch (a_whence) {  // @todo: st_size处是否越界？
@@ -187,7 +187,14 @@ string Path::pathAbsolute() const {
     vector<string> name_abs = dirname;
     for(shared_ptr<DEntry> entry = base; !(entry->isRoot() && entry->getINode()->getSpBlk()->getFS()->isRootFS()); entry = entry->getParent()) { name_abs.emplace(name_abs.begin(), entry->rName()); }
     string path_abs = "";
-    for(string name : name_abs) { path_abs = path_abs + "/" + name; }
+    for(auto name = name_abs.begin(); name != name_abs.end();) {
+        if(*name=="." || *name=="..") { name = name_abs.erase(name); }
+        else if(next(name)!=name_abs.end() && *(next(name))=="..") { name = name_abs.erase(name); }
+        else {
+            path_abs = path_abs + "/" + *name;
+            ++name;
+        }
+    }
     if(path_abs == "") { path_abs = "/"; }
     return path_abs;
 }
@@ -216,11 +223,11 @@ shared_ptr<DEntry> Path::pathHitTable() {
 shared_ptr<DEntry> Path::pathSearch(bool a_parent) {
     if(pathname == "/") { return mnt_table["/"]->getSpBlk()->getRoot(); }  // 防止初始化进程时循环依赖cwd
     shared_ptr<DEntry> entry, next;
-    int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
     else if((entry=pathHitTable()) != nullptr) {}  // 查挂载表，若查到则起始目录存到entry中
     // else if(pathname[0] == '/') { entry = mnt_table["/"]->getSpBlk()->getRoot(); }  // 绝对路径
     else { entry = base; }  // 相对路径
+    int dirnum = dirname.size();
     for(int i = 0; i < dirnum; ++i) {
         while(entry->isMntPoint()) panic("should be processed above");
         if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
