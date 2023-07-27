@@ -4,7 +4,9 @@
 #include "vm/pager.hh"
 #include <elf.h>
 
-eastl::tuple<xlen_t,xlen_t> ld::loadElf(const uint8_t *buff,vm::VMAR &vmar){
+namespace ld{
+
+eastl::tuple<xlen_t,xlen_t> loadElf(const uint8_t *buff,vm::VMAR &vmar){
     Elf64_Ehdr *elfHeader=(Elf64_Ehdr*)(buff);
     Log(info,"Elf header=%p, section header table=%lx, secheader str indx=%lx",elfHeader,elfHeader->e_shoff,elfHeader->e_shstrndx);
     for(int i=0;i<EI_NIDENT;i++)
@@ -26,7 +28,7 @@ eastl::tuple<xlen_t,xlen_t> ld::loadElf(const uint8_t *buff,vm::VMAR &vmar){
     vmar.print();
     return eastl::make_tuple(elfHeader->e_entry,programbreak);
 }
-eastl::tuple<xlen_t,xlen_t> ld::loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar){
+eastl::tuple<xlen_t,xlen_t> loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar){
     auto vmo=file->vmo();
     vm::VMOMapper mapper(vmo);
     auto buff=(uint8_t*)mapper.start();
@@ -55,4 +57,14 @@ eastl::tuple<xlen_t,xlen_t> ld::loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar
     }
     vmar.print();
     return eastl::make_tuple(elfHeader->e_entry,programbreak);
+}
+bool isElf(shared_ptr<fs::File> file){
+    Elf64_Ehdr elfHeader;
+    if(auto rdbytes=file->read(ArrayBuff(&elfHeader,1).toArrayBuff<uint8_t>()); 
+        rdbytes==sizeof(elfHeader)
+        && *reinterpret_cast<word_t*>(elfHeader.e_ident)==*reinterpret_cast<const word_t*>(ELFMAG) )
+        return true;
+    return false;
+}
+
 }
