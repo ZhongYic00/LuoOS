@@ -62,6 +62,7 @@ namespace sys
         exit_group=94,
         settidaddress=96,
         nanosleep=101,
+        clock_gettime=113,
         yield=124,
         kill=129,
         tkill=130,
@@ -135,7 +136,7 @@ namespace sys
     
 } // namespace sy
 namespace kernel {
-    constexpr int timerInterval=100000;
+    constexpr int timerInterval=1000000;
     constexpr long INTERVAL = 390000000 / 100;
     constexpr long CLK_FREQ = 8900000;
     constexpr int NMAXSLEEP = 32;

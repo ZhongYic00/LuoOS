@@ -9,6 +9,7 @@
 #include <EASTL/chrono.h>
 #include <linux/reboot.h>
 #include <linux/unistd.h>
+#include <sys/time.h>
 #include <asm/poll.h>
 using nonstd::expected;
 
@@ -612,7 +613,7 @@ namespace syscall {
         if(base == nullptr) { return -EBADF; }
 
         shared_ptr<DEntry> entry = Path(path, base).pathSearch();
-        if(entry == nullptr) { return statcode::err; }
+        if(entry == nullptr) { return -ENOENT; }
         KStat kst = entry;
         curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst, sizeof(kst)));
 
@@ -662,6 +663,7 @@ namespace syscall {
         }
         return statcode::err;
     }
+    extern int clock_gettime (clockid_t __clock_id, struct timespec *__tp);
     void yield(){
         Log(debug,"yield!");
         auto &cur=kHartObj().curtask;
@@ -917,19 +919,8 @@ namespace syscall {
         
         return curproc->setRLimit(a_rsrc, rlim);
     }
-    xlen_t getTimeOfDay() {
-        auto &ctx = kHartObj().curtask->ctx;
-        auto a_ts = ctx.x(10);
-        if(a_ts == 0) { return -EINVAL; }
-    
-        auto curproc = kHartObj().curtask->getProcess();
-        auto cur=eastl::chrono::system_clock::now();
-        auto ticks=cur.time_since_epoch().count();
-        struct timespec ts = { ticks/kernel::CLK_FREQ, ((100000*ticks/kernel::CLK_FREQ)%100000)*10 };
-        curproc->vmar[a_ts]<<ts;
-
-        return statcode::ok;
-    }
+    extern int gettimeofday (struct timeval *__restrict __tv,
+			 struct timezone *__tz) __THROW __nonnull ((1));
     xlen_t getPid(){
         return kHartObj().curtask->getProcess()->pid();
     }
@@ -1245,6 +1236,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::exit_group,exitGroup);
         DECLSYSCALL(scnum::settidaddress,setTidAddress)
         DECLSYSCALL(scnum::nanosleep,nanoSleep);
+        DECLSYSCALL(scnum::clock_gettime,clock_gettime);
         DECLSYSCALL(scnum::yield,sysyield);
         DECLSYSCALL(scnum::kill,kill);
         DECLSYSCALL(scnum::tkill,tkill);
@@ -1266,7 +1258,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::getrlimit,getRLimit);
         DECLSYSCALL(scnum::setrlimit,setRLimit);
         DECLSYSCALL(scnum::umask,uMask);
-        DECLSYSCALL(scnum::gettimeofday,getTimeOfDay);
+        DECLSYSCALL(scnum::gettimeofday,gettimeofday);
         DECLSYSCALL(scnum::getpid,getPid);
         DECLSYSCALL(scnum::getppid,getPPid);
         DECLSYSCALL(scnum::getuid,getUid);
