@@ -104,7 +104,7 @@ namespace fs{
             DEntry() = delete;
             DEntry(const DEntry& a_entry) = delete;
             DEntry& operator=(const DEntry& a_entry) = delete;
-            DEntry(DERef prnt,string name,INodeRef nod_):parent(prnt),nod(nod_){ assert(nod_.use_count()); }
+            DEntry(DERef prnt,string name,INodeRef nod_):parent(prnt),nod(nod_),isMount(false){ assert(nod_.use_count()); }
             Result<DERef> entSearch(DERef self,string a_dirname, uint *a_off = nullptr); // 在该目录项下(不包含子目录)搜索名为a_dirname的目录项，返回指向目标目录项的共享指针（找不到则返回nullptr）
             Result<DERef> entCreate(DERef self,string a_name, int a_attr);  // 在该目录项下以a_attr属性创建名为a_name的文件，返回指向该文件目录项的共享指针
             inline void setMntPoint() {isMount=true;}  // 设该目录项为a_fs文件系统的挂载点（不更新a_fs）
