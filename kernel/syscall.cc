@@ -1119,15 +1119,20 @@ namespace syscall {
         char *path=(char*)pathbuf.buff;
 
         Log(debug,"execve(path=%s,)",path);
-        // auto Ent=fs::entEnter(path);
         shared_ptr<DEntry> Ent=Path(path).pathSearch();
         auto file=make_shared<File>(Ent,fs::FileOp::read);
-        // auto buf=file->read(Ent->getINode()->rFileSize());
-        // auto buf=klib::ByteArray{0};
-        // buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
+        
+        vector<ByteArray> args;
+
+        // check whether elf or script
+        auto interprtArg="sh\0";
+        if(!ld::isElf(file)){
+            string interpreter="/busybox";
+            file=make_shared<File>(Path(interpreter).pathSearch(),fs::FileOp::read);
+            args.push_back(ByteArray((uint8_t*)interprtArg,strlen(interprtArg)+1));
+        }
 
         /// @brief get args
-        vector<ByteArray> args;
         xlen_t str;
         do{
             curproc->vmar[argv]>>str;
