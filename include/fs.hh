@@ -19,10 +19,10 @@ namespace fs{
     template<typename T>
     using Result=expected<T,xlen_t>;
     
-    constexpr dev_t STDIN_DEV = 0;
-    constexpr dev_t STDOUT_DEV = (0x01<<10) | 0x01;
-    constexpr dev_t STDERR_DEV = (0x02<<10) | 0x02;
-    constexpr dev_t UNIMPL_DEV = -1;
+    constexpr uint64 STDIN_DEV = 0;
+    constexpr uint64 STDOUT_DEV = (0x01<<20) | 0x01;
+    constexpr uint64 STDERR_DEV = (0x02<<20) | 0x02;
+    constexpr uint64 UNIMPL_DEV = -1;
 
     class INode;
     class DEntry;
@@ -51,7 +51,7 @@ namespace fs{
             virtual string rKey() const = 0;  // 返回文件系统在挂载表中的键值（不同键值的文件系统可以对应同一物理设备/设备号）
             virtual bool isRootFS() const = 0;  // 返回该文件系统是否为根文件系统
             virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该文件系统超级块的共享指针
-            virtual int ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) = 0;  // 从设备号为a_dev的物理设备上装载该文件系统的超级块，并设挂载点为a_mnt，若a_mnt为nullptr则作为根文件系统装载，返回错误码
+            virtual int ldSpBlk(uint64 a_dev, shared_ptr<fs::DEntry> a_mnt) = 0;  // 从设备号为a_dev的物理设备上装载该文件系统的超级块，并设挂载点为a_mnt，若a_mnt为nullptr则作为根文件系统装载，返回错误码
             virtual void unInstall() = 0;  // 卸载该文件系统的超级块
             virtual long rMagic() const = 0;  // 读魔数
             virtual long rBlkSiz() const = 0;  // 读块大小
@@ -96,9 +96,9 @@ namespace fs{
             virtual int readLink(char *a_buf, size_t a_bufsiz) = 0;
             virtual int readDir(DStat *a_buf, uint a_len) = 0;  // 读取该目录下尽可能多的目录项到a_bufarr中，返回读取的字节数
             virtual uint8 rAttr() const = 0;  // 返回该文件的属性
-            virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
-            virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
-            virtual uint32 rINo() const = 0;  // 返回该INode的ino
+            virtual uint64 rDev() const = 0;  // 返回该文件所在文件系统的设备号
+            virtual off_t rFileSize() const = 0;  // 返回该文件的字节数
+            virtual uint64 rINo() const = 0;  // 返回该INode的ino
             virtual const timespec& rCTime() const = 0;
             virtual const timespec& rMTime() const = 0;
             virtual const timespec& rATime() const = 0;
@@ -146,23 +146,23 @@ namespace fs{
         }
     };
     enum FileType { none, pipe, entry, dev, stdin, stdout, stderr };
-    inline dev_t mkDevNum(FileType a_type) { return a_type==stdin ? STDIN_DEV : (a_type==stdout ? STDOUT_DEV : (a_type==stderr ? STDERR_DEV : UNIMPL_DEV)); }
+    inline uint64 mkDevNum(FileType a_type) { return a_type==stdin ? STDIN_DEV : (a_type==stdout ? STDOUT_DEV : (a_type==stderr ? STDERR_DEV : UNIMPL_DEV)); }
     inline string mkDevName(FileType a_type) { return a_type==stdin ? "$STDIN" : (a_type==stdout ? "$STDOUT" : (a_type==stderr ? "$STDERR" : "UNIMPL")); }
     // @todo: 管道和设备文件无inode
 	class KStat {
         public:
-            dev_t st_dev;  			/* ID of device containing file */
-            ino_t st_ino;  			/* Inode number */
+            uint64 st_dev;  			/* ID of device containing file */
+            uint64 st_ino;  			/* Inode number */
             mode_t st_mode;  		/* File type and mode */
-            nlink_t st_nlink;  		/* Number of hard links */
-            uid_t st_uid;			/* User ID of owner */
-            gid_t st_gid;			/* Group ID of owner */
-            dev_t st_rdev;			/* Device ID (if special file) */
+            uint32 st_nlink;  		/* Number of hard links */
+            uint32 st_uid;			/* User ID of owner */
+            uint32 st_gid;			/* Group ID of owner */
+            uint64 st_rdev;			/* Device ID (if special file) */
             unsigned long __pad;	
-            size_t st_size;			/* Total size, in bytes */
-            blksize_t st_blksize;	/* Block size for filesystem I/O */
+            off_t st_size;			/* Total size, in bytes */
+            uint32 st_blksize;	/* Block size for filesystem I/O */
             int __pad2; 			
-            blkcnt_t st_blocks;		/* Number of 512B blocks allocated */
+            uint64 st_blocks;		/* Number of 512B blocks allocated */
             long st_atime_sec;		/* Time of last access */
             long st_atime_nsec;		
             long st_mtime_sec;		/* Time of last modification */
@@ -179,18 +179,18 @@ namespace fs{
             KStat(FileType a_type):st_dev(0), st_ino(mkDevNum(a_type)), st_mode(S_IFCHR), st_nlink(1), st_uid(0), st_gid(0), st_rdev(mkDevNum(a_type)), __pad(0), st_size(0), st_blksize(0), __pad2(0), st_blocks(0), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) {}
             ~KStat() = default;
 	};
-	class Stat {
-        public:
-            char name[STAT_MAX_NAME + 1]; // 文件名
-            int dev;     // File system's disk device // 文件系统的磁盘设备
-            short type;  // Type of file // 文件类型
-            uint64 size; // Size of file in bytes // 文件大小(字节)
-        // public:
-            Stat() = default;
-            Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
-            Stat(shared_ptr<DEntry> a_entry):name(), dev(a_entry->getINode()->rDev()), type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), size(a_entry->getINode()->rFileSize()) { strncpy(name, a_entry->rName().c_str(), STAT_MAX_NAME); }
-            ~Stat() = default;
-	};
+	// class Stat {
+    //     public:
+    //         char name[STAT_MAX_NAME + 1]; // 文件名
+    //         uint64 dev;     // File system's disk device // 文件系统的磁盘设备
+    //         short type;  // Type of file // 文件类型
+    //         uint64 size; // Size of file in bytes // 文件大小(字节)
+    //     // public:
+    //         Stat() = default;
+    //         Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
+    //         Stat(shared_ptr<DEntry> a_entry):name(), dev(a_entry->getINode()->rDev()), type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), size(a_entry->getINode()->rFileSize()) { strncpy(name, a_entry->rName().c_str(), STAT_MAX_NAME); }
+    //         ~Stat() = default;
+	// };
     struct File {
         FileOps ops;
         int flags;

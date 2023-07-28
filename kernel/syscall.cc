@@ -205,7 +205,7 @@ namespace syscall {
         // if (file->obj.kst().st_dev == DEV_TTY) { return fs_ioctl_tty(fd, request, argp); }
         // else if (file->obj.kst().st_dev == DEV_RTC) { return fs_ioctl_rtc(fd, request, argp); }
         else {
-            Log(error, "ioctl: unimplemented device 0x%x", file->obj.kst().st_rdev);
+            Log(error, "ioctl: unimplemented device 0x%lx", file->obj.kst().st_rdev);
             return -ENODEV;
         }
     }

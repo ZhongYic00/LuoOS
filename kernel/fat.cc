@@ -222,7 +222,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         }
         // 找到了一个有效文件
         // @todo 不区分大小写？
-        else if (a_dirname=="" || strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME)==0) {
+        else if (strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME)==0) {
             ep->parent = entDup();
             ep->off = off;
             ep->valid = 1;
@@ -677,7 +677,7 @@ void SuperBlock::unInstall() {
     mnt_point.reset();
     return;
 }
-int FileSystem::ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) {
+int FileSystem::ldSpBlk(uint64 a_dev, shared_ptr<fs::DEntry> a_mnt) {
     static bool ecacheinit = true;
     if(ecacheinit) {
         eCacheInit();
