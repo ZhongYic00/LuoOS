@@ -29,6 +29,7 @@ namespace sys
         dup=23,
         dup3=24,
         fcntl=25,
+        ioctl=29,
         mkdirat=34,
         unlinkat=35,
         symlinkat=36,

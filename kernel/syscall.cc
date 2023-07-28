@@ -193,6 +193,22 @@ namespace syscall {
 
         return -EINVAL;  // should never reach here
     }
+    xlen_t ioCtl() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_fd = ctx.x(10);
+        xlen_t a_request = ctx.x(11);
+        void *a_arg = (void*)ctx.x(12); // @todo 还没用上
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> file = curproc->ofile(a_fd);
+        if (!(file->obj.kst().st_mode & S_IFCHR)) { return -ENOTTY; }
+        // if (file->obj.kst().st_dev == DEV_TTY) { return fs_ioctl_tty(fd, request, argp); }
+        // else if (file->obj.kst().st_dev == DEV_RTC) { return fs_ioctl_rtc(fd, request, argp); }
+        else {
+            Log(error, "ioctl: unimplemented device 0x%x", file->obj.kst().st_rdev);
+            return -ENODEV;
+        }
+    }
     xlen_t mkDirAt(void) {
         auto &ctx = kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
@@ -358,8 +374,8 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> nwd = curproc->ofile(a_fd);
         if(nwd == nullptr) { return -EBADF; }
-        if(!(nwd->obj.ep->getINode()->rAttr() & ATTR_DIRECTORY)) { return -ENOTDIR; }
-        curproc->cwd = nwd->obj.ep;
+        if(!(nwd->obj.getEntry()->getINode()->rAttr() & ATTR_DIRECTORY)) { return -ENOTDIR; }
+        curproc->cwd = nwd->obj.getEntry();
         curproc->files[FdCwd] = nwd;
 
         return statcode::ok;
@@ -468,18 +484,21 @@ namespace syscall {
     }
     xlen_t getDents64(void) {
         auto &ctx = kHartObj().curtask->ctx;
-        int a_fd = ctx.x(10);
+        int a_dirfd = ctx.x(10);
         DStat *a_buf = (DStat*)ctx.x(11);
         size_t a_len = ctx.x(12);
-        if(a_buf==nullptr || a_len<sizeof(DStat)) { return -EFAULT; }
+        if(a_buf==nullptr) { return -EFAULT; }
 
         auto curproc = kHartObj().curtask->getProcess();
-        shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
-        DStat ds = file->obj.ep;
-        curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)&ds,sizeof(ds)));
+        shared_ptr<File> dir = curproc->ofile(a_dirfd);
+        if(dir == nullptr) { return -EBADF; }
+        if(dir->obj.rType() != fs::FileType::entry) { return -EINVAL; }
+        // DStat ds = file;
+        ArrayBuff<DStat> buf(a_len / sizeof(DStat));
+        int len = dir->obj.getEntry()->readDir(buf);
+        if(len > 0) { curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)buf.buff, len)); }
 
-        return sizeof(ds);
+        return len;
     }
     xlen_t lSeek(int fd,off_t offset,int whence) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -627,7 +646,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
         if(file == nullptr) { return -EBADF; }
-        KStat kst = file->obj.ep;
+        KStat kst = file->obj.kst();
         curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst,sizeof(kst)));
         // @bug 用户态读到的数据混乱
         return statcode::ok;
@@ -1212,6 +1231,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::dup,dup);
         DECLSYSCALL(scnum::dup3,dup3);
         DECLSYSCALL(scnum::fcntl,fCntl);
+        DECLSYSCALL(scnum::ioctl,ioCtl);
         DECLSYSCALL(scnum::mkdirat,mkDirAt);
         DECLSYSCALL(scnum::linkat,linkAt);
         DECLSYSCALL(scnum::unlinkat,unlinkAt);

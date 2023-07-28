@@ -21,23 +21,41 @@ static constexpr int SEEK_SET = 0;
 static constexpr int SEEK_CUR = 1;
 static constexpr int SEEK_END = 2;
 
+// DStat::DStat(shared_ptr<File> a_file) {
+//     switch(a_file->obj.rType()) {
+//         case dev:
+//             *this = DStat(a_file->obj.rType());
+//             break;
+//         case pipe:
+//             *this = DStat(a_file->obj.getPipe());
+//             break;
+//         case entry:
+//             *this = DStat(a_file->obj.getEntry());
+//             break;
+//         default:
+//             *this = DStat(a_file->obj.rType());
+//             break;
+//     }
+//     return;
+// }
+
 int File::write(ByteArray a_buf){
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.w) { return rt; }
     Log(debug,"write(%d bytes)",a_buf.len);
-    switch(type){
+    switch(obj.rType()){
         case FileType::stdout:
         case FileType::stderr:
             FMT_PROC("%s", string(a_buf.c_str(), a_buf.len).c_str());
             rt = a_buf.len;
             break;
         case FileType::pipe:
-            obj.pipe->write(a_buf);
+            obj.getPipe()->write(a_buf);
             rt = a_buf.len;
             break;
         case FileType::entry:
-            if (obj.ep->getINode()->nodWrite(false, (xlen_t)a_buf.buff, off, a_buf.len) == a_buf.len) {
-                off += a_buf.len;
+            if (obj.getEntry()->getINode()->nodWrite(false, (xlen_t)a_buf.buff, obj.off(), a_buf.len) == a_buf.len) {
+                obj.off() += a_buf.len;
                 rt = a_buf.len;
             }
             else { rt = sys::statcode::err; }
@@ -47,22 +65,22 @@ int File::write(ByteArray a_buf){
     return rt;
 }
 int File::read(ByteArray buf, long a_off, bool a_update){  // @todo: 重构一下
-    if(a_off < 0) { a_off = off; }
     xlen_t rt=sys::statcode::err;
     if(!ops.fields.r) { return rt; }
-    switch(type){
+    switch(obj.rType()){
         case FileType::stdin:
             panic("unimplementd read type stdin\n");
             break;
         case FileType::pipe:
-            return obj.pipe->read(buf);
+            return obj.getPipe()->read(buf);
             break;
         case FileType::dev:
             panic("unimplementd read type dev\n");
             break;
         case FileType::entry: {
-            if(auto rdbytes = obj.ep->getINode()->nodRead(false, (uint64)buf.buff, a_off, buf.len); rdbytes > 0) {
-                if(a_update) { off = a_off + rdbytes; }
+            if(a_off < 0) { a_off = obj.off(); }
+            if(auto rdbytes = obj.getEntry()->getINode()->nodRead(false, (uint64)buf.buff, a_off, buf.len); rdbytes > 0) {
+                if(a_update) { obj.off() = a_off + rdbytes; }
                 return rdbytes;
             }
             break;
@@ -74,9 +92,9 @@ int File::read(ByteArray buf, long a_off, bool a_update){  // @todo: 重构一�
     return 0;
 }
 ByteArray File::readAll(){
-    switch(type){
+    switch(obj.rType()){
         case FileType::entry:{
-            size_t size=obj.ep->getINode()->rFileSize();
+            size_t size=obj.getEntry()->getINode()->rFileSize();
             return read(size);
         }
         default:
@@ -84,30 +102,30 @@ ByteArray File::readAll(){
     }
 }
 off_t File::lSeek(off_t a_offset, int a_whence) {
-    // if ((kst.st_mode&S_IFMT)==S_IFCHR || (kst.st_mode&S_IFMT)==S_IFIFO) { return 0; }
-    if(type!=FileType::entry)return -ESPIPE;
-    KStat kst = obj.ep;
+    if ((obj.kst().st_mode&S_IFMT)==S_IFCHR || (obj.kst().st_mode&S_IFMT)==S_IFIFO) { return 0; }
+    // if(type!=FileType::entry)return -ESPIPE;
+    KStat kst = obj.getEntry();
     switch (a_whence) {  // @todo: st_size处是否越界？
         case SEEK_SET: {
             if(a_offset<0 || a_offset>kst.st_size) { return -EINVAL; }
-            off = a_offset;
+            obj.off() = a_offset;
             break;
         }
         case SEEK_CUR: {
-            off_t noff = off + a_offset;
+            off_t noff = obj.off() + a_offset;
             if(noff<0 || noff>kst.st_size) { return -EINVAL; }
-            off = noff;
+            obj.off() = noff;
             break;
         }
         case SEEK_END: {
             off_t noff = kst.st_size + a_offset;
             if(noff<0 || noff>kst.st_size) { return -EINVAL; }
-            off = noff;
+            obj.off() = noff;
             break;
         }
         default: { return -EINVAL; }
     }
-    return off;
+    return obj.off();
 }
 ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len) {
     uint64_t in_off = 0;
@@ -137,11 +155,11 @@ ssize_t File::sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len
     return nsend;
 }
 File::~File() {
-    switch(type){
+    switch(obj.rType()){
         case FileType::pipe: {
-            if(ops.fields.r)obj.pipe->decReader();
-            else if(ops.fields.w)obj.pipe->decWriter();
-            obj.pipe.reset();
+            if(ops.fields.r)obj.getPipe()->decReader();
+            else if(ops.fields.w)obj.getPipe()->decWriter();
+            obj.getPipe().reset();
             break;
         }
         case FileType::entry: {
@@ -187,7 +205,14 @@ string Path::pathAbsolute() const {
     vector<string> name_abs = dirname;
     for(shared_ptr<DEntry> entry = base; !(entry->isRoot() && entry->getINode()->getSpBlk()->getFS()->isRootFS()); entry = entry->getParent()) { name_abs.emplace(name_abs.begin(), entry->rName()); }
     string path_abs = "";
-    for(string name : name_abs) { path_abs = path_abs + "/" + name; }
+    for(auto name = name_abs.begin(); name != name_abs.end();) {
+        if(*name=="." || *name=="..") { name = name_abs.erase(name); }
+        else if(next(name)!=name_abs.end() && *(next(name))=="..") { name = name_abs.erase(name); }
+        else {
+            path_abs = path_abs + "/" + *name;
+            ++name;
+        }
+    }
     if(path_abs == "") { path_abs = "/"; }
     return path_abs;
 }
@@ -216,11 +241,11 @@ shared_ptr<DEntry> Path::pathHitTable() {
 shared_ptr<DEntry> Path::pathSearch(bool a_parent) {
     if(pathname == "/") { return mnt_table["/"]->getSpBlk()->getRoot(); }  // 防止初始化进程时循环依赖cwd
     shared_ptr<DEntry> entry, next;
-    int dirnum = dirname.size();
     if(pathname.length() < 1) { return nullptr; }  // 空路径
     else if((entry=pathHitTable()) != nullptr) {}  // 查挂载表，若查到则起始目录存到entry中
     // else if(pathname[0] == '/') { entry = mnt_table["/"]->getSpBlk()->getRoot(); }  // 绝对路径
     else { entry = base; }  // 相对路径
+    int dirnum = dirname.size();
     for(int i = 0; i < dirnum; ++i) {
         Log(trace,"entry=",entry->rName().c_str());
         while(entry->isMntPoint()) panic("should be processed above");
@@ -352,7 +377,7 @@ int Path::pathOpen(int a_flags, mode_t a_mode) {  // @todo: 添加不打开额�
         return -ENOTDIR;
     }
     shared_ptr<File> file = make_shared<File>(entry, a_flags);
-    file->off = (a_flags&O_APPEND) ? entry->getINode()->rFileSize() : 0;
+    file->obj.off() = (a_flags&O_APPEND) ? entry->getINode()->rFileSize() : 0;
     int fd = kHartObj().curtask->getProcess()->fdAlloc(file);
     if(fd < 0) { return -1; }
     if(!(entry->getINode()->rAttr()&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { entry->getINode()->nodTrunc(); }
@@ -430,7 +455,7 @@ namespace fs
 list<shared_ptr<vm::VMO>> vmolru;
 
     shared_ptr<vm::VMO> File::vmo(){
-        auto vnode=obj.ep->getINode();
+        auto vnode=obj.getEntry()->getINode();
         if(vnode->vmo.expired()){
             auto rt=make_shared<vm::VMOPaged>(vm::bytes2pages(vnode->rFileSize()),eastl::dynamic_pointer_cast<vm::Pager>(make_shared<vm::VnodePager>(vnode)));
             vnode->vmo=eastl::weak_ptr<vm::VMOPaged>(rt);
@@ -441,9 +466,9 @@ list<shared_ptr<vm::VMO>> vmolru;
         return vnode->vmo.lock();
     }
     size_t File::readv(ScatteredIO &dst){
-        switch(type){
+        switch(obj.rType()){
         case FileType::entry:{
-            SingleFileScatteredReader fio(*obj.ep->getINode(),{{off,obj.ep->getINode()->rFileSize()}});
+            SingleFileScatteredReader fio(*obj.getEntry()->getINode(),{{obj.off(), obj.getEntry()->getINode()->rFileSize()}});
             return scatteredCopy(dst,fio);
         } break;
         case FileType::stdin:
@@ -453,13 +478,13 @@ list<shared_ptr<vm::VMO>> vmolru;
         return -1;
     }
     size_t File::writev(ScatteredIO &dst){
-        switch(type){
+        switch(obj.rType()){
         case FileType::entry:{
-            SingleFileScatteredWriter fio(*obj.ep->getINode(),{{off,obj.ep->getINode()->rFileSize()}});
+            SingleFileScatteredWriter fio(*obj.getEntry()->getINode(),{{obj.off(), obj.getEntry()->getINode()->rFileSize()}});
             return scatteredCopy(dst,fio);
             } break;
         case FileType::pipe:{
-            PipeScatteredWriter pio(*obj.pipe);
+            PipeScatteredWriter pio(*obj.getPipe());
             return scatteredCopy(dst,pio);
         } break;
         case FileType::stdout:

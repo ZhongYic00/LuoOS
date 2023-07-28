@@ -146,10 +146,11 @@ Process* proc::createProcess(){
         proc->files[FdCwd] = make_shared<File>(proc->cwd,0);
     }
     else { inited = true; }
-    using op=fs::FileOp;
-    proc->files[0] = make_shared<File>(File::stdin,op::read);
-    proc->files[1] = make_shared<File>(File::stdout,op::write);
-    proc->files[2] = make_shared<File>(File::stderr,op::write);
+    using FileOp = fs::FileOp;
+    using FileType = fs::FileType;
+    proc->files[0] = make_shared<File>(FileType::stdin, FileOp::read);
+    proc->files[1] = make_shared<File>(FileType::stdout, FileOp::write);
+    proc->files[2] = make_shared<File>(FileType::stderr, FileOp::write);
     DBG(proc->print();)
     Log(info,"proc created. pid=%d\n",proc->id);
     return proc;

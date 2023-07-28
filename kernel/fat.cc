@@ -170,7 +170,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         attribute = li.de.sne.attr;
     }
-    // // @todo 判断移到Path中
+    // // @done 判断已移到Path中
     // // '.'表示当前目录，则增加当前目录引用计数并返回当前目录
     // if (a_dirname == ".") { return entDup(); }
     // // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
@@ -191,7 +191,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     int entcnt = (len+CHAR_LONG_NAME-1) / CHAR_LONG_NAME + 1;   // count of l-n-entries, rounds up. plus s-n-e
     int count = 0; 
     int type;
-    uint off = 0;
+    uint off = a_off==nullptr ? 0 : *a_off;  // 从a_off处开始搜索
     relocClus(0, false); // 将当前目录的cur_clus设为0
     while ((type = entNext(ep, off, &count) != -1)) { // 每轮从off开始往后搜索
         // 文件已被删除
@@ -204,7 +204,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         }
         // 找到了一个有效文件
         // @todo 不区分大小写？
-        else if (strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME) == 0) {
+        else if (a_dirname=="" || strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME)==0) {
             ep->parent = entDup();
             ep->off = off;
             ep->valid = 1;
@@ -681,4 +681,22 @@ void FileSystem::unInstall() {
     spblk->unInstall();
     spblk.reset();
     return;
+}
+// @bug: 原型中无法使用自定义数据类型，似乎和shared_ptr有关
+// int INode::readDir(ArrayBuff<fs::DStat> &a_bufarr) override{
+int INode::readDir(fs::DStat *a_buf, uint a_len) {
+    nodPanic();
+    using fs::DStat;
+    uint off = 0, i = 0;
+    DirEnt *next_entry = nullptr;
+    for(; i < a_len; ++i) {
+        next_entry == entry->entSearch(&off);
+        if(next_entry != nullptr) { a_buf[i] = DStat(next_entry->first_clus, next_entry->off, next_entry->file_size, (next_entry->attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG, next_entry->filename); }
+        else { break; }
+    }
+    for(uint j = 0; j < i; ++j) {  // 计算偏移
+        if(j < i-1) { a_buf[j].d_off = a_buf[j+1].d_off - a_buf[j].d_off; }
+        else { a_buf[j].d_off = 0; }
+    }
+    return i * sizeof(DStat);
 }

@@ -162,7 +162,10 @@ namespace fat {
             ~DirEnt() { ref = 0; valid = 0; }
             DirEnt& operator=(const DirEnt& a_entry);
             DirEnt& operator=(const union Ent& a_ent);
-            DirEnt *entSearch(string a_dirname, uint *a_off = nullptr);
+            DirEnt *entSearch(string a_dirname, uint *a_off);  // 搜索完成后，a_off将被设置为搜索到的目录项的偏移
+            inline DirEnt *entSearch(string a_dirname) { return entSearch(a_dirname, nullptr); }
+            inline DirEnt *entSearch(uint *a_off) { return entSearch("", a_off); }  // 读取a_off起的下一个有效目录项
+            inline DirEnt *entSearch() { return entSearch("", nullptr); }
             int entNext(DirEnt *const a_entry, uint a_off, int *const a_count);
             inline int entNext(DirEnt *const a_entry, uint a_off) { return entNext(a_entry, a_off, nullptr); }
             inline int entNext(uint a_off, int *const a_count) { return entNext(nullptr, a_off, a_count); }
@@ -224,6 +227,7 @@ namespace fat {
             inline int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) { nodPanic(); return entry->entRead(a_usrdst, a_dst, a_off, a_len); }
             inline int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) { nodPanic(); return entry->entWrite(a_usrsrc, a_src, a_off, a_len); }
             inline int readLink(char *a_buf, size_t a_bufsiz) { Log(error,"FAT32 does not support readlink\n"); return -EPERM; }
+            int readDir(fs::DStat *a_buf, uint a_len);
             
             inline void unInstall() { nodPanic(); entry->entRelse(); entry->spblk.reset(); entry->mntblk.reset(); entry = nullptr; }
             inline uint8 rAttr() const { nodPanic(); return entry->attribute; }

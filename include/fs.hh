@@ -18,10 +18,16 @@ namespace fs{
     using memvec=eastl::vector<Segment<xlen_t>>;
     template<typename T>
     using Result=expected<T,xlen_t>;
+    
+    constexpr dev_t STDIN_DEV = 0;
+    constexpr dev_t STDOUT_DEV = (0x01<<10) | 0x01;
+    constexpr dev_t STDERR_DEV = (0x02<<10) | 0x02;
+    constexpr dev_t UNIMPL_DEV = -1;
 
     class INode;
     class DEntry;
     class FileSystem;
+    class DStat;
 
     class SuperBlock {
         public:
@@ -87,6 +93,7 @@ namespace fs{
             /// @param dst memvec(ppn)
             void readPages(const memvec &src,const memvec &dst);
             virtual int readLink(char *a_buf, size_t a_bufsiz) = 0;
+            virtual int readDir(DStat *a_buf, uint a_len) = 0;  // 读取该目录下尽可能多的目录项到a_bufarr中，返回读取的字节数
             virtual uint8 rAttr() const = 0;  // 返回该文件的属性
             virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
             virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
@@ -109,6 +116,7 @@ namespace fs{
             Result<DERef> entCreate(DERef self,string a_name, int a_attr);  // 在该目录项下以a_attr属性创建名为a_name的文件，返回指向该文件目录项的共享指针
             inline void setMntPoint() {isMount=true;}  // 设该目录项为a_fs文件系统的挂载点（不更新a_fs）
             inline void clearMnt() {isMount=false;}  // 清除该目录项的挂载点记录
+            inline int readDir(ArrayBuff<DStat> &a_bufarr) { return nod->readDir(a_bufarr.buff, a_bufarr.len); }
             inline string rName() const {return name;}  // 返回该目录项的文件名
             inline DERef getParent() {return parent;}  // 返回指向该目录项父目录的共享指针
             inline INodeRef getINode() {return nod;}  // 返回指向该目录项对应INode的共享指针
@@ -133,98 +141,10 @@ namespace fs{
             fields.a = a_flags & O_APPEND;
         }
     };
-    struct File {
-        enum FileType { none, pipe, entry, dev, stdin, stdout, stderr };
-        FileOps ops;
-        const FileType type;
-        int flags;
-        uint off = 0;
-        union Data {
-            shared_ptr<Pipe> pipe;
-            shared_ptr<DEntry> ep;
-            Data(FileType a_type){ assert(a_type==none || a_type==stdin || a_type==stdout || a_type==stderr); }
-            Data(const shared_ptr<Pipe> &a_pipe): pipe(a_pipe) {}
-            Data(shared_ptr<DEntry> a_ep): ep(a_ep) {}
-            ~Data() {}
-        }obj;
-        File(FileType a_type): type(a_type), obj(a_type) {}
-        File(FileType a_type, FileOp a_ops = FileOp::none): type(a_type), obj(a_type), ops(a_ops) {}
-        File(FileType a_type, int a_flags): type(a_type), obj(a_type), ops(a_flags), flags(a_flags) {}
-        File(const shared_ptr<Pipe> &a_pipe, FileOp a_ops): type(FileType::pipe), obj(a_pipe), ops(a_ops) { if(ops.fields.r)obj.pipe->addReader(); if(ops.fields.w)obj.pipe->addWriter(); }
-        File(shared_ptr<DEntry> a_ep, FileOp a_ops): type(FileType::entry), obj(a_ep), ops(a_ops) {}
-        File(shared_ptr<DEntry> a_ep, int a_flags): type(FileType::entry), obj(a_ep), ops(a_flags), flags(a_flags) {}
-        ~File();
-        int write(ByteArray a_buf);
-        int read(ByteArray buf, long a_off = -1, bool a_update = true);
-        ByteArray readAll();
-        size_t readv(ScatteredIO &dst);
-        size_t writev(ScatteredIO &dst);
-        shared_ptr<vm::VMO> vmo();
-        inline int readLink(char *a_buf, size_t a_bufsiz) { return obj.ep->getINode()->readLink(a_buf, a_bufsiz); }
-        off_t lSeek(off_t a_offset, int a_whence);
-        ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
-        inline int chMod(mode_t a_mode) { obj.ep->getINode()->chMod(a_mode); }
-        inline int chOwn(uid_t a_owner, gid_t a_group) { return obj.ep->getINode()->chOwn(a_owner, a_group); }
-    };
-    class Path {
-        private:
-            string pathname;
-            vector<string> dirname;
-            shared_ptr<DEntry> base;
-        public:
-            Path() = default;
-            Path(const Path& a_path) = default;
-            Path(const string& a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.ep) { pathBuild(); }
-            Path(const string& a_str, shared_ptr<DEntry> a_base):pathname(a_str), dirname(), base(a_base) { pathBuild(); }
-            Path(const string& a_str):pathname(a_str), dirname(), base(nullptr) { pathBuild(); }
-            Path(const char *a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.ep) { pathBuild(); }
-            Path(const char *a_str, shared_ptr<DEntry> a_base):pathname(a_str), dirname(), base(a_base) { pathBuild(); }
-            Path(const char *a_str):pathname(a_str), dirname(), base(nullptr) { pathBuild(); }
-            Path(shared_ptr<File> a_base):pathname(), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.ep) { pathBuild(); }
-            Path(shared_ptr<DEntry> a_base):pathname(), dirname(), base(a_base) { pathBuild(); }
-            ~Path() = default;
-            Path& operator=(const Path& a_path) = default;
-            void pathBuild();
-            string pathAbsolute() const;
-            shared_ptr<DEntry> pathHitTable();
-            shared_ptr<DEntry> pathSearch(bool a_parent = false);
-            shared_ptr<DEntry> pathCreate(short a_type, int a_mode);
-            int pathRemove();
-            int pathHardLink(Path a_newpath);
-            int pathHardUnlink();
-            int pathMount(Path a_devpath, string a_fstype);
-            int pathUnmount() const;
-            int pathOpen(int a_flags, mode_t a_mode = S_IFREG);
-            int pathSymLink(string a_target);
-            // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
-            // inline shared_ptr<File> pathOpen(mode_t a_mode) const { return pathOpen(0, a_file); }
-            // inline shared_ptr<File> pathOpen() const { return pathOpen(0, nullptr); }
-    };
-	class DStat {
-        public:
-            uint64 d_ino;	// 索引结点号
-            int64 d_off;	// 到下一个dirent的偏移
-            uint16 d_reclen;	// 当前dirent的长度
-            uint8 d_type;	// 文件类型
-            char d_name[STAT_MAX_NAME + 1];	//文件名
-        // public:
-            DStat() = default;
-            DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, STAT_MAX_NAME); }
-            DStat(shared_ptr<DEntry> a_entry):d_ino(a_entry->getINode()->rINo()), d_off(0), d_reclen(a_entry->getINode()->rFileSize()), d_type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry->rName().c_str(), STAT_MAX_NAME); }
-            ~DStat() = default;
-	};
-	class Stat {
-        public:
-            char name[STAT_MAX_NAME + 1]; // 文件名
-            int dev;     // File system's disk device // 文件系统的磁盘设备
-            short type;  // Type of file // 文件类型
-            uint64 size; // Size of file in bytes // 文件大小(字节)
-        // public:
-            Stat() = default;
-            Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
-            Stat(shared_ptr<DEntry> a_entry):name(), dev(a_entry->getINode()->rDev()), type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? T_DIR : T_FILE), size(a_entry->getINode()->rFileSize()) { strncpy(name, a_entry->rName().c_str(), STAT_MAX_NAME); }
-            ~Stat() = default;
-	};
+    enum FileType { none, pipe, entry, dev, stdin, stdout, stderr };
+    inline dev_t mkDevNum(FileType a_type) { return a_type==stdin ? STDIN_DEV : (a_type==stdout ? STDOUT_DEV : (a_type==stderr ? STDERR_DEV : UNIMPL_DEV)); }
+    inline string mkDevName(FileType a_type) { return a_type==stdin ? "$STDIN" : (a_type==stdout ? "$STDOUT" : (a_type==stderr ? "$STDERR" : "UNIMPL")); }
+    // @todo: 管道和设备文件无inode
 	class KStat {
         public:
             dev_t st_dev;  			/* ID of device containing file */
@@ -251,8 +171,114 @@ namespace fs{
             KStat() = default;
             KStat(const KStat& a_kstat):st_dev(a_kstat.st_dev), st_ino(a_kstat.st_ino), st_mode(a_kstat.st_mode), st_nlink(a_kstat.st_nlink), st_uid(a_kstat.st_uid), st_gid(a_kstat.st_gid), st_rdev(a_kstat.st_rdev), __pad(a_kstat.__pad), st_size(a_kstat.st_size), st_blksize(a_kstat.st_blksize), __pad2(a_kstat.__pad2), st_blocks(a_kstat.st_blocks), st_atime_sec(a_kstat.st_atime_sec), st_atime_nsec(a_kstat.st_atime_nsec), st_mtime_sec(a_kstat.st_mtime_sec), st_mtime_nsec(a_kstat.st_mtime_nsec), st_ctime_sec(a_kstat.st_ctime_sec), st_ctime_nsec(a_kstat.st_ctime_nsec), _unused() { memmove(_unused, a_kstat._unused, sizeof(_unused)); }
             KStat(shared_ptr<DEntry> a_entry):st_dev(a_entry->getINode()->rDev()), st_ino(a_entry->getINode()->rINo()), st_mode((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(a_entry->getINode()->rFileSize()), st_blksize(a_entry->getINode()->getSpBlk()->getFS()->rBlkSiz()), __pad2(0), st_blocks(st_size / st_blksize), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) { if(st_blocks*st_blksize < st_size) { ++st_blocks; } }
+            KStat(shared_ptr<Pipe> a_pipe):st_dev(0), st_ino(-1), st_mode(S_IFIFO), st_nlink(1), st_uid(0), st_gid(0), st_rdev(0), __pad(0), st_size(0), st_blksize(0), __pad2(0), st_blocks(0), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) {}
+            KStat(FileType a_type):st_dev(0), st_ino(mkDevNum(a_type)), st_mode(S_IFCHR), st_nlink(1), st_uid(0), st_gid(0), st_rdev(mkDevNum(a_type)), __pad(0), st_size(0), st_blksize(0), __pad2(0), st_blocks(0), st_atime_sec(0), st_atime_nsec(0), st_mtime_sec(0), st_mtime_nsec(0), st_ctime_sec(0), st_ctime_nsec(0), _unused({ 0, 0 }) {}
             ~KStat() = default;
-
+	};
+	class Stat {
+        public:
+            char name[STAT_MAX_NAME + 1]; // 文件名
+            int dev;     // File system's disk device // 文件系统的磁盘设备
+            short type;  // Type of file // 文件类型
+            uint64 size; // Size of file in bytes // 文件大小(字节)
+        // public:
+            Stat() = default;
+            Stat(const Stat& a_stat):name(), dev(a_stat.dev), type(a_stat.type), size(a_stat.size) { strncpy(name, a_stat.name, STAT_MAX_NAME); }
+            Stat(shared_ptr<DEntry> a_entry):name(), dev(a_entry->getINode()->rDev()), type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), size(a_entry->getINode()->rFileSize()) { strncpy(name, a_entry->rName().c_str(), STAT_MAX_NAME); }
+            ~Stat() = default;
+	};
+    struct File {
+        FileOps ops;
+        int flags;
+        union Data {
+            private:
+                // 在所有类型的struct中，objtype和kst的位置必须相同
+                struct { const FileType objtype; KStat kst; }dv;
+                struct { const FileType objtype; KStat kst; shared_ptr<Pipe> pipe; }pp;
+                struct { const FileType objtype; KStat kst; shared_ptr<DEntry> de; off_t off; }ep;  // @todo: 随File使用更新kst时间戳
+                inline void ensureDev() const { assert(dv.objtype==none || dv.objtype==stdin || dv.objtype==stdout || dv.objtype==stderr || dv.objtype==dev); }
+                inline void ensurePipe() const { assert(pp.objtype == pipe); }
+                inline void ensureEntry() const { assert(ep.objtype == entry); }
+            public:
+                Data(FileType a_type):dv({ a_type, a_type }) { ensureDev(); }
+                Data(const shared_ptr<Pipe> &a_pipe): pp({ FileType::pipe, a_pipe, a_pipe }) {}
+                Data(shared_ptr<DEntry> a_de): ep({ FileType::entry, a_de, a_de, 0 }) {}
+                ~Data() {}
+                inline shared_ptr<Pipe> getPipe() const { ensurePipe(); return pp.pipe; }
+                inline shared_ptr<DEntry> getEntry() const { ensureEntry(); return ep.de; }
+                inline KStat& kst() { return ep.kst; }
+                inline off_t& off() { ensureEntry(); return ep.off; }
+                inline FileType rType() { return dv.objtype; }
+        }obj;
+        File(FileType a_type):obj(a_type) {}
+        File(FileType a_type, FileOp a_ops = FileOp::none):obj(a_type), ops(a_ops) {}
+        File(FileType a_type, int a_flags):obj(a_type), ops(a_flags), flags(a_flags) {}
+        File(const shared_ptr<Pipe> &a_pipe, FileOp a_ops):obj(a_pipe), ops(a_ops) { if(ops.fields.r)obj.getPipe()->addReader(); if(ops.fields.w)obj.getPipe()->addWriter(); }
+        File(shared_ptr<DEntry> a_de, FileOp a_ops):obj(a_de), ops(a_ops) {}
+        File(shared_ptr<DEntry> a_de, int a_flags):obj(a_de), ops(a_flags), flags(a_flags) {}
+        ~File();
+        int write(ByteArray a_buf);
+        int read(ByteArray buf, long a_off = -1, bool a_update = true);
+        ByteArray readAll();
+        size_t readv(ScatteredIO &dst);
+        size_t writev(ScatteredIO &dst);
+        shared_ptr<vm::VMO> vmo();
+        inline int readLink(char *a_buf, size_t a_bufsiz) { return obj.getEntry()->getINode()->readLink(a_buf, a_bufsiz); }
+        off_t lSeek(off_t a_offset, int a_whence);
+        ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
+        inline int chMod(mode_t a_mode) { obj.getEntry()->getINode()->chMod(a_mode); }
+        inline int chOwn(uid_t a_owner, gid_t a_group) { return obj.getEntry()->getINode()->chOwn(a_owner, a_group); }
+    };
+    class Path {
+        private:
+            string pathname;
+            vector<string> dirname;
+            shared_ptr<DEntry> base;
+        public:
+            Path() = default;
+            Path(const Path& a_path) = default;
+            Path(const string& a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.getEntry()) { pathBuild(); }
+            Path(const string& a_str, shared_ptr<DEntry> a_base):pathname(a_str), dirname(), base(a_base) { pathBuild(); }
+            Path(const string& a_str):pathname(a_str), dirname(), base(nullptr) { pathBuild(); }
+            Path(const char *a_str, shared_ptr<File> a_base):pathname(a_str), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.getEntry()) { pathBuild(); }
+            Path(const char *a_str, shared_ptr<DEntry> a_base):pathname(a_str), dirname(), base(a_base) { pathBuild(); }
+            Path(const char *a_str):pathname(a_str), dirname(), base(nullptr) { pathBuild(); }
+            Path(shared_ptr<File> a_base):pathname(), dirname(), base(a_base==nullptr ? nullptr : a_base->obj.getEntry()) { pathBuild(); }
+            Path(shared_ptr<DEntry> a_base):pathname(), dirname(), base(a_base) { pathBuild(); }
+            ~Path() = default;
+            Path& operator=(const Path& a_path) = default;
+            void pathBuild();
+            string pathAbsolute() const;
+            shared_ptr<DEntry> pathHitTable();
+            shared_ptr<DEntry> pathSearch(bool a_parent = false);
+            shared_ptr<DEntry> pathCreate(short a_type, int a_mode);
+            int pathRemove();
+            int pathHardLink(Path a_newpath);
+            int pathHardUnlink();
+            int pathMount(Path a_devpath, string a_fstype);
+            int pathUnmount() const;
+            int pathOpen(int a_flags, mode_t a_mode = S_IFREG);
+            int pathSymLink(string a_target);
+            // inline shared_ptr<File> pathOpen(int a_flags) const { return pathOpen(a_flags, nullptr); }
+            // inline shared_ptr<File> pathOpen(mode_t a_mode) const { return pathOpen(0, a_file); }
+            // inline shared_ptr<File> pathOpen() const { return pathOpen(0, nullptr); }
+    };
+	class DStat {  // 即dirent64
+        public:
+            uint64 d_ino;	// 索引结点号
+            int64 d_off;	// 到下一个dirent的偏移
+            uint16 d_reclen;	// 当前dirent的长度
+            uint8 d_type;	// 文件类型
+            char d_name[STAT_MAX_NAME + 1];	//文件名
+        // public:
+            DStat() = default;
+            DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, STAT_MAX_NAME); }
+            DStat(uint64 a_ino, int64 a_off, uint16 a_len, uint8 a_type, string a_name):d_ino(a_ino), d_off(a_off), d_reclen(a_len), d_type(a_type), d_name() { strncpy(d_name, a_name.c_str(), STAT_MAX_NAME);}
+            // DStat(shared_ptr<File> a_file);
+            // DStat(shared_ptr<DEntry> a_entry):d_ino(a_entry->getINode()->rINo()), d_off(a_entry->getINode()->rNextOff()), d_reclen(a_entry->getINode()->rFileSize()), d_type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry->rName().c_str(), STAT_MAX_NAME); }
+            // DStat(shared_ptr<Pipe> a_pipe):d_ino(-1), d_off(0), d_reclen(0), d_type(S_IFIFO), d_name("$PIPE") {}
+            // DStat(FileType a_type):d_ino(mkDevNum(a_type)), d_off(0), d_reclen(0), d_type(S_IFIFO), d_name() { strncpy(d_name, mkDevName(a_type).c_str(), STAT_MAX_NAME); }
+            ~DStat() = default;
 	};
     class StatFS {
         private:
