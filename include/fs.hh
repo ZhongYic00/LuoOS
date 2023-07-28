@@ -39,6 +39,7 @@ namespace fs{
             virtual shared_ptr<DEntry> getMntPoint() const = 0;  // 返回文件系统在父文件系统上的挂载点，如果是根文件系统则返回根目录
             virtual FileSystem *getFS() const = 0;  // 返回指向该文件系统对象的共享指针
             virtual bool isValid() const = 0;  // 返回该超级块是否有效（Unmount后失效）
+            virtual mode_t rDefaultMod() const = 0;
     };
     class FileSystem {
         public:
@@ -98,6 +99,9 @@ namespace fs{
             virtual uint8 rDev() const = 0;  // 返回该文件所在文件系统的设备号
             virtual uint32 rFileSize() const = 0;  // 返回该文件的字节数
             virtual uint32 rINo() const = 0;  // 返回该INode的ino
+            virtual const timespec& rCTime() const = 0;
+            virtual const timespec& rMTime() const = 0;
+            virtual const timespec& rATime() const = 0;
             virtual bool isEmpty() = 0;
             virtual shared_ptr<SuperBlock> getSpBlk() const = 0;  // 返回指向该INode所属文件系统超级块的共享指针;
     };

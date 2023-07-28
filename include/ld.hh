@@ -20,6 +20,7 @@ namespace ld
     /// @brief 
     /// @return [entry, program break, ]
     eastl::tuple<xlen_t,xlen_t> loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar);
+    bool isElf(shared_ptr<fs::File> file);
 } // namespace ld
 
 #endif

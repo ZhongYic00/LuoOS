@@ -51,6 +51,7 @@ int main(){
         // "waitpid",
         // "write",
         // "yield"
+        "./time-test",
         "./busybox"
     };
     const int tsn = sizeof(testsuits) / sizeof(char const*);

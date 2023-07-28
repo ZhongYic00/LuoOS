@@ -8,6 +8,9 @@ namespace fat {
     using BlockBuf = struct bio::BlockBuf;
     using fs::File;
     using fs::DEntry;
+
+    static constexpr mode_t defaultMod = 0x0777;
+
     class FileSystem;
     class DirEnt;
 
@@ -71,6 +74,7 @@ namespace fat {
             inline uint32 rFS() const { return bpb.fat_sz; }
             inline uint32 rRC() const { return bpb.root_clus; }
             inline uint8 rDev() const { return dev; }
+            inline mode_t rDefaultMod() const { return defaultMod; }
             inline shared_ptr<fs::DEntry> getRoot() const;
             inline shared_ptr<fs::DEntry> getMntPoint() const { return mnt_point; }
             inline fs::FileSystem *getFS() const;
@@ -155,10 +159,13 @@ namespace fat {
             DirEnt *next; // 
             DirEnt *prev; // 
             bool mount_flag;
+            timespec ctime;
+            timespec mtime;
+            timespec atime;
         // public:
             DirEnt() = default;
-            DirEnt(const DirEnt& a_entry):filename(), attribute(a_entry.attribute), first_clus(a_entry.first_clus), file_size(a_entry.file_size), cur_clus(a_entry.cur_clus), clus_cnt(a_entry.clus_cnt), spblk(a_entry.spblk), mntblk(nullptr), dirty(a_entry.dirty), valid(a_entry.valid), ref(a_entry.ref), off(a_entry.off), parent(a_entry.parent), next(a_entry.next), prev(a_entry.prev), mount_flag(a_entry.mount_flag) { strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME); }
-            DirEnt(const char *a_name, uint8 a_attr, uint32 a_first_clus, shared_ptr<SuperBlock> a_spblk, DirEnt *a_next, DirEnt *a_prev):filename(), attribute(a_attr), first_clus(a_first_clus), file_size(0), cur_clus(first_clus), clus_cnt(0), spblk(a_spblk), mntblk(nullptr), dirty(false), valid(1), ref(1), off(0), parent(nullptr), next(a_next), prev(a_prev), mount_flag(false) { strncpy(filename, a_name, FAT32_MAX_FILENAME); }
+            DirEnt(const DirEnt& a_entry):filename(), attribute(a_entry.attribute), first_clus(a_entry.first_clus), file_size(a_entry.file_size), cur_clus(a_entry.cur_clus), clus_cnt(a_entry.clus_cnt), spblk(a_entry.spblk), mntblk(nullptr), dirty(a_entry.dirty), valid(a_entry.valid), ref(a_entry.ref), off(a_entry.off), parent(a_entry.parent), next(a_entry.next), prev(a_entry.prev), mount_flag(a_entry.mount_flag), ctime(a_entry.ctime), mtime(a_entry.mtime), atime(a_entry.atime) { strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME); }
+            DirEnt(const char *a_name, uint8 a_attr, uint32 a_first_clus, shared_ptr<SuperBlock> a_spblk, DirEnt *a_next, DirEnt *a_prev):filename(), attribute(a_attr), first_clus(a_first_clus), file_size(0), cur_clus(first_clus), clus_cnt(0), spblk(a_spblk), mntblk(nullptr), dirty(false), valid(1), ref(1), off(0), parent(nullptr), next(a_next), prev(a_prev), mount_flag(false), ctime({ 0 }), mtime({ 0 }), atime({ 0 }) { strncpy(filename, a_name, FAT32_MAX_FILENAME); }
             ~DirEnt() { ref = 0; valid = 0; }
             DirEnt& operator=(const DirEnt& a_entry);
             DirEnt& operator=(const union Ent& a_ent);
@@ -234,9 +241,13 @@ namespace fat {
             inline uint8 rDev() const { nodPanic(); return entry->spblk->rDev(); }
             inline uint32 rFileSize() const { nodPanic(); return entry->file_size; }
             inline uint32 rINo() const { nodPanic(); return inode_num; }
+            inline const timespec& rCTime() const { nodPanic(); return entry->ctime; }
+            inline const timespec& rMTime() const { nodPanic(); return entry->mtime; }
+            inline const timespec& rATime() const { nodPanic(); return entry->atime; }
             inline shared_ptr<fs::SuperBlock> getSpBlk() const { nodPanic(); return entry->mntblk==nullptr ? entry->spblk : entry->mntblk; }
             inline DirEnt *rawPtr() const { return nodDup(); }
     };
+    timespec getTimeSpec(uint16 a_date, uint16 a_time, uint8 a_tenth);
 }
 
 #endif

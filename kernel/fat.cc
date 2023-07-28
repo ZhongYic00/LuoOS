@@ -134,6 +134,21 @@ void Ent::readEntName(char *a_buf) const {
     else { sne.readEntName(a_buf); }
     return;
 }
+timespec fat::getTimeSpec(uint16 a_date, uint16 a_time, uint8 a_tenth) {
+    int day = a_date & ((1<<5) - 1);
+    a_date = a_date >> 5;
+    int month = a_date & ((1<<4) - 1);
+    a_date = a_date >> 4;
+    int year = (a_date & ((1<<7) - 1)) + 1980;
+
+    int second = (a_time & ((1<<5) - 1)) * 2 + a_tenth/100;
+    a_time = a_time >> 5;
+    int minute = a_time & ((1<<6) - 1);
+    a_time = a_time >> 6;
+    int hour = a_time & ((1<<5) - 1);
+
+    return { ((year/4 - year/100 + year/400) + 365*year + 367*month/12 + day - 719499)*86400 + hour*3600 + minute*60 + second, (a_tenth%100) * 10000000 };
+}
 DirEnt& DirEnt::operator=(const DirEnt& a_entry) {
     strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME);
     attribute = a_entry.attribute;
@@ -158,6 +173,9 @@ DirEnt& DirEnt::operator=(const union Ent& a_ent) {
     cur_clus = first_clus = ((uint32)a_ent.sne.fst_clus_hi<<16) | a_ent.sne.fst_clus_lo;
     file_size = a_ent.sne.file_size;
     clus_cnt = 0;
+    ctime = getTimeSpec(a_ent.sne._crt_date, a_ent.sne._crt_time, a_ent.sne._crt_time_tenth);
+    mtime = getTimeSpec(a_ent.sne._lst_wrt_date, a_ent.sne._lst_wrt_time, 0);
+    atime = getTimeSpec(a_ent.sne._lst_acce_date, 0, 0);
     return *this;
 }
 DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
