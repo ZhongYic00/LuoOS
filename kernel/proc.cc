@@ -187,10 +187,10 @@ void Process::exit(int status){
 }
 void Process::zombieExit(){
     Log(info,"Proc[%d] zombie exit",pid());
-    kGlobObjs->procMgr->del(this);
+    kGlobObjs->procMgr->del(pid());
 }
 Process::~Process(){
-    for(auto task:tasks)kGlobObjs->taskMgr->del(task);
+    for(auto task:tasks)kGlobObjs->taskMgr->del(task->id);
     tasks.clear();
 }
 Process *Process::parentProc(){return (**kGlobObjs->procMgr)[parent];}
