@@ -37,6 +37,33 @@ void VMAR::map(const PageMapping &mapping,bool ondemand){
     Log(debug, "after map, VMAR:%s", klib::toString(mappings).c_str());
     Log(debug,"pagetable: %s",pagetable.toString().c_str());
 }
+void VMAR::protect(const Segment region, perm_t perm){
+    Log(debug, "protect [%x,%x]=>%x", region.l,region.r,perm);
+    // bf
+    auto l = mappings.begin();
+    auto r = mappings.end();
+    for (auto i = l; i != r;){
+        if (auto ovlp=i->vsegment() & region){
+            pagetable.removeMapping(*i);
+            // left part
+            if(auto lregion=Segment{i->vpn,ovlp.l-1}){
+                auto lslice=i->splitChild(lregion);
+                map(lslice);
+            }
+            // right part
+            if(auto rregion=Segment{ovlp.r+1,i->vend()}){
+                auto rslice=i->splitChild(rregion);
+                map(rslice);
+            }
+            auto newmapping=i->splitChild(ovlp,perm);
+            /// @bug order may be incorrect
+            // remove origin
+            i=mappings.erase(i);
+            map(newmapping);
+        } else i++;
+    }
+    Log(debug, "after protect, VMAR:%s", klib::toString(mappings).c_str());
+}
 void VMAR::reset()
 {
     Log(debug,"before reset, VMAR:%s",klib::toString(mappings).c_str());

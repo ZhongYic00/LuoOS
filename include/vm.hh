@@ -128,9 +128,9 @@ namespace vm
         inline PageNum vend() const { return vpn + pages() - 1; }
         inline string toString() const { return klib::format("%lx=>%s", vpn, vmo->toString()); }
         /// @param region absolute vpn region
-        inline PageMapping splitChild(Segment region) const {
+        inline PageMapping splitChild(Segment region,perm_t newperm=0) const {
             /// @todo reduce mem
-            return PageMapping{region.l,region.length(),offset,vmo,perm,mapping,sharing};
+            return PageMapping{region.l,region.length(),offset,vmo,newperm?newperm:perm,mapping,sharing};
         }
         inline PageSlice req(PageNum idx) const{return vmo->req(offset+idx);}
         inline PageMapping clone() const {
@@ -225,6 +225,7 @@ namespace vm
         }
         /// @brief overlap should has been unmapped
         void map(const PageMapping &mapping,bool ondemand=false);
+        void protect(const Segment region, perm_t perm);
         /// @param region absolute vpn
         inline void unmap(const Segment region){
             // Log(debug, "unmap %s", mapping.toString().c_str());
@@ -246,7 +247,7 @@ namespace vm
                         map(rslice);
                     }
                     // remove origin
-                    /// @bug may be incorrect
+                    /// @bug may be incorrect, pagetable should first remove then overwrite?
                     pagetable.removeMapping(*i);
                     i=mappings.erase(i);
                 } else i++;
