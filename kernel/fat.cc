@@ -708,7 +708,7 @@ int INode::readDir(fs::DStat *a_buf, uint a_len) {
     uint off = 0, i = 0;
     DirEnt *next_entry = nullptr;
     for(; i < a_len; ++i) {
-        next_entry == entry->entSearch(&off);
+        next_entry = entry->entSearch(&off);
         if(next_entry != nullptr) { a_buf[i] = DStat(next_entry->first_clus, next_entry->off, next_entry->file_size, (next_entry->attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG, next_entry->filename); }
         else { break; }
     }
