@@ -48,12 +48,14 @@ Task* Process::newTask(){
     return thrd;
 }
 
-Task* Process::newTask(const Task &other,bool allocStack){
+Task* Process::newTask(const Task &other,addr_t ustack){
     auto [vaddr,buff]=newTrapframe();
     auto thrd=Task::createTask(**kGlobObjs->taskMgr,buff,other,this->pid());
     thrd->kctx.vaddr=vaddr;
-    if(allocStack){
+    if(!ustack){
         thrd->ctx.sp()=newUstack();
+    } else {
+        thrd->ctx.sp()=ustack;
     }
     addTask(thrd);
     kGlobObjs->scheduler->add(thrd);
@@ -161,7 +163,7 @@ pid_t proc::clone(Task *task){
     Log(info,"clone(src=%p:[%d])",proc,proc->pid());
     TRACE(Log(info,"src proc VMAR:\n");proc->vmar.print();)
     auto newproc=new (**kGlobObjs->procMgr) Process(*proc);
-    newproc->newTask(*task,false);
+    newproc->newTask(*task,task->ctx.sp());
     newproc->defaultTask()->ctx.a0()=sys::statcode::ok;
     TRACE(newproc->vmar.print();)
     return newproc->pid();
@@ -188,10 +190,10 @@ void Process::exit(int status){
 }
 void Process::zombieExit(){
     Log(info,"Proc[%d] zombie exit",pid());
-    kGlobObjs->procMgr->del(this);
+    kGlobObjs->procMgr->del(pid());
 }
 Process::~Process(){
-    for(auto task:tasks)kGlobObjs->taskMgr->del(task);
+    for(auto task:tasks)kGlobObjs->taskMgr->del(task->id);
     tasks.clear();
 }
 Process *Process::parentProc(){return (**kGlobObjs->procMgr)[parent];}

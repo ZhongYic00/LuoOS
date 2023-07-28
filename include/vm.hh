@@ -128,9 +128,9 @@ namespace vm
         inline PageNum vend() const { return vpn + pages() - 1; }
         inline string toString() const { return klib::format("%lx=>%s", vpn, vmo->toString()); }
         /// @param region absolute vpn region
-        inline PageMapping splitChild(Segment region) const {
+        inline PageMapping splitChild(Segment region,perm_t newperm=0) const {
             /// @todo reduce mem
-            return PageMapping{region.l,region.length(),offset,vmo,perm,mapping,sharing};
+            return PageMapping{region.l,region.length(),offset,vmo,newperm?newperm:perm,mapping,sharing};
         }
         inline PageSlice req(PageNum idx) const{return vmo->req(offset+idx);}
         inline PageMapping clone() const {
@@ -141,6 +141,8 @@ namespace vm
         }
         inline static perm_t prot2perm(Prot prot){
             using masks=PageTableEntry::fieldMasks;
+            /// @note how to deal with PROT_NONE
+            if(prot==0)return masks::u;
             perm_t rt=masks::v|masks::u;
             rt|=(prot&mask)<<1;
             return rt;
@@ -223,6 +225,7 @@ namespace vm
         }
         /// @brief overlap should has been unmapped
         void map(const PageMapping &mapping,bool ondemand=false);
+        void protect(const Segment region, perm_t perm);
         /// @param region absolute vpn
         inline void unmap(const Segment region){
             // Log(debug, "unmap %s", mapping.toString().c_str());
@@ -244,7 +247,7 @@ namespace vm
                         map(rslice);
                     }
                     // remove origin
-                    /// @bug may be incorrect
+                    /// @bug may be incorrect, pagetable should first remove then overwrite?
                     pagetable.removeMapping(*i);
                     i=mappings.erase(i);
                 } else i++;
@@ -283,14 +286,7 @@ namespace vm
             }
             return false;
         }
-        template<typename Lambda>
-        inline PageMapping find(Lambda predicate){
-            for(auto mapping: mappings){
-                if(predicate(mapping))
-                    return mapping;
-            }
-            /// @todo error handling
-        }
+        inline addr_t transaddr(addr_t vaddr){return pagetable.transaddr(vaddr);}
         class Writer{
             xlen_t vaddr;
             VMAR &parent;

@@ -468,8 +468,11 @@ list<shared_ptr<vm::VMO>> vmolru;
     size_t File::readv(ScatteredIO &dst){
         switch(obj.rType()){
         case FileType::entry:{
-            SingleFileScatteredReader fio(*obj.getEntry()->getINode(),{{obj.off(), obj.getEntry()->getINode()->rFileSize()}});
-            return scatteredCopy(dst,fio);
+            vector<Slice> fvec={{obj.off(),obj.getEntry()->getINode()->rFileSize()}};
+            SingleFileScatteredReader fio(*obj.getEntry()->getINode(),fvec);
+            auto rdbytes=scatteredCopy(dst,fio);
+            obj.off()+=rdbytes;
+            return rdbytes;
         } break;
         case FileType::stdin:
         default:
@@ -480,8 +483,11 @@ list<shared_ptr<vm::VMO>> vmolru;
     size_t File::writev(ScatteredIO &dst){
         switch(obj.rType()){
         case FileType::entry:{
-            SingleFileScatteredWriter fio(*obj.getEntry()->getINode(),{{obj.off(), obj.getEntry()->getINode()->rFileSize()}});
-            return scatteredCopy(dst,fio);
+            vector<Slice> fvec={{obj.off(),obj.getEntry()->getINode()->rFileSize()}};
+            SingleFileScatteredWriter fio(*obj.getEntry()->getINode(),fvec);
+            auto wbytes=scatteredCopy(dst,fio);
+            obj.off()+=wbytes;
+            return wbytes;
             } break;
         case FileType::pipe:{
             PipeScatteredWriter pio(*obj.getPipe());
