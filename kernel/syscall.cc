@@ -495,7 +495,7 @@ namespace syscall {
         if(dir->obj.rType() != fs::FileType::entry) { return -EINVAL; }
         // DStat ds = file;
         ArrayBuff<DStat> buf(a_len / sizeof(DStat));
-        int len = dir->obj.getEntry()->readDir(buf);
+        int len = dir->readDir(buf);
         if(len > 0) { curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)buf.buff, len)); }
 
         return len;

@@ -203,7 +203,15 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     }
     // DirEnt *ep = entHit(this, a_dirname.c_str());  // 从缓冲区中找
     DirEnt *ep = eCacheHit(a_dirname);  // 从缓冲区中找
-    if (ep->valid == 1) { return ep; }  // ecache hits
+    if (ep->valid == 1) {
+        // @todo: 会导致严重的性能问题
+        // if(a_off != nullptr) {
+        //     int count = 0;
+        //     entNext(ep->off, &count);
+        //     *a_off = ep->off + (count << 5);  // 将a_off更新为下一目录项的偏移
+        // }
+        return ep;
+    }  // ecache hits
     // 缓冲区找不到则往下执行
     size_t len = a_dirname.length();
     int entcnt = (len+CHAR_LONG_NAME-1) / CHAR_LONG_NAME + 1;   // count of l-n-entries, rounds up. plus s-n-e
@@ -222,11 +230,15 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         }
         // 找到了一个有效文件
         // @todo 不区分大小写？
-        else if (strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME)==0) {
-            ep->parent = entDup();
-            ep->off = off;
-            ep->valid = 1;
-            return ep;
+        else {
+            string epname = ep->filename;
+            if (strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME)==0 || (a_dirname=="" && epname!="." && epname!="..")) {
+                ep->parent = entDup();
+                ep->off = off;
+                ep->valid = 1;
+                if(a_off != nullptr) { *a_off = off + (count << 5); }
+                return ep;
+            }
         }
         off += count << 5; // off += count*32
     }
@@ -343,7 +355,8 @@ DirEnt *DirEnt::entDup() {
 DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成ecache的成员
     DirEnt *head = &(ecache.entries[0]);
     for (DirEnt *ep = head->next; ep != head; ep = ep->next) {  // LRU algo
-        if (ep->valid == 1 && ep->parent == this && strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME) == 0) {  // @todo 不区分大小写？
+        string epname = ep->filename;
+        if (ep->valid==1 && ep->parent==this && (strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME)==0 || (a_name=="" && epname!="." && epname!=".."))) {  // @todo 不区分大小写？
             if (ep->ref++ == 0) { ep->parent->ref++; }
             return ep;
         }
@@ -702,13 +715,13 @@ void FileSystem::unInstall() {
 }
 // @bug: 原型中无法使用自定义数据类型，似乎和shared_ptr有关
 // int INode::readDir(ArrayBuff<fs::DStat> &a_bufarr) override{
-int INode::readDir(fs::DStat *a_buf, uint a_len) {
+int INode::readDir(fs::DStat *a_buf, uint a_len, off_t &a_off) {
     nodPanic();
     using fs::DStat;
-    uint off = 0, i = 0;
+    uint i = 0;
     DirEnt *next_entry = nullptr;
     for(; i < a_len; ++i) {
-        next_entry = entry->entSearch(&off);
+        next_entry = entry->entSearch((uint*)&a_off);
         if(next_entry != nullptr) { a_buf[i] = DStat(next_entry->first_clus, next_entry->off, next_entry->file_size, (next_entry->attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG, next_entry->filename); }
         else { break; }
     }

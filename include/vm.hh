@@ -158,8 +158,9 @@ namespace vm
     public:
         VMOMapper(Arc<VMO> vmo);
         ~VMOMapper();
-        inline xlen_t start(){return pn2addr(region.l);}
-        inline klib::ByteArray asBytes(){return klib::ByteArray((uint8_t*)pn2addr(region.l),region.length()*pageSize);}
+        inline xlen_t start(){ return pn2addr(region.l); }
+        inline xlen_t end() { return pn2addr(region.r) + pageSize - 1; }  // 最后一页的最后一个字节（包括）
+        inline klib::ByteArray asBytes(){ return klib::ByteArray((uint8_t*)pn2addr(region.l), region.length()*pageSize); }
     };
 
     class PageTable{
@@ -269,14 +270,7 @@ namespace vm
             auto buff=ByteArray::from(paddr,len);
             return buff;
         }
-        inline void copyout(xlen_t addr,const ByteArray &buff){
-            // @todo 检查拷贝后是否会越界（addr+buff.len后超出用户进程大小）
-            // xlen_t paddr=pagetable.transaddr(addr);
-            auto mapping=find(addr);
-            VMOMapper mapper(mapping->vmo);
-            auto off=addr-pn2addr(mapping->vpn)+pn2addr(mapping->offset);
-            memmove((ptr_t)mapper.start()+off,buff.buff,buff.len);
-        }
+        void copyout(xlen_t addr,const ByteArray &buff);
         inline bool contains(xlen_t addr){
             for(auto mapping: mappings){
                 if(mapping.contains(addr))return true;

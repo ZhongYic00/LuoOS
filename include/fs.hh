@@ -94,7 +94,7 @@ namespace fs{
             /// @param dst memvec(ppn)
             void readPages(const memvec &src,const memvec &dst);
             virtual int readLink(char *a_buf, size_t a_bufsiz) = 0;
-            virtual int readDir(DStat *a_buf, uint a_len) = 0;  // 读取该目录下尽可能多的目录项到a_bufarr中，返回读取的字节数
+            virtual int readDir(DStat *a_buf, uint a_len, off_t &a_off) = 0;  // 读取该目录下尽可能多的目录项到a_bufarr中，返回读取的字节数
             virtual uint8 rAttr() const = 0;  // 返回该文件的属性
             virtual uint64 rDev() const = 0;  // 返回该文件所在文件系统的设备号
             virtual off_t rFileSize() const = 0;  // 返回该文件的字节数
@@ -120,7 +120,7 @@ namespace fs{
             Result<DERef> entCreate(DERef self,string a_name, int a_attr);  // 在该目录项下以a_attr属性创建名为a_name的文件，返回指向该文件目录项的共享指针
             inline void setMntPoint() {isMount=true;}  // 设该目录项为a_fs文件系统的挂载点（不更新a_fs）
             inline void clearMnt() {isMount=false;}  // 清除该目录项的挂载点记录
-            inline int readDir(ArrayBuff<DStat> &a_bufarr) { return nod->readDir(a_bufarr.buff, a_bufarr.len); }
+            inline int readDir(ArrayBuff<DStat> &a_bufarr, off_t &a_off) { return nod->readDir(a_bufarr.buff, a_bufarr.len, a_off); }
             inline string rName() const {return name;}  // 返回该目录项的文件名
             inline DERef getParent() {return parent;}  // 返回指向该目录项父目录的共享指针
             inline INodeRef getINode() {return nod;}  // 返回指向该目录项对应INode的共享指针
@@ -212,7 +212,7 @@ namespace fs{
                 inline shared_ptr<DEntry> getEntry() const { ensureEntry(); return ep.de; }
                 inline KStat& kst() { return ep.kst; }
                 inline off_t& off() { ensureEntry(); return ep.off; }
-                inline FileType rType() { return dv.objtype; }
+                inline FileType rType() { return ep.objtype; }
         }obj;
         File(FileType a_type):obj(a_type) {}
         File(FileType a_type, FileOp a_ops = FileOp::none):obj(a_type), ops(a_ops) {}
@@ -228,6 +228,7 @@ namespace fs{
         size_t writev(ScatteredIO &dst);
         shared_ptr<vm::VMO> vmo();
         inline int readLink(char *a_buf, size_t a_bufsiz) { return obj.getEntry()->getINode()->readLink(a_buf, a_bufsiz); }
+        inline int readDir(ArrayBuff<DStat> &a_bufarr) { return obj.getEntry()->readDir(a_bufarr, obj.off()); }
         off_t lSeek(off_t a_offset, int a_whence);
         ssize_t sendFile(shared_ptr<File> a_outfile, off_t *a_offset, size_t a_len);
         inline int chMod(mode_t a_mode) { obj.getEntry()->getINode()->chMod(a_mode); }
