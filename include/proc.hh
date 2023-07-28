@@ -67,7 +67,7 @@ namespace proc
             inline void sTick() { ++m_tms_stime; }
     };
     constexpr xlen_t UserStackDefault=0x8000000,
-        UstackSize=0x4000,
+        UstackSize=0x8000,
         UstackBottom=UserStackDefault-UstackSize,
         TrapframePages=2,
         UserHeapSize=0x100000;

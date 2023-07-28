@@ -12,6 +12,7 @@ namespace syscall
         if(flags&(CLONE_VM|CLONE_THREAD|CLONE_SIGHAND)){
             auto curproc=kHartObj().curtask->getProcess();
             auto thrd=curproc->newTask(*kHartObj().curtask,(addr_t)stack);
+            thrd->ctx.a0()=0;
             return thrd->id;
         } else {
             auto pid=proc::clone(kHartObj().curtask);
