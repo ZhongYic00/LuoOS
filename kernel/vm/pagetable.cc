@@ -113,7 +113,7 @@ namespace vm
                 if(entry.isLeaf())entry.setInvalid();
                 else {
                     // pushed down
-                    removeMapping(entry.child(),vpn,pages,level-1);
+                    removeMapping(entry.child(),vpn,bigPageSize,level-1);
                     assert(freePTNode(entry.child()));
                     entry.setInvalid();
                 }
@@ -155,13 +155,18 @@ namespace vm
         // auto rt=reinterpret_cast<pgtbl_t>(new PageTableNode);
         auto rt=reinterpret_cast<pgtbl_t>(vm::pn2addr(kGlobObjs->pageMgr->alloc(1)));
         memset(rt,0,sizeof(PageTableNode));
-        Log(debug,"createPTNode=0x%lx",rt);
+        Log(info,"createPTNode=0x%x",rt);
         return rt;
     }
     bool PageTable::freePTNode(pgtbl_t table){
         for(int i=0;i<pageEntriesPerPage;i++){
             auto &entry=table[i];
             if(entry.isValid())return false;
+        }
+        if(addr2pn((xlen_t)table)==0x833ff){
+            Log(info,"freePTNode=0x%x",addr2pn((xlen_t)table));
+            int i=0;
+            i++;
         }
         kGlobObjs->pageMgr->free(addr2pn((xlen_t)table),0);
         return true;
