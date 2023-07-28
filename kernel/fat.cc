@@ -205,11 +205,11 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
     DirEnt *ep = eCacheHit(a_dirname);  // 从缓冲区中找
     if (ep->valid == 1) {
         // @todo: 会导致严重的性能问题
-        // if(a_off != nullptr) {
-        //     int count = 0;
-        //     entNext(ep->off, &count);
-        //     *a_off = ep->off + (count << 5);  // 将a_off更新为下一目录项的偏移
-        // }
+        if(a_off != nullptr) {
+            int count = 0;
+            entNext(ep->off, &count);
+            *a_off = ep->off + (count << 5);  // 将a_off更新为下一目录项的偏移
+        }
         return ep;
     }  // ecache hits
     // 缓冲区找不到则往下执行
@@ -725,9 +725,10 @@ int INode::readDir(fs::DStat *a_buf, uint a_len, off_t &a_off) {
         if(next_entry != nullptr) { a_buf[i] = DStat(next_entry->first_clus, next_entry->off, next_entry->file_size, (next_entry->attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG, next_entry->filename); }
         else { break; }
     }
-    for(uint j = 0; j < i; ++j) {  // 计算偏移
+    for(uint j = 0; j < a_len; ++j) {  // 计算偏移
         if(j < i-1) { a_buf[j].d_off = a_buf[j+1].d_off - a_buf[j].d_off; }
-        else { a_buf[j].d_off = 0; }
+        else if(j == (i-1)) { a_buf[j].d_off = 0; }
+        // else { a_buf[j] = DStat(0, 0, 0, 0, nullptr); }
     }
     return i * sizeof(DStat);
 }
