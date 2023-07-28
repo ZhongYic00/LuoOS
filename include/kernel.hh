@@ -61,6 +61,7 @@ namespace sys
         exit=93,
         exit_group=94,
         settidaddress=96,
+        futex=98,
         nanosleep=101,
         clock_gettime=113,
         yield=124,
@@ -165,6 +166,7 @@ namespace kernel {
         mutex::LockedObject<proc::TaskManager,spinlock<false>> taskMgr;
         mutex::LockedObject<proc::ProcManager,spinlock<false>> procMgr;
         vm::PageCacheMgr pageCache;
+        unordered_map<addr_t,condition_variable::condition_variable> futexes;
         xlen_t ksatp;
         xlen_t prevsatp;
         KernelGlobalObjs();

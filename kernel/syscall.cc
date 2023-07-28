@@ -637,6 +637,9 @@ namespace syscall {
         // 现阶段实现为write-through缓存，自动同步
         return statcode::ok;
     }
+    int futex(int *uaddr, int futex_op, int val,
+                 const struct timespec *timeout,   /* or: uint32_t val2 */
+                 int *uaddr2, int val3);
     __attribute__((naked))
     void sleepSave(ptr_t gpr){
         saveContextTo(gpr);
@@ -738,14 +741,11 @@ namespace syscall {
         size_t a_sigsetsize = ctx.x(13);
 
         auto curproc = kHartObj().curtask->getProcess();
-        ByteArray nsetarr = curproc->vmar.copyin((xlen_t)a_nset, sizeof(SigSet));
-        SigSet *nset = (SigSet*)nsetarr.buff;
-        ByteArray osetarr(sizeof(SigSet));
-        SigSet *oset = (SigSet*)osetarr.buff;
-        if(a_oset == nullptr) { oset = nullptr; }
-
-        int ret = signal::sigProcMask(a_how, nset, oset, a_sigsetsize);
-        if(ret==0 && oset!=nullptr) { curproc->vmar.copyout((xlen_t)a_oset, osetarr); }
+        if(!a_nset) return 0;
+        SigSet nset,oset;
+        curproc->vmar[(addr_t)a_nset]>> nset;
+        int ret = signal::sigProcMask(a_how, &nset, &oset, a_sigsetsize);
+        if(a_oset) curproc->vmar[(addr_t)a_oset]<<oset;
         return ret;
     }
     xlen_t sigReturn() {
@@ -1189,6 +1189,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::exit,exit);
         DECLSYSCALL(scnum::exit_group,exitGroup);
         DECLSYSCALL(scnum::settidaddress,setTidAddress)
+        DECLSYSCALL(scnum::futex,futex);
         DECLSYSCALL(scnum::nanosleep,nanoSleep);
         DECLSYSCALL(scnum::clock_gettime,clock_gettime);
         DECLSYSCALL(scnum::yield,sysyield);

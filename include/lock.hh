@@ -120,6 +120,7 @@ namespace condition_variable
         void notify_one();
         void notify_all();
         void wait();
+        inline int waiters() const {return waiting.size();}
         inline void wait_for(){panic("unimplemented!");}
     };
 } // namespace condition_variable

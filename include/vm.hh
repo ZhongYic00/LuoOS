@@ -286,14 +286,7 @@ namespace vm
             }
             return false;
         }
-        template<typename Lambda>
-        inline PageMapping find(Lambda predicate){
-            for(auto mapping: mappings){
-                if(predicate(mapping))
-                    return mapping;
-            }
-            /// @todo error handling
-        }
+        inline addr_t transaddr(addr_t vaddr){return pagetable.transaddr(vaddr);}
         class Writer{
             xlen_t vaddr;
             VMAR &parent;
