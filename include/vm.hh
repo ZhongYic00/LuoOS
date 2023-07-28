@@ -141,6 +141,8 @@ namespace vm
         }
         inline static perm_t prot2perm(Prot prot){
             using masks=PageTableEntry::fieldMasks;
+            /// @note how to deal with PROT_NONE
+            if(prot==0)return masks::u;
             perm_t rt=masks::v|masks::u;
             rt|=(prot&mask)<<1;
             return rt;

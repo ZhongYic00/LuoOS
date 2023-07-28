@@ -6,9 +6,11 @@
 // #define moduleLevel LogLevel::debug
 
 using namespace vm;
-PageBuf::PageBuf(const PageKey key_):key(key),ppn(kGlobObjs->pageMgr->alloc(1)){}
+PageBuf::PageBuf(const PageKey key_):key(key),ppn(kGlobObjs->pageMgr->alloc(1)){
+    Log(info,"alloc(%x)",ppn);
+}
 PageBuf::~PageBuf(){
-    Log(debug,"free(%x)",ppn);
+    Log(info,"free(%x)",ppn);
     kGlobObjs->pageMgr->free(ppn,0);
 }
 
