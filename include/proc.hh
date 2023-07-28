@@ -123,7 +123,7 @@ namespace proc
         inline xlen_t satp(){return vmar.satp();}
         shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围
         Task* newTask();
-        Task* newTask(const Task &other,bool allocStack=true);
+        Task* newTask(const Task &other,addr_t ustack=0u);
         Task* newKTask(prior_t prior=0);
         void print();
         int fdAlloc(shared_ptr<File> a_file, int a_fd = 0, bool a_appoint = false);

@@ -946,17 +946,9 @@ namespace syscall {
     xlen_t getTid() {
         return kHartObj().curtask->tid();
     }
-    xlen_t clone(){
-        auto &ctx=kHartObj().curtask->ctx;
-        xlen_t func=ctx.x(10),childStack=ctx.x(11);
-        int flags=ctx.x(12);
-        auto pid=proc::clone(kHartObj().curtask);
-        auto thrd=(**kGlobObjs->procMgr)[pid]->defaultTask();
-        if(childStack)thrd->ctx.sp()=childStack;
-        // if(func)thrd->ctx.pc=func;
-        Log(debug,"clone curproc=%d, new proc=%d",kHartObj().curtask->getProcess()->pid(),pid);
-        return pid;
-    }
+    extern long clone(unsigned long flags, void *stack,
+                      int *parent_tid, int *child_tid,
+                      unsigned long tls);
     int waitpid(pid_t pid,xlen_t wstatus,int options){
         Log(debug,"waitpid(pid=%d,options=%d)",pid,options);
         auto curproc=kHartObj().curtask->getProcess();
