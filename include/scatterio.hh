@@ -106,6 +106,8 @@ public:
     size_t contConsume(Slice slice) override {
         auto availbytes=klib::min(it->length()-off,slice.length());
         auto rdbytes=vnode.nodWrite(false,slice.l,it->l+off,availbytes);
+        assert(rdbytes>0);
+        if(rdbytes<=0){it++;off=0;return 0;}
         off+=rdbytes;
         if(off==it->length()){it++;off=0;}
         if(availbytes && !rdbytes)it=vec.end();
