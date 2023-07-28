@@ -445,7 +445,9 @@ list<shared_ptr<vm::VMO>> vmolru;
         case FileType::entry:{
             vector<Slice> fvec={{off,obj.ep->getINode()->rFileSize()}};
             SingleFileScatteredReader fio(*obj.ep->getINode(),fvec);
-            return scatteredCopy(dst,fio);
+            auto rdbytes=scatteredCopy(dst,fio);
+            off+=rdbytes;
+            return rdbytes;
         } break;
         case FileType::stdin:
         default:
@@ -458,7 +460,9 @@ list<shared_ptr<vm::VMO>> vmolru;
         case FileType::entry:{
             vector<Slice> fvec={{off,obj.ep->getINode()->rFileSize()}};
             SingleFileScatteredWriter fio(*obj.ep->getINode(),fvec);
-            return scatteredCopy(dst,fio);
+            auto wbytes=scatteredCopy(dst,fio);
+            off+=wbytes;
+            return wbytes;
             } break;
         case FileType::pipe:{
             PipeScatteredWriter pio(*obj.pipe);
