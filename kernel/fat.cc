@@ -498,7 +498,7 @@ void DirEnt::entCreateOnDisk(const DirEnt *a_entry, uint a_off) {
         spblk->rwClus(cur_clus, true, false, (uint64)&de, a_off, sizeof(de));
     }
 }
-int DirEnt::entRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) {
+int DirEnt::entRead(uint64 a_dst, uint a_off, uint a_len) {
     if (a_off > file_size || a_off + a_len < a_off || (attribute & ATTR_DIRECTORY)) { return 0; }
     if (attribute & ATTR_LINK){
         struct Link li;
@@ -512,11 +512,11 @@ int DirEnt::entRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) {
         relocClus(a_off, false);
         m = spblk->rBPC() - a_off % spblk->rBPC();
         if (a_len - tot < m) { m = a_len - tot; }
-        if (spblk->rwClus(cur_clus, false, a_usrdst, a_dst, a_off % spblk->rBPC(), m) != m) { break; }
+        if (spblk->rwClus(cur_clus, false, false, a_dst, a_off % spblk->rBPC(), m) != m) { break; }
     }
     return tot;
 }
-int DirEnt::entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) {
+int DirEnt::entWrite(uint64 a_src, uint a_off, uint a_len) {
     if (a_off > file_size || a_off + a_len < a_off || (uint64)a_off + a_len > 0xffffffff || (attribute & ATTR_READ_ONLY)) { return -1; }
     if (attribute & ATTR_LINK){
         struct Link li;
@@ -534,7 +534,7 @@ int DirEnt::entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) {
         relocClus(a_off, true);
         m = spblk->rBPC() - a_off % spblk->rBPC();
         if (a_len - tot < m) { m = a_len - tot; }
-        if (spblk->rwClus(cur_clus, true, a_usrsrc, a_src, a_off % spblk->rBPC(), m) != m) { break; }
+        if (spblk->rwClus(cur_clus, true, false, a_src, a_off % spblk->rBPC(), m) != m) { break; }
     }
     if(a_len > 0) {
         if(a_off > file_size) {

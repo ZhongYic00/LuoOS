@@ -16,7 +16,7 @@ using namespace fs;
 
 using vm::pageSize;
 
-static unordered_map<string, shared_ptr<FileSystem>> mnt_table;
+unordered_map<string, shared_ptr<FileSystem>> mnt_table;
 static constexpr int SEEK_SET = 0;
 static constexpr int SEEK_CUR = 1;
 static constexpr int SEEK_END = 2;
@@ -54,7 +54,7 @@ int File::write(ByteArray a_buf){
             rt = a_buf.len;
             break;
         case FileType::entry:
-            if (obj.getEntry()->getINode()->nodWrite(false, (xlen_t)a_buf.buff, obj.off(), a_buf.len) == a_buf.len) {
+            if (obj.getEntry()->getINode()->nodWrite((xlen_t)a_buf.buff, obj.off(), a_buf.len) == a_buf.len) {
                 obj.off() += a_buf.len;
                 rt = a_buf.len;
             }
@@ -79,7 +79,7 @@ int File::read(ByteArray buf, long a_off, bool a_update){  // @todo: 重构一�
             break;
         case FileType::entry: {
             if(a_off < 0) { a_off = obj.off(); }
-            if(auto rdbytes = obj.getEntry()->getINode()->nodRead(false, (uint64)buf.buff, a_off, buf.len); rdbytes > 0) {
+            if(auto rdbytes = obj.getEntry()->getINode()->nodRead((uint64)buf.buff, a_off, buf.len); rdbytes > 0) {
                 if(a_update) { obj.off() = a_off + rdbytes; }
                 return rdbytes;
             }
@@ -233,7 +233,9 @@ shared_ptr<DEntry> Path::pathHitTable() {
         shared_ptr<DEntry> entry = mnt_table[longest_prefix]->getSpBlk()->getRoot();
         base = entry;
         pathname = path_abs.substr(longest);
-        pathBuild();
+        /// @todo refactor
+        if(!pathname.length())dirname.clear();
+        else pathBuild();
         return entry;
     }
     else { return nullptr; }
@@ -347,6 +349,14 @@ int Path::pathMount(Path a_devpath, string a_fstype) {
         return -1;
     }
     return 0;
+}
+int Path::mount(shared_ptr<FileSystem> fs){
+    if(auto dentry=pathSearch()){
+        auto pathabs=pathAbsolute();
+        mnt_table[pathabs]=fs;
+        return 0;
+    }
+    return -1;
 }
 int Path::pathUnmount() const {
     string path_abs = pathAbsolute();

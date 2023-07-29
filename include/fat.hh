@@ -186,8 +186,8 @@ namespace fat {
             void parentUpdate();
             DirEnt *entCreate(string a_name, int a_attr);
             void entCreateOnDisk(const DirEnt *a_entry, uint a_off);
-            int entRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len);
-            int entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len);
+            int entRead(uint64 a_dst, uint a_off, uint a_len);
+            int entWrite(uint64 a_src, uint a_off, uint a_len);
             void entRemove();
             inline bool isEmpty() { return entNext(2 * 32) == -1; }  // skip the "." and ".."
             int entLink(DirEnt *a_entry) const;
@@ -231,20 +231,20 @@ namespace fat {
             inline int chMod(mode_t a_mode) { Log(error,"FAT32 does not support chmod\n"); return -EPERM; }
             inline int chOwn(uid_t a_owner, gid_t a_group) { Log(error,"FAT32 does not support chown\n"); return -EPERM; }
             inline void nodTrunc() { nodPanic(); entry->entTrunc(); }
-            inline int nodRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) { nodPanic(); return entry->entRead(a_usrdst, a_dst, a_off, a_len); }
-            inline int nodWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) { nodPanic(); return entry->entWrite(a_usrsrc, a_src, a_off, a_len); }
+            inline int nodRead(uint64 a_dst, uint a_off, uint a_len) { nodPanic(); return entry->entRead(a_dst, a_off, a_len); }
+            inline int nodWrite(uint64 a_src, uint a_off, uint a_len) { nodPanic(); return entry->entWrite(a_src, a_off, a_len); }
             inline int readLink(char *a_buf, size_t a_bufsiz) { Log(error,"FAT32 does not support readlink\n"); return -EPERM; }
             int readDir(fs::DStat *a_buf, uint a_len, off_t &a_off);
             
             inline void unInstall() { nodPanic(); entry->entRelse(); entry->spblk.reset(); entry->mntblk.reset(); entry = nullptr; }
             inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
-            inline uint64 rDev() const { nodPanic(); return entry->spblk->rDev(); }
+            inline dev_t rDev() const { nodPanic(); return entry->spblk->rDev(); }
             inline off_t rFileSize() const { nodPanic(); return entry->file_size; }
-            inline uint64 rINo() const { nodPanic(); return inode_num; }
+            inline ino_t rINo() const { nodPanic(); return inode_num; }
             inline const timespec& rCTime() const { nodPanic(); return entry->ctime; }
             inline const timespec& rMTime() const { nodPanic(); return entry->mtime; }
             inline const timespec& rATime() const { nodPanic(); return entry->atime; }
-            inline shared_ptr<fs::SuperBlock> getSpBlk() const { nodPanic(); return entry->mntblk==nullptr ? entry->spblk : entry->mntblk; }
+            inline fs::SuperBlockRef getSpBlk() const { nodPanic(); return entry->mntblk==nullptr ? entry->spblk.get() : entry->mntblk.get(); }
             inline DirEnt *rawPtr() const { return nodDup(); }
     };
     timespec getTimeSpec(uint16 a_date, uint16 a_time, uint8 a_tenth);
