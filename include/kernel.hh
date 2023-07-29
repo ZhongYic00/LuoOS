@@ -153,10 +153,10 @@ namespace kernel {
     struct KernelInfo{
         using segment_t=vm::segment_t;
         struct KSegments{
-            segment_t dev,text,rodata,data,kstack,bss,frames,ramdisk;
+            segment_t dev,text,rodata,data,vdso,kstack,bss,frames,ramdisk;
         }segments;
         struct KVMOs{
-            Arc<vm::VMO> dev,text,rodata,data,kstack,bss,frames,ramdisk;
+            Arc<vm::VMO> dev,text,rodata,data,vdso,kstack,bss,frames,ramdisk;
         }vmos;
     };
     struct KernelGlobalObjs{

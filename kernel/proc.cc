@@ -7,6 +7,11 @@ using namespace proc;
 // #define moduleLevel LogLevel::info
 Process::Process(pid_t pid,prior_t prior,pid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
+    using namespace vm;
+    using perm=PageTableEntry::fieldMasks;
+    using mapping=PageMapping::MappingType;
+    using sharing=PageMapping::SharingType;
+    vmar.map(PageMapping{addr2pn(vDSOBase),vDSOPages,0,kInfo.vmos.vdso,perm::r|perm::x|perm::u|perm::v,mapping::system,sharing::shared});
 }
 Process::Process(prior_t prior,pid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){

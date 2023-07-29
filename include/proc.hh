@@ -66,11 +66,15 @@ namespace proc
             inline void uTick() { ++m_tms_utime; }
             inline void sTick() { ++m_tms_stime; }
     };
-    constexpr xlen_t UserStackDefault=0x8000000,
+    constexpr addr_t UserStackDefault=0x8000000,
         UstackSize=0x8000,
         UstackBottom=UserStackDefault-UstackSize,
         TrapframePages=2,
         UserHeapSize=0x100000;
+    constexpr addr_t vDSOBase=0x9000000,
+        vDSOPages=1;
+    template<typename fptr_t>
+    constexpr inline addr_t vDSOfuncAddr(fptr_t func){return vDSOBase+(addr_t)func&vm::vaddrOffsetMask;}
     constexpr int mOFiles = 101; // 官网测例往fd=100中写东西
     constexpr int FdCwd = 3;
 
