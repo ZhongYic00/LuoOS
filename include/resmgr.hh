@@ -12,7 +12,7 @@ struct IdManagable{
 };
 template<typename T>
 class ObjManager{
-    constexpr static int nobjs=128;
+    constexpr static int nobjs=512;
     int idCnt;
     T *objlist[nobjs];
 public:

@@ -168,7 +168,8 @@ pid_t proc::clone(Task *task){
     return newproc->pid();
 }
 
-Process::Process(const Process &other,pid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd){
+Process::Process(const Process &other,pid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd),
+    heapTop(other.heapBottom),heapBottom(other.heapBottom){
     for(int i=0;i<mOFiles;i++)files[i]=other.files[i];
 }
 void Process::exit(int status){
@@ -189,6 +190,9 @@ void Process::exit(int status){
 }
 void Process::zombieExit(){
     Log(info,"Proc[%d] zombie exit",pid());
+    for(auto child:kGlobObjs->procMgr->getChilds(pid())){
+        child->parent=parent;
+    }
     kGlobObjs->procMgr->del(pid());
 }
 Process::~Process(){

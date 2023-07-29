@@ -22,7 +22,7 @@ namespace proc
 
     struct Context
     {
-        xlen_t gpr[30];
+        xlen_t gpr[31];
         FORCEDINLINE inline xlen_t& x(int r){return gpr[r-1];}
         FORCEDINLINE inline xlen_t& ra(){return x(1);}
         FORCEDINLINE inline xlen_t& a0(){return x(10);}
@@ -67,7 +67,7 @@ namespace proc
             inline void sTick() { ++m_tms_stime; }
     };
     constexpr xlen_t UserStackDefault=0x8000000,
-        UstackSize=0x8000,
+        UstackSize=0x10000,
         UstackBottom=UserStackDefault-UstackSize,
         TrapframePages=2,
         UserHeapSize=0x100000;
@@ -193,7 +193,7 @@ namespace proc
     public:
         vector<Process*> getChilds(pid_t pid){
             vector<Process*> rt;
-            for(int i=0;i<128;i++){
+            for(int i=0;i<512;i++){
                 auto p=this->operator[](i);
                 if(p && p->parent==pid)
                     rt.push_back(p);

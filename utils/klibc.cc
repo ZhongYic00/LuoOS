@@ -1,6 +1,7 @@
 #ifndef GUEST
 
 #include "klib.h"
+#include "rvcsr.hh"
 #include "alloc.hh"
 
 void (*puts)(const char *s);
@@ -147,7 +148,12 @@ int printf(const char* s, ...)
 
 void panic(const char *s)
 {
-	printf("panic: %s",s);
+	printf("panic: %s\n",s);
+	xlen_t sepc,scause,stval;
+	csrRead(sepc,sepc);
+	csrRead(scause,scause);
+	csrRead(stval,stval);
+	printf("sepc=%x scause=%x stval=%x\n",sepc,scause,stval);
 	halt();
 }
 void assert_(bool cond,const char *s){
