@@ -274,11 +274,12 @@ namespace fs{
             int64 d_off;	// 到下一个dirent的偏移
             uint16 d_reclen;	// 当前dirent的长度
             uint8 d_type;	// 文件类型
-            char d_name[STAT_MAX_NAME + 1];	//文件名
+            char d_name[255 + 1];	//文件名
+            // uint8 _unused[19] = { 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };  // 对齐
         // public:
             DStat() = default;
-            DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, STAT_MAX_NAME); }
-            DStat(uint64 a_ino, int64 a_off, uint16 a_len, uint8 a_type, string a_name):d_ino(a_ino), d_off(a_off), d_reclen(a_len), d_type(a_type), d_name() { strncpy(d_name, a_name.c_str(), STAT_MAX_NAME);}
+            DStat(const DStat& a_dstat):d_ino(a_dstat.d_ino), d_off(a_dstat.d_off), d_reclen(a_dstat.d_reclen), d_type(a_dstat.d_type), d_name() { strncpy(d_name, a_dstat.d_name, 255); }
+            DStat(uint64 a_ino, int64 a_off, uint16 a_len, uint8 a_type, string a_name):d_ino(a_ino), d_off(a_off), d_reclen(a_len), d_type(a_type), d_name() { strncpy(d_name, a_name.c_str(), 255);}
             // DStat(shared_ptr<File> a_file);
             // DStat(shared_ptr<DEntry> a_entry):d_ino(a_entry->getINode()->rINo()), d_off(a_entry->getINode()->rNextOff()), d_reclen(a_entry->getINode()->rFileSize()), d_type((a_entry->getINode()->rAttr()&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG), d_name() { strncpy(d_name, a_entry->rName().c_str(), STAT_MAX_NAME); }
             // DStat(shared_ptr<Pipe> a_pipe):d_ino(-1), d_off(0), d_reclen(0), d_type(S_IFIFO), d_name("$PIPE") {}

@@ -89,10 +89,15 @@ namespace syscall {
         // curproc->cwd = fs::entEnter("/");
         curproc->cwd = Path("/").pathSearch();
         curproc->files[FdCwd] = make_shared<File>(curproc->cwd,0);
+        // Path("/proc").pathRemove();
         shared_ptr<DEntry> ep = Path("/proc").pathCreate(T_DIR, 0);
         if(ep == nullptr) { panic("create /dev failed\n"); }
-        ep = Path("/proc/mounts").pathCreate(T_DIR, 0);
+        // Path("/proc/mounts").pathRemove();
+        ep = Path("/proc/mounts").pathCreate(T_FILE, 0);
         if(ep == nullptr) { panic("create /proc/mounts failed\n"); }
+        auto file = make_shared<File>(ep, O_RDWR);
+        const char content[] = "fat32 /";
+        file->write(ByteArray((uint8*)content, strlen(content)+1));
         Log(info,"fat initialize ok");
         return statcode::ok;
     }
@@ -493,11 +498,9 @@ namespace syscall {
         shared_ptr<File> dir = curproc->ofile(a_dirfd);
         if(dir == nullptr) { return -EBADF; }
         if(dir->obj.rType() != fs::FileType::entry) { return -EINVAL; }
-        // DStat ds = file;
         ArrayBuff<DStat> buf(a_len / sizeof(DStat));
         int len = dir->readDir(buf);
         if(len > 0) { curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)buf.buff, len)); }
-        // return len;
         return len;
     }
     xlen_t lSeek(int fd,off_t offset,int whence) {

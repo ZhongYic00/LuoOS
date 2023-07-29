@@ -207,7 +207,9 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         // @todo: 会导致严重的性能问题
         if(a_off != nullptr) {
             int count = 0;
-            entNext(ep->off, &count);
+            DirEnt tmp;
+            tmp.valid = 0;
+            entNext(&tmp, ep->off, &count);
             *a_off = ep->off + (count << 5);  // 将a_off更新为下一目录项的偏移
         }
         return ep;
@@ -722,13 +724,9 @@ int INode::readDir(fs::DStat *a_buf, uint a_len, off_t &a_off) {
     DirEnt *next_entry = nullptr;
     for(; i < a_len; ++i) {
         next_entry = entry->entSearch((uint*)&a_off);
-        if(next_entry != nullptr) { a_buf[i] = DStat(next_entry->first_clus, next_entry->off, next_entry->file_size, (next_entry->attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG, next_entry->filename); }
+        if(next_entry != nullptr) { a_buf[i] = DStat(next_entry->first_clus, a_off - next_entry->off, sizeof(DStat), (next_entry->attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG, next_entry->filename); }
         else { break; }
     }
-    for(uint j = 0; j < a_len; ++j) {  // 计算偏移
-        if(j < i-1) { a_buf[j].d_off = a_buf[j+1].d_off - a_buf[j].d_off; }
-        else if(j == (i-1)) { a_buf[j].d_off = 0; }
-        // else { a_buf[j] = DStat(0, 0, 0, 0, ""); }
-    }
+    if(i > 0) { a_buf[i-1].d_off = 0; }
     return i * sizeof(DStat);
 }
