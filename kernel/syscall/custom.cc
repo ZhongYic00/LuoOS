@@ -98,8 +98,9 @@ namespace syscall
             auto root=procfs->getSpBlk()->getRoot();
             auto mounts=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<MountsFile>();
             root->getINode()->link("mounts",mounts);
+            auto self=root->entCreate(root,"self",ATTR_DIRECTORY).value();
             auto mountsinfo=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<MountsInfoFile>();
-            root->getINode()->link("mountsinfo",mountsinfo);
+            self->getINode()->link("mountinfo",mountsinfo);
             auto meminfo=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<MemInfoFile>();
             root->getINode()->link("meminfo",meminfo);
             Log(warning,"%d",mounts->rINo());
