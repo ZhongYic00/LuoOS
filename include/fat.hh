@@ -180,7 +180,7 @@ namespace fat {
             int relocClus(uint a_off, bool a_alloc);
             const uint32 allocClus() const;
             DirEnt *entDup();
-            DirEnt *eCacheHit(string a_name) const;
+            DirEnt *eCacheHit(string a_name, off_t a_off = 0) const;
             void entRelse();
             void entTrunc();
             void parentUpdate();

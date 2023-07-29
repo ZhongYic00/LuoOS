@@ -497,6 +497,7 @@ namespace syscall {
         ArrayBuff<DStat> buf(a_len / sizeof(DStat));
         int len = dir->readDir(buf);
         if(len > 0) { curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)buf.buff, len)); }
+        // return len;
         return len;
     }
     xlen_t lSeek(int fd,off_t offset,int whence) {

@@ -202,7 +202,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         return nullptr;
     }
     // DirEnt *ep = entHit(this, a_dirname.c_str());  // 从缓冲区中找
-    DirEnt *ep = eCacheHit(a_dirname);  // 从缓冲区中找
+    DirEnt *ep = eCacheHit(a_dirname, a_off==nullptr ? 0 : *a_off);  // 从缓冲区中找
     if (ep->valid == 1) {
         // @todo: 会导致严重的性能问题
         if(a_off != nullptr) {
@@ -352,11 +352,11 @@ DirEnt *DirEnt::entDup() {
     ++ref;
     return this;
 }
-DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成ecache的成员
+DirEnt *DirEnt::eCacheHit(string a_name, off_t a_off) const {  // @todo 重构ecache，写成ecache的成员
     DirEnt *head = &(ecache.entries[0]);
     for (DirEnt *ep = head->next; ep != head; ep = ep->next) {  // LRU algo
         string epname = ep->filename;
-        if (ep->valid==1 && ep->parent==this && (strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME)==0 || (a_name=="" && epname!="." && epname!=".."))) {  // @todo 不区分大小写？
+        if (ep->valid==1 && ep->parent==this && ep->off>=a_off && (strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME)==0 || (a_name=="" && epname!="." && epname!=".."))) {  // @todo 不区分大小写？
             if (ep->ref++ == 0) { ep->parent->ref++; }
             return ep;
         }
@@ -728,7 +728,7 @@ int INode::readDir(fs::DStat *a_buf, uint a_len, off_t &a_off) {
     for(uint j = 0; j < a_len; ++j) {  // 计算偏移
         if(j < i-1) { a_buf[j].d_off = a_buf[j+1].d_off - a_buf[j].d_off; }
         else if(j == (i-1)) { a_buf[j].d_off = 0; }
-        // else { a_buf[j] = DStat(0, 0, 0, 0, nullptr); }
+        // else { a_buf[j] = DStat(0, 0, 0, 0, ""); }
     }
     return i * sizeof(DStat);
 }
