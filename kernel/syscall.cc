@@ -80,27 +80,7 @@ namespace syscall {
         // return rt;
         return statcode::ok;
     }
-    xlen_t testFATInit() {
-        // @todo: 处理/proc/mounts
-        Log(info, "initializing fat\n");
-        int init = fs::rootFSInit();
-        if(init != 0) { panic("fat init failed\n"); }
-        auto curproc = kHartObj().curtask->getProcess();
-        // curproc->cwd = fs::entEnter("/");
-        curproc->cwd = Path("/").pathSearch();
-        curproc->files[FdCwd] = make_shared<File>(curproc->cwd,0);
-        // Path("/proc").pathRemove();
-        shared_ptr<DEntry> ep = Path("/proc").pathCreate(T_DIR, 0);
-        if(ep == nullptr) { panic("create /dev failed\n"); }
-        // Path("/proc/mounts").pathRemove();
-        ep = Path("/proc/mounts").pathCreate(T_FILE, 0);
-        if(ep == nullptr) { panic("create /proc/mounts failed\n"); }
-        auto file = make_shared<File>(ep, O_RDWR);
-        const char content[] = "fat32 /";
-        file->write(ByteArray((uint8*)content, strlen(content)+1));
-        Log(info,"fat initialize ok");
-        return statcode::ok;
-    }
+    extern sysrt_t testFATInit();
     xlen_t getCwd(void) {
         auto &ctx = kHartObj().curtask->ctx;
         char *a_buf = (char*)ctx.x(10);
