@@ -1048,6 +1048,8 @@ namespace syscall {
         ustream.reverse=true;
         xlen_t endMarker=0x114514;
         ustream<<endMarker;
+        ustream<<0ul;
+        auto dlRandomAddr=ustream.addr();
         for(auto arg:args){
             ustream<<arg;
             argv.buff[argc++]=ustream.addr();
@@ -1058,6 +1060,7 @@ namespace syscall {
         // ctx.sp()-=ctx.sp()%16;
         vector<Elf64_auxv_t> auxv;
         auxv.push_back({AT_PAGESZ,vm::pageSize});
+        auxv.push_back({AT_RANDOM,dlRandomAddr});
         auxv.push_back({AT_NULL,0});
         ustream<<ArrayBuff(auxv.data(),auxv.size());
         ustream<<nullptr;
