@@ -1002,7 +1002,7 @@ namespace syscall {
     sysrt_t madvise(addr_t addr,size_t length,int advice);
     sysrt_t mlock(addr_t addr, size_t len);
     sysrt_t munlock(addr_t addr, size_t len);
-    int execve_(shared_ptr<fs::File> file,vector<klib::ByteArray> &args,char **envp){
+    int execve_(shared_ptr<fs::File> file,vector<klib::ByteArray> &args,vector<klib::ByteArray> &envs){
         auto &ctx=kHartObj().curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
         auto curproc=kHartObj().curtask->getProcess();
@@ -1018,6 +1018,7 @@ namespace syscall {
         curproc->heapTop=curproc->heapBottom=brk;
         /// setup stack
         ArrayBuff<xlen_t> argv(args.size()+1);
+        vector<addr_t> envps;
         int argc=0;
         auto ustream=curproc->vmar[ctx.sp()];
         ustream.reverse=true;
@@ -1029,6 +1030,10 @@ namespace syscall {
             ustream<<arg;
             argv.buff[argc++]=ustream.addr();
         }
+        for(auto env:envs){
+            ustream<<env;
+            envps.push_back(ustream.addr());
+        }
         // ctx.sp()=ustream.addr();
         argv.buff[argc]=0;
         // ctx.sp()-=argv.len*sizeof(xlen_t);
@@ -1039,6 +1044,7 @@ namespace syscall {
         auxv.push_back({AT_NULL,0});
         ustream<<ArrayBuff(auxv.data(),auxv.size());
         ustream<<nullptr;
+        ustream<<envps;
         ustream<<argv;
         auto argvsp=ustream.addr();
         // assert(argvsp==ctx.sp());
@@ -1067,7 +1073,7 @@ namespace syscall {
         shared_ptr<DEntry> Ent=Path(path).pathSearch();
         auto file=make_shared<File>(Ent,fs::FileOp::read);
         
-        vector<ByteArray> args;
+        vector<ByteArray> args,envs;
 
         // check whether elf or script
         auto interprtArg="sh\0";
@@ -1087,7 +1093,14 @@ namespace syscall {
             argv+=sizeof(char*);
         }while(str!=0);
         /// @brief get envs
-        return execve_(file,args,0);
+        auto ustream=curproc->vmar[envp];
+        do{
+            ustream>>str;
+            if(!str)break;
+            auto buff=curproc->vmar.copyinstr(str,100);
+            envs.push_back(buff);
+        }while(str!=0);
+        return execve_(file,args,envs);
     }
     expected<xlen_t,string> reboot(){
         auto &ctx=kHartObj().curtask->ctx;

@@ -292,6 +292,12 @@ namespace vm
                 auto buff=ByteArray((uint8_t*)&d,sizeof(d));
                 return operator<<(buff);
             }
+            template<typename T>
+            inline Writer& operator<<(vector<T> &vec){
+                auto buff=ArrayBuff<T>(vec.begin(),vec.size())
+                    .template toArrayBuff<uint8_t>();
+                return operator<<(buff);
+            }
             inline Writer& operator<<(const ByteArray &bytes){
                 if(!reverse){
                     parent.copyout(vaddr,bytes);
