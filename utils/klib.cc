@@ -3,7 +3,7 @@
 #include "sbi.hh"
 #include "lock.hh"
 
-int enableLevel=LogLevel::error;
+int enableLevel=LogLevel::info;
 
 mutex::spinlock<false> putslock;
 void IO::_sbiputs(const char *s){

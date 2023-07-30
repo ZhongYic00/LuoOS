@@ -80,22 +80,7 @@ namespace syscall {
         // return rt;
         return statcode::ok;
     }
-    xlen_t testFATInit() {
-        // @todo: 处理/proc/mounts
-        Log(info, "initializing fat\n");
-        int init = fs::rootFSInit();
-        if(init != 0) { panic("fat init failed\n"); }
-        auto curproc = kHartObj().curtask->getProcess();
-        // curproc->cwd = fs::entEnter("/");
-        curproc->cwd = Path("/").pathSearch();
-        curproc->files[FdCwd] = make_shared<File>(curproc->cwd,0);
-        shared_ptr<DEntry> ep = Path("/proc").pathCreate(T_DIR, 0);
-        if(ep == nullptr) { panic("create /dev failed\n"); }
-        ep = Path("/proc/mounts").pathCreate(T_DIR, 0);
-        if(ep == nullptr) { panic("create /proc/mounts failed\n"); }
-        Log(info,"fat initialize ok");
-        return statcode::ok;
-    }
+    extern sysrt_t testFATInit();
     xlen_t getCwd(void) {
         auto &ctx = kHartObj().curtask->ctx;
         char *a_buf = (char*)ctx.x(10);
@@ -197,17 +182,12 @@ namespace syscall {
         auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
         xlen_t a_request = ctx.x(11);
-        void *a_arg = (void*)ctx.x(12); // @todo 还没用上
+        addr_t a_arg = ctx.x(12); // @todo 还没用上
         
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
-        if (!(file->obj.kst().st_mode & S_IFCHR)) { return -ENOTTY; }
-        // if (file->obj.kst().st_dev == DEV_TTY) { return fs_ioctl_tty(fd, request, argp); }
-        // else if (file->obj.kst().st_dev == DEV_RTC) { return fs_ioctl_rtc(fd, request, argp); }
-        else {
-            Log(error, "ioctl: unimplemented device 0x%x", file->obj.kst().st_rdev);
-            return -ENODEV;
-        }
+        auto rt=file->ioctl(a_request,a_arg);
+        return rt;
     }
     xlen_t mkDirAt(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -360,7 +340,7 @@ namespace syscall {
         // DirEnt *ep = fs::entEnter(path);
         shared_ptr<DEntry> ep = Path(path).pathSearch();
         if(ep == nullptr) { return statcode::err; }
-        if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)){ return statcode::err; }
+        if(!S_ISDIR(ep->getINode()->rMode())){ return statcode::err; }
 
         curproc->cwd = ep;
         curproc->files[FdCwd] = make_shared<File>(curproc->cwd, O_RDWR);
@@ -374,7 +354,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> nwd = curproc->ofile(a_fd);
         if(nwd == nullptr) { return -EBADF; }
-        if(!(nwd->obj.getEntry()->getINode()->rAttr() & ATTR_DIRECTORY)) { return -ENOTDIR; }
+        if(!S_ISDIR(nwd->obj.getEntry()->getINode()->rMode())) { return -ENOTDIR; }
         curproc->cwd = nwd->obj.getEntry();
         curproc->files[FdCwd] = nwd;
 
@@ -493,11 +473,9 @@ namespace syscall {
         shared_ptr<File> dir = curproc->ofile(a_dirfd);
         if(dir == nullptr) { return -EBADF; }
         if(dir->obj.rType() != fs::FileType::entry) { return -EINVAL; }
-        // DStat ds = file;
         ArrayBuff<DStat> buf(a_len / sizeof(DStat));
-        int len = dir->obj.getEntry()->readDir(buf);
+        int len = dir->readDir(buf);
         if(len > 0) { curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)buf.buff, len)); }
-
         return len;
     }
     xlen_t lSeek(int fd,off_t offset,int whence) {

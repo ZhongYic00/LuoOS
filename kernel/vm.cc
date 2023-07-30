@@ -77,3 +77,17 @@ void VMAR::reset()
     Log(debug,"after reset, VMAR:%s",klib::toString(mappings).c_str());
     Log(debug,"pagetable: %s",pagetable.toString().c_str());
 }
+void VMAR::copyout(xlen_t addr,const ByteArray &buff) {
+    // @todo 检查拷贝后是否会越界（addr+buff.len后超出用户进程大小）
+    for(xlen_t va_begin = addr, src_begin = (xlen_t)buff.buff, len = buff.len, cpylen = 0; len > 0; va_begin += cpylen, src_begin += cpylen, len -= cpylen) {
+        auto mapping = find(va_begin);
+        VMOMapper mapper(mapping->vmo);
+        xlen_t off = va_begin - pn2addr(mapping->vpn) + pn2addr(mapping->offset);
+        xlen_t pa_begin = mapper.start() + off;
+        xlen_t pa_end = pa_begin + len - 1;  // 包括pa_end
+        xlen_t pa_bound = mapper.end();  // 包括pa_bound
+        pa_end = pa_end>pa_bound ? pa_bound : pa_end;  // 包括pa_end
+        cpylen = pa_end - pa_begin + 1;
+        memmove((void*)pa_begin, (void*)src_begin, cpylen);
+    }
+}
