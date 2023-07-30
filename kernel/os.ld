@@ -121,6 +121,12 @@ SECTIONS
 		 */
 		*(.sdata .sdata.*)
 		*(.data .data.*)
+
+		. = ALIGN(4k);
+		PROVIDE(_vdso_start = .);
+		*(vDSO)
+		PROVIDE(_vdso_end = .);
+
 		PROVIDE(_data_end = .);
 	} >ram
 

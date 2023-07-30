@@ -20,6 +20,7 @@ kernel::KernelHartObjs kHartObjs[8];
 extern char _text_start,_text_end;
 extern char _rodata_start,_rodata_end;
 extern char _data_start,_data_end;
+extern char _vdso_start,_vdso_end;
 extern char _bss_start,_bss_end;
 extern char _frames_start,_frames_end;
 extern char _kstack_start,_kstack_end;
@@ -29,6 +30,7 @@ kernel::KernelInfo kInfo={
         .text={(xlen_t)&_text_start,(xlen_t)&_text_end},
         .rodata={(xlen_t)&_rodata_start,(xlen_t)&_rodata_end},
         .data={(xlen_t)&_data_start,(xlen_t)&_data_end},
+        .vdso={(xlen_t)&_vdso_start,(xlen_t)&_vdso_end},
         .kstack=vm::segment_t{(xlen_t)&_kstack_start,(xlen_t)&_kstack_end},
         .bss={(xlen_t)&_bss_start,(xlen_t)&_bss_end},
         .frames={(xlen_t)&_frames_start,(xlen_t)&_frames_end},
@@ -122,6 +124,7 @@ static void memInit(){
     { auto &seg=kInfo.segments.rodata;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.rodata=make_shared<VMOContiguous>(st,pages);}
     { auto &seg=kInfo.segments.kstack;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.kstack=make_shared<VMOContiguous>(st,pages);}
     { auto &seg=kInfo.segments.data;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.data=make_shared<VMOContiguous>(st,pages);}
+    { auto &seg=kInfo.segments.vdso;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.vdso=make_shared<VMOContiguous>(st,pages);}
     { auto &seg=kInfo.segments.bss;auto st=addr2pn(seg.first),ed=addr2pn(seg.second),pages=ed-st+1;kInfo.vmos.bss=make_shared<VMOContiguous>(st,pages);}
     kernel::createKernelMapping(*(kGlobObjs->vmar.get()));
     { auto &seg=kInfo.segments.dev;
@@ -247,6 +250,7 @@ void init(int hartid){
         schedule();
         Log(info,"first schedule on hart%d",kernel::readHartId());
         kLogger.outputLevel=warning;
+        enableLevel=warning;
         _strapexit();
     }
     halt();

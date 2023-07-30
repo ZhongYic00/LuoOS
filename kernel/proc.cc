@@ -7,6 +7,11 @@ using namespace proc;
 // #define moduleLevel LogLevel::info
 Process::Process(pid_t pid,prior_t prior,pid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
+    using namespace vm;
+    using perm=PageTableEntry::fieldMasks;
+    using mapping=PageMapping::MappingType;
+    using sharing=PageMapping::SharingType;
+    vmar.map(PageMapping{addr2pn(vDSOBase),vDSOPages,0,kInfo.vmos.vdso,perm::r|perm::x|perm::u|perm::v,mapping::system,sharing::shared});
 }
 Process::Process(prior_t prior,pid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
@@ -148,10 +153,11 @@ Process* proc::createProcess(){
         proc->files[FdCwd] = make_shared<File>(proc->cwd,0);
     }
     else { inited = true; }
-    using op=fs::FileOp;
-    proc->files[0] = make_shared<File>(File::stdin,op::read);
-    proc->files[1] = make_shared<File>(File::stdout,op::write);
-    proc->files[2] = make_shared<File>(File::stderr,op::write);
+    using FileOp = fs::FileOp;
+    using FileType = fs::FileType;
+    proc->files[0] = make_shared<File>(FileType::stdin, FileOp::read);
+    proc->files[1] = make_shared<File>(FileType::stdout, FileOp::write);
+    proc->files[2] = make_shared<File>(FileType::stderr, FileOp::write);
     DBG(proc->print();)
     Log(info,"proc created. pid=%d\n",proc->id);
     return proc;

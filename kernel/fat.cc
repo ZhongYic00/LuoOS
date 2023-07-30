@@ -134,6 +134,21 @@ void Ent::readEntName(char *a_buf) const {
     else { sne.readEntName(a_buf); }
     return;
 }
+timespec fat::getTimeSpec(uint16 a_date, uint16 a_time, uint8 a_tenth) {
+    int day = a_date & ((1<<5) - 1);
+    a_date = a_date >> 5;
+    int month = a_date & ((1<<4) - 1);
+    a_date = a_date >> 4;
+    int year = (a_date & ((1<<7) - 1)) + 1980;
+
+    int second = (a_time & ((1<<5) - 1)) * 2 + a_tenth/100;
+    a_time = a_time >> 5;
+    int minute = a_time & ((1<<6) - 1);
+    a_time = a_time >> 6;
+    int hour = a_time & ((1<<5) - 1);
+
+    return { ((year/4 - year/100 + year/400) + 365*year + 367*month/12 + day - 719499)*86400 + hour*3600 + minute*60 + second, (a_tenth%100) * 10000000 };
+}
 DirEnt& DirEnt::operator=(const DirEnt& a_entry) {
     strncpy(filename, a_entry.filename, FAT32_MAX_FILENAME);
     attribute = a_entry.attribute;
@@ -158,6 +173,9 @@ DirEnt& DirEnt::operator=(const union Ent& a_ent) {
     cur_clus = first_clus = ((uint32)a_ent.sne.fst_clus_hi<<16) | a_ent.sne.fst_clus_lo;
     file_size = a_ent.sne.file_size;
     clus_cnt = 0;
+    ctime = getTimeSpec(a_ent.sne._crt_date, a_ent.sne._crt_time, a_ent.sne._crt_time_tenth);
+    mtime = getTimeSpec(a_ent.sne._lst_wrt_date, a_ent.sne._lst_wrt_time, 0);
+    atime = getTimeSpec(a_ent.sne._lst_acce_date, 0, 0);
     return *this;
 }
 DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
@@ -170,7 +188,7 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         first_clus = ((uint32)(li.de.sne.fst_clus_hi)<<16) + li.de.sne.fst_clus_lo;
         attribute = li.de.sne.attr;
     }
-    // // @todo 判断移到Path中
+    // // @done 判断已移到Path中
     // // '.'表示当前目录，则增加当前目录引用计数并返回当前目录
     // if (a_dirname == ".") { return entDup(); }
     // // '..'表示父目录，则增加当前目录的父目录引用计数并返回父目录；如果当前是根目录则同'.'
@@ -184,14 +202,24 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         return nullptr;
     }
     // DirEnt *ep = entHit(this, a_dirname.c_str());  // 从缓冲区中找
-    DirEnt *ep = eCacheHit(a_dirname);  // 从缓冲区中找
-    if (ep->valid == 1) { return ep; }  // ecache hits
+    DirEnt *ep = eCacheHit(a_dirname, a_off==nullptr ? 0 : *a_off);  // 从缓冲区中找
+    if (ep->valid == 1) {
+        // @todo: 会导致严重的性能问题
+        if(a_off != nullptr) {
+            int count = 0;
+            DirEnt tmp;
+            tmp.valid = 0;
+            entNext(&tmp, ep->off, &count);
+            *a_off = ep->off + (count << 5);  // 将a_off更新为下一目录项的偏移
+        }
+        return ep;
+    }  // ecache hits
     // 缓冲区找不到则往下执行
     size_t len = a_dirname.length();
     int entcnt = (len+CHAR_LONG_NAME-1) / CHAR_LONG_NAME + 1;   // count of l-n-entries, rounds up. plus s-n-e
     int count = 0; 
     int type;
-    uint off = 0;
+    uint off = a_off==nullptr ? 0 : *a_off;  // 从a_off处开始搜索
     relocClus(0, false); // 将当前目录的cur_clus设为0
     while ((type = entNext(ep, off, &count) != -1)) { // 每轮从off开始往后搜索
         // 文件已被删除
@@ -204,11 +232,15 @@ DirEnt *DirEnt::entSearch(string a_dirname, uint *a_off) {
         }
         // 找到了一个有效文件
         // @todo 不区分大小写？
-        else if (strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME) == 0) {
-            ep->parent = entDup();
-            ep->off = off;
-            ep->valid = 1;
-            return ep;
+        else {
+            string epname = ep->filename;
+            if (strncmpamb(a_dirname.c_str(), ep->filename, FAT32_MAX_FILENAME)==0 || (a_dirname=="" && epname!="." && epname!="..")) {
+                ep->parent = entDup();
+                ep->off = off;
+                ep->valid = 1;
+                if(a_off != nullptr) { *a_off = off + (count << 5); }
+                return ep;
+            }
         }
         off += count << 5; // off += count*32
     }
@@ -322,10 +354,11 @@ DirEnt *DirEnt::entDup() {
     ++ref;
     return this;
 }
-DirEnt *DirEnt::eCacheHit(string a_name) const {  // @todo 重构ecache，写成ecache的成员
+DirEnt *DirEnt::eCacheHit(string a_name, off_t a_off) const {  // @todo 重构ecache，写成ecache的成员
     DirEnt *head = &(ecache.entries[0]);
     for (DirEnt *ep = head->next; ep != head; ep = ep->next) {  // LRU algo
-        if (ep->valid == 1 && ep->parent == this && strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME) == 0) {  // @todo 不区分大小写？
+        string epname = ep->filename;
+        if (ep->valid==1 && ep->parent==this && ep->off>=a_off && (strncmpamb(ep->filename, a_name.c_str(), FAT32_MAX_FILENAME)==0 || (a_name=="" && epname!="." && epname!=".."))) {  // @todo 不区分大小写？
             if (ep->ref++ == 0) { ep->parent->ref++; }
             return ep;
         }
@@ -465,7 +498,7 @@ void DirEnt::entCreateOnDisk(const DirEnt *a_entry, uint a_off) {
         spblk->rwClus(cur_clus, true, false, (uint64)&de, a_off, sizeof(de));
     }
 }
-int DirEnt::entRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) {
+int DirEnt::entRead(uint64 a_dst, uint a_off, uint a_len) {
     if (a_off > file_size || a_off + a_len < a_off || (attribute & ATTR_DIRECTORY)) { return 0; }
     if (attribute & ATTR_LINK){
         struct Link li;
@@ -479,11 +512,11 @@ int DirEnt::entRead(bool a_usrdst, uint64 a_dst, uint a_off, uint a_len) {
         relocClus(a_off, false);
         m = spblk->rBPC() - a_off % spblk->rBPC();
         if (a_len - tot < m) { m = a_len - tot; }
-        if (spblk->rwClus(cur_clus, false, a_usrdst, a_dst, a_off % spblk->rBPC(), m) != m) { break; }
+        if (spblk->rwClus(cur_clus, false, false, a_dst, a_off % spblk->rBPC(), m) != m) { break; }
     }
     return tot;
 }
-int DirEnt::entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) {
+int DirEnt::entWrite(uint64 a_src, uint a_off, uint a_len) {
     if (a_off > file_size || a_off + a_len < a_off || (uint64)a_off + a_len > 0xffffffff || (attribute & ATTR_READ_ONLY)) { return -1; }
     if (attribute & ATTR_LINK){
         struct Link li;
@@ -501,7 +534,7 @@ int DirEnt::entWrite(bool a_usrsrc, uint64 a_src, uint a_off, uint a_len) {
         relocClus(a_off, true);
         m = spblk->rBPC() - a_off % spblk->rBPC();
         if (a_len - tot < m) { m = a_len - tot; }
-        if (spblk->rwClus(cur_clus, true, a_usrsrc, a_src, a_off % spblk->rBPC(), m) != m) { break; }
+        if (spblk->rwClus(cur_clus, true, false, a_src, a_off % spblk->rBPC(), m) != m) { break; }
     }
     if(a_len > 0) {
         if(a_off > file_size) {
@@ -659,7 +692,7 @@ void SuperBlock::unInstall() {
     mnt_point.reset();
     return;
 }
-int FileSystem::ldSpBlk(uint8 a_dev, shared_ptr<fs::DEntry> a_mnt) {
+int FileSystem::ldSpBlk(uint64 a_dev, shared_ptr<fs::DEntry> a_mnt) {
     static bool ecacheinit = true;
     if(ecacheinit) {
         eCacheInit();
@@ -681,4 +714,19 @@ void FileSystem::unInstall() {
     spblk->unInstall();
     spblk.reset();
     return;
+}
+// @bug: 原型中无法使用自定义数据类型，似乎和shared_ptr有关
+// int INode::readDir(ArrayBuff<fs::DStat> &a_bufarr) override{
+int INode::readDir(fs::DStat *a_buf, uint a_len, off_t &a_off) {
+    nodPanic();
+    using fs::DStat;
+    uint i = 0;
+    DirEnt *next_entry = nullptr;
+    for(; i < a_len; ++i) {
+        next_entry = entry->entSearch((uint*)&a_off);
+        if(next_entry != nullptr) { a_buf[i] = DStat(next_entry->first_clus, a_off - next_entry->off, sizeof(DStat), (next_entry->attribute&ATTR_DIRECTORY) ? S_IFDIR : S_IFREG, next_entry->filename); }
+        else { break; }
+    }
+    if(i > 0) { a_buf[i-1].d_off = 0; }
+    return i * sizeof(DStat);
 }

@@ -22,25 +22,8 @@
 
 // #define F_DUPFD         1
 
-#define ATTR_READ_ONLY      0x01  // 只读
-#define ATTR_HIDDEN         0x02  // 隐藏
-#define ATTR_SYSTEM         0x04  // 系统
-#define ATTR_VOLUME_ID      0x08  // 卷标
-#define ATTR_DIRECTORY      0x10  // 目录
-#define ATTR_ARCHIVE        0x20  // 文档
-#define ATTR_LONG_NAME      0x0F  // 长名
-#define ATTR_LINK           0x40  // link
-
-#define LAST_LONG_ENTRY     0x40  // 最后一个长文件名目录
-#define FAT32_EOC           0x0ffffff8  // 
-#define EMPTY_ENTRY         0xe5
-#define END_OF_ENTRY        0x00
-#define CHAR_LONG_NAME      13
-#define CHAR_SHORT_NAME     11
-
 #define FAT32_MAX_FILENAME  255
 #define FAT32_MAX_PATH      260
-#define ENTRY_CACHE_NUM     50
 
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 

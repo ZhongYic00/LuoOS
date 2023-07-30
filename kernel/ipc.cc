@@ -6,6 +6,8 @@ namespace pipe
 {
 } // namespace ipc
 shared_ptr<signal::SigAct> defaultSigAct;
+
+extern void sigreturn();
 namespace signal
 {
     #define SIG_BASE_ERRNO (128)
@@ -282,8 +284,7 @@ namespace signal
         curproc->vmar.copyout((xlen_t)link, ByteArray((uint8*)&sigstack, sizeof(uintptr_t)));
         // 切换信号处理上下文
         if(sa->sa_restorer != nullptr) { ctx.x(REG_RA) = reinterpret_cast<long>(sa->sa_restorer); }  // @todo: 设置了SA_SIGINFO时restorer发生改变
-        // else { ctx.x(REG_RA) = VSDO_ADDR | ((uintptr_t)__sigreturn & 0xfff); }  // @todo: VSDO
-        else { panic("unimplemented: VSDO"); }
+        else { ctx.ra() = proc::vDSOfuncAddr(sigreturn); }  // @todo: VSDO
         ctx.x(REG_SP) = sigstack;
         ctx.x(REG_A0) = signum;
         if(sa->sa_flags & SA_SIGINFO) {

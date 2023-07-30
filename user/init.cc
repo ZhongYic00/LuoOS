@@ -51,7 +51,7 @@ int main(){
         // "waitpid",
         // "write",
         // "yield"
-        // "./libc-bench",
+        // "./time-test",
         "./busybox"
     };
     const int tsn = sizeof(testsuits) / sizeof(char const*);
