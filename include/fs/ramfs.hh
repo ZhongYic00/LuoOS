@@ -1,5 +1,6 @@
 #ifndef RAMFS_HH__
 #define RAMFS_HH__
+#include "fcntl.h"
 #include "fs.hh"
 
 #define moduleLevel debug
@@ -63,9 +64,9 @@ namespace ramfs
         inline int readDir(fs::DStat *a_buf, uint a_len, off_t &a_off) override {
             return 0;
         }
-        inline INodeRef mknod(string a_name,int attr) override {
+        inline INodeRef mknod(string a_name,mode_t mode) override {
             if(!isDir) return nullptr;
-            bool isdir=attr&ATTR_DIRECTORY;
+            bool isdir=S_ISDIR(mode);
             auto nod=super->mknod(isdir);
             subs[a_name]=nod;
             return nod;
@@ -92,7 +93,7 @@ namespace ramfs
             return a_len;
         }
         int readLink(char *a_buf, size_t a_bufsiz) override { return -1; }
-        uint8_t rAttr() const override {return isDir?ATTR_DIRECTORY:0;}
+        virtual mode_t rMode() const override {return isDir?S_IFDIR:S_IFREG;}
         dev_t rDev() const override {return 0;}
         off_t rFileSize() const override {return bytes.size();}
         ino_t rINo() const override {return ino;}

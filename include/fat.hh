@@ -9,6 +9,26 @@ namespace fat {
     using fs::File;
     using fs::DEntry;
 
+
+
+#define ATTR_READ_ONLY      0x01  // 只读
+#define ATTR_HIDDEN         0x02  // 隐藏
+#define ATTR_SYSTEM         0x04  // 系统
+#define ATTR_VOLUME_ID      0x08  // 卷标
+#define ATTR_DIRECTORY      0x10  // 目录
+#define ATTR_ARCHIVE        0x20  // 文档
+#define ATTR_LONG_NAME      0x0F  // 长名
+#define ATTR_LINK           0x40  // link
+
+#define LAST_LONG_ENTRY     0x40  // 最后一个长文件名目录
+#define FAT32_EOC           0x0ffffff8  // 
+#define EMPTY_ENTRY         0xe5
+#define END_OF_ENTRY        0x00
+#define CHAR_LONG_NAME      13
+#define CHAR_SHORT_NAME     11
+
+#define ENTRY_CACHE_NUM     100
+
     static constexpr mode_t defaultMod = 0x0777;
 
     class FileSystem;
@@ -221,8 +241,10 @@ namespace fat {
                     return make_shared<INode>(ptr);
                 return nullptr;
             }
-            inline fs::INodeRef mknod(string a_name,int attr) override {
-                if(auto ptr=entry->entCreate(a_name,attr))
+            inline fs::INodeRef mknod(string a_name,mode_t mode) override {
+                auto attr=(S_ISDIR(mode)?ATTR_DIRECTORY:ATTR_ARCHIVE)
+                    | (mode&O_RDONLY?ATTR_READ_ONLY:0);
+                if(auto ptr=entry->entCreate(a_name,mode))
                     return make_shared<INode>(ptr);
                 return nullptr;
             }
@@ -237,7 +259,7 @@ namespace fat {
             int readDir(fs::DStat *a_buf, uint a_len, off_t &a_off);
             
             inline void unInstall() { nodPanic(); entry->entRelse(); entry->spblk.reset(); entry->mntblk.reset(); entry = nullptr; }
-            inline uint8 rAttr() const { nodPanic(); return entry->attribute; }
+            inline mode_t rMode() const { nodPanic(); return (entry->attribute&ATTR_DIRECTORY ? S_IFDIR : S_IFREG) | (entry->attribute&ATTR_READ_ONLY?O_RDONLY:O_RDWR); }
             inline dev_t rDev() const { nodPanic(); return entry->spblk->rDev(); }
             inline off_t rFileSize() const { nodPanic(); return entry->file_size; }
             inline ino_t rINo() const { nodPanic(); return inode_num; }

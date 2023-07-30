@@ -182,17 +182,12 @@ namespace syscall {
         auto &ctx = kHartObj().curtask->ctx;
         int a_fd = ctx.x(10);
         xlen_t a_request = ctx.x(11);
-        void *a_arg = (void*)ctx.x(12); // @todo 还没用上
+        addr_t a_arg = ctx.x(12); // @todo 还没用上
         
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
-        if (!(file->obj.kst().st_mode & S_IFCHR)) { return -ENOTTY; }
-        // if (file->obj.kst().st_dev == DEV_TTY) { return fs_ioctl_tty(fd, request, argp); }
-        // else if (file->obj.kst().st_dev == DEV_RTC) { return fs_ioctl_rtc(fd, request, argp); }
-        else {
-            Log(error, "ioctl: unimplemented device 0x%lx", file->obj.kst().st_rdev);
-            return -ENODEV;
-        }
+        auto rt=file->ioctl(a_request,a_arg);
+        return rt;
     }
     xlen_t mkDirAt(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -345,7 +340,7 @@ namespace syscall {
         // DirEnt *ep = fs::entEnter(path);
         shared_ptr<DEntry> ep = Path(path).pathSearch();
         if(ep == nullptr) { return statcode::err; }
-        if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)){ return statcode::err; }
+        if(!S_ISDIR(ep->getINode()->rMode())){ return statcode::err; }
 
         curproc->cwd = ep;
         curproc->files[FdCwd] = make_shared<File>(curproc->cwd, O_RDWR);
@@ -359,7 +354,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> nwd = curproc->ofile(a_fd);
         if(nwd == nullptr) { return -EBADF; }
-        if(!(nwd->obj.getEntry()->getINode()->rAttr() & ATTR_DIRECTORY)) { return -ENOTDIR; }
+        if(!S_ISDIR(nwd->obj.getEntry()->getINode()->rMode())) { return -ENOTDIR; }
         curproc->cwd = nwd->obj.getEntry();
         curproc->files[FdCwd] = nwd;
 

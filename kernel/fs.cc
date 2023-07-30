@@ -102,7 +102,7 @@ ByteArray File::readAll(){
     }
 }
 off_t File::lSeek(off_t a_offset, int a_whence) {
-    if ((obj.kst().st_mode&S_IFMT)==S_IFCHR || (obj.kst().st_mode&S_IFMT)==S_IFIFO) { return 0; }
+    if (S_ISCHR(obj.kst().st_mode) || S_ISIFO(obj.kst().st_mode)) { return 0; }
     // if(type!=FileType::entry)return -ESPIPE;
     KStat kst = obj.getEntry();
     switch (a_whence) {  // @todo: st_size处是否越界？
@@ -251,7 +251,7 @@ shared_ptr<DEntry> Path::pathSearch(bool a_parent) {
     for(int i = 0; i < dirnum; ++i) {
         Log(trace,"entry=",entry->rName().c_str());
         while(entry->isMntPoint()) panic("should be processed above");
-        if (!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) { return nullptr; }
+        if (!S_ISDIR(entry->getINode()->rMode())) { return nullptr; }
         if (a_parent && i == dirnum-1) { return entry; }
         if(dirname[i] == ".") { next = entry; }
         else if(dirname[i] == "..") { next = entry->getParent(); }
@@ -270,19 +270,18 @@ shared_ptr<DEntry> Path::pathCreate(short a_type, int a_mode) {  // @todo 改成
         printf("can't find dir\n");
         return nullptr;
     }
-    if (a_type == T_DIR) { a_mode = ATTR_DIRECTORY; }
-    else if (a_mode & O_RDONLY) { a_mode = ATTR_READ_ONLY; }
-    else { a_mode = 0; }
+    if (a_type == T_DIR) { a_mode |= S_IFDIR; }
+    else a_mode|=S_IFREG;
     if(auto rt = dp->entCreate(dp,dirname.back(), a_mode)){
         auto ep=rt.value();
-        if ((a_type==T_DIR && !(ep->getINode()->rAttr()&ATTR_DIRECTORY)) || (a_type==T_FILE && (ep->getINode()->rAttr()&ATTR_DIRECTORY))) { return nullptr; }
+        if ((a_type==T_DIR && !S_ISDIR(ep->getINode()->rMode())) || (a_type==T_FILE && S_ISDIR(ep->getINode()->rMode()))) { return nullptr; }
         return ep;
     } else return nullptr;
 }
 int Path::pathRemove() {
     shared_ptr<DEntry> ep = pathSearch();
     if(ep == nullptr) { return -1; }
-    if((ep->getINode()->rAttr() & ATTR_DIRECTORY) && !ep->getINode()->isEmpty()) { return -1; }
+    if(S_ISDIR(ep->getINode()->rMode()) && !ep->getINode()->isEmpty()) { return -1; }
     ep->getINode()->nodRemove();
     return 0;
 }
@@ -330,7 +329,7 @@ int Path::pathMount(Path a_devpath, string a_fstype) {
         printf("not allowed\n");
         return -1;
     }
-    if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)) {
+    if(!S_ISDIR(ep->getINode()->rMode())) {
         printf("mountpoint is not a dir\n");
         return -1;
     }
@@ -378,11 +377,11 @@ int Path::pathOpen(int a_flags, mode_t a_mode) {  // @todo: 添加不打开额�
         entry=pathCreate(S_ISDIR(a_mode)?T_DIR:T_FILE, a_flags);
     if(!entry)
         return -1;
-    if((entry->getINode()->rAttr()&ATTR_DIRECTORY) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
+    if(S_ISDIR(entry->getINode()->rMode()) && ((a_flags&O_RDWR) || (a_flags&O_WRONLY))) {
         Log(error, "try to open a dir as writable\n");
         return -EISDIR;
     }
-    if((a_flags&O_DIRECTORY) && !(entry->getINode()->rAttr()&ATTR_DIRECTORY)) {
+    if((a_flags&O_DIRECTORY) && !S_ISDIR(entry->getINode()->rMode())) {
         Log(error, "try to open a not dir file as dir\n");
         return -ENOTDIR;
     }
@@ -390,7 +389,7 @@ int Path::pathOpen(int a_flags, mode_t a_mode) {  // @todo: 添加不打开额�
     file->obj.off() = (a_flags&O_APPEND) ? entry->getINode()->rFileSize() : 0;
     int fd = kHartObj().curtask->getProcess()->fdAlloc(file);
     if(fd < 0) { return -1; }
-    if(!(entry->getINode()->rAttr()&ATTR_DIRECTORY) && (a_flags&O_TRUNC)) { entry->getINode()->nodTrunc(); }
+    if(!S_ISDIR(entry->getINode()->rMode()) && (a_flags&O_TRUNC)) { entry->getINode()->nodTrunc(); }
 
     return fd;
 }
@@ -405,7 +404,7 @@ int Path::pathSymLink(string a_target) {
         Log(error, "dir not exists\n");
         return -1;
     }
-    else if(!(entry->getINode()->rAttr() & ATTR_DIRECTORY)) {
+    else if(!S_ISDIR(entry->getINode()->rMode())) {
         Log(error, "parent not dir\n");
         return -1;
     }
@@ -451,10 +450,10 @@ namespace fs
         }
         return make_unexpected(-1);
     }
-    Result<DERef> DEntry::entCreate(DERef self,string a_name, int a_attr){
+    Result<DERef> DEntry::entCreate(DERef self,string a_name, mode_t mode){
         if(auto it=subs.find(a_name); it!=subs.end())
             return make_unexpected(-1);
-        if(auto subnod=nod->mknod(a_name,a_attr)){
+        if(auto subnod=nod->mknod(a_name,mode)){
             auto sub=make_shared<DEntry>(self,a_name,subnod);
             subs[a_name]=weak_ptr<DEntry>(sub);
             return sub;
