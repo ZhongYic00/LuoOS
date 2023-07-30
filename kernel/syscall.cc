@@ -873,13 +873,10 @@ namespace syscall {
     }
     xlen_t uName(void) {
         auto &ctx = kHartObj().curtask->ctx;
-        struct UtSName *a_uts = (struct UtSName*)ctx.x(10);
-        if(a_uts == nullptr) { return -EFAULT; }
-
+        addr_t a_uts=ctx.x(10);
+        if(!a_uts) { return -EFAULT; }
         auto curproc = kHartObj().curtask->getProcess();
-        static struct UtSName uts = { "domainname", "machine", "nodename", "release", "sysname", "version" };
-        curproc->vmar.copyout((xlen_t)a_uts, ByteArray((uint8*)&uts, sizeof(uts)));
-
+        curproc->vmar[a_uts]<<kInfo.uts;
         return statcode::ok;
     }
     xlen_t uMask() {
@@ -1064,6 +1061,7 @@ namespace syscall {
         ByteArray pathbuf = curproc->vmar.copyinstr(pathuva, FAT32_MAX_PATH);
         // string path((char*)pathbuf.buff,pathbuf.len);
         char *path=(char*)pathbuf.buff;
+        curproc->exe=Path(path).pathAbsolute();
 
         Log(debug,"execve(path=%s,)",path);
         shared_ptr<DEntry> Ent=Path(path).pathSearch();
