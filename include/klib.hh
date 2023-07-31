@@ -252,7 +252,7 @@ class Logger{
   klib::ringbuf<LogItem> ring[5];
   std::atomic_uint32_t lid=0;
 public:
-  LogLevel outputLevel=LogLevel::info;
+  LogLevel outputLevel=LogLevel::debug;
     void log(int level,const char *fmt,...);
 };
 extern Logger kLogger;

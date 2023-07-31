@@ -39,7 +39,8 @@ namespace vm
         };
         enum fieldMasks{
             #define Off2Mask(field) field=1<<fieldOffsets::field##Off
-            Off2Mask(v),Off2Mask(r),Off2Mask(w),Off2Mask(x),Off2Mask(u),Off2Mask(g),Off2Mask(a),Off2Mask(d)
+            Off2Mask(v),Off2Mask(r),Off2Mask(w),Off2Mask(x),Off2Mask(u),Off2Mask(g),Off2Mask(a),Off2Mask(d),
+            v2=v|a|d,
         };
         inline bool isValid(){ assert(this);return fields.v; }
         inline void setValid(){ fields.v=1; }

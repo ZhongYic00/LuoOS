@@ -97,11 +97,11 @@ void kernel::createKernelMapping( vm::VMAR &vmar){
     using perm=PageTableEntry::fieldMasks;
     using mapping=PageMapping::MappingType;
     using sharing=PageMapping::SharingType;
-    { auto &seg=kInfo.segments.text;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.text,perm::v|perm::r|perm::x,mapping::system,sharing::shared});}
-    { auto &seg=kInfo.segments.rodata;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.rodata,perm::v|perm::r,mapping::system,sharing::shared});}
-    { auto &seg=kInfo.segments.kstack;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.kstack,perm::v|perm::r|perm::w,mapping::system,sharing::shared});}
-    { auto &seg=kInfo.segments.data;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.data,perm::v|perm::r|perm::w,mapping::system,sharing::shared});}
-    { auto &seg=kInfo.segments.bss;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.bss,perm::v|perm::r|perm::w,mapping::system,sharing::shared});}
+    { auto &seg=kInfo.segments.text;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.text,perm::v2|perm::r|perm::w|perm::x,mapping::system,sharing::shared});}
+    { auto &seg=kInfo.segments.rodata;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.rodata,perm::v2|perm::r|perm::w|perm::x,mapping::system,sharing::shared});}
+    { auto &seg=kInfo.segments.kstack;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.kstack,perm::v2|perm::r|perm::w|perm::x,mapping::system,sharing::shared});}
+    { auto &seg=kInfo.segments.data;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.data,perm::v2|perm::r|perm::w|perm::x,mapping::system,sharing::shared});}
+    { auto &seg=kInfo.segments.bss;vmar.map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second)-vm::addr2pn(seg.first)+1,0,kInfo.vmos.bss,perm::v2|perm::r|perm::w|perm::x,mapping::system,sharing::shared});}
 }
 kernel::KernelGlobalObjs::KernelGlobalObjs():
     heapMgr(pool,sizeof(pool),pageMgr),
@@ -114,6 +114,7 @@ static void memInit(){
     satp.mode=8;
     satp.asid=0;
     satp.ppn=vm::addr2pn((xlen_t)kernelPageTableRoot);
+    memset(kernelPageTableRoot,0,sizeof(kernelPageTableRoot));
     auto kGlobObjsInternal=new ((void*)kObjsBuf.kGlobObjsBuf) kernel::KernelGlobalObjs();
     using namespace vm;
     using perm=PageTableEntry::fieldMasks;
@@ -129,17 +130,20 @@ static void memInit(){
     kernel::createKernelMapping(*(kGlobObjs->vmar.get()));
     { auto &seg=kInfo.segments.dev;
         kInfo.vmos.dev=make_shared<VMOContiguous>(addr2pn(seg.first),addr2pn(seg.second-seg.first+1));
-        kGlobObjs->vmar->map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first+1),0,kInfo.vmos.dev,perm::v|perm::r|perm::w, mapping::anon,sharing::privt });}
+        kGlobObjs->vmar->map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first+1),0,kInfo.vmos.dev,perm::v2|perm::r|perm::w, mapping::anon,sharing::privt });}
     { auto &seg=kInfo.segments.frames;
         kInfo.vmos.frames=make_shared<VMOContiguous>(addr2pn(seg.first),addr2pn(seg.second-seg.first+1));
-        kGlobObjs->vmar->map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first+1),0,kInfo.vmos.frames,perm::v|perm::r|perm::w,mapping::anon,sharing::privt });}
+        kGlobObjs->vmar->map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first+1),0,kInfo.vmos.frames,perm::v2|perm::r|perm::w,mapping::anon,sharing::privt });}
     { auto &seg=kInfo.segments.ramdisk;
         kInfo.vmos.ramdisk=make_shared<VMOContiguous>(addr2pn(seg.first),addr2pn(seg.second-seg.first+1));
-        kGlobObjs->vmar->map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first+1),0,kInfo.vmos.ramdisk,perm::v|perm::r|perm::w,mapping::anon,sharing::privt });}
+        kGlobObjs->vmar->map(PageMapping{ vm::addr2pn(seg.first),vm::addr2pn(seg.second-seg.first+1),0,kInfo.vmos.ramdisk,perm::v2|perm::r|perm::w,mapping::anon,sharing::privt });}
 
     kGlobObjs->vmar->print();
     Log(info,"is about to enable kernel vm");
-    csrWrite(satp,kGlobObjs->ksatp=satp.value());
+    auto ksatp=kGlobObjs->ksatp=satp.value();
+    Log(info,"ksatp=%lx",ksatp);
+    // ExecInst(sfence.vma);
+    csrWrite(satp,ksatp);
     ExecInst(sfence.vma);
     Log(info,"kernel vm enabled, memInit success");
 }
@@ -163,7 +167,7 @@ std::atomic<uint32_t> started;
 mutex::spinlock spin;
 extern void schedule();
 extern void program0();
-extern void strapwrapper();
+extern void ktrapwrapper();
 extern void _strapexit();
 
 FORCEDINLINE
@@ -189,15 +193,23 @@ void init(int hartid){
     "                                                                   \n"\
     );
         sbi_init();
-        csrWrite(stvec,strapwrapper);
-        puts=IO::_blockingputs;
+        csrWrite(sstatus,0);
+        csrWrite(stvec,ktrapwrapper);
+        csrSet(sstatus,BIT(csr::mstatus::sum)|BIT(csr::mstatus::mxr)|BIT(csr::mstatus::fs));
+        Log(info,"stvec set");
+        // puts=IO::_blockingputs;
         isinit=true;
 
         infoInit();
+        xlen_t mstatus,sstatus;
+        // csrRead(mstatus,mstatus);
+        csrRead(sstatus,sstatus);
+        Log(info,"mstatus=%lx, sstatus=%lx",mstatus,sstatus);
         memInit();
+        Log(info,"memInit ok, init syscall");
         syscall::init();
+        Log(info,"syscall init ok,setting sstatus");
         // csrWrite(sscratch,ctx.gpr);
-        csrSet(sstatus,BIT(csr::mstatus::sum));
         // csrSet(sstatus,BIT(csr::mstatus::sie));
         csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));
         // halt();
@@ -227,10 +239,11 @@ void init(int hartid){
         sbi_remote_sfence_vma((cpumask*)&mask,0x0,0x84000000);
         // for(volatile int i=10000000;i;i--);
     } else {
-        csrWrite(stvec,strapwrapper);
-        csrSet(sstatus,BIT(csr::mstatus::sum));
-        // csrSet(sstatus,BIT(csr::mstatus::sie));
-        csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));
+        halt();
+        // csrWrite(stvec,strapwrapper);
+        // csrSet(sstatus,BIT(csr::mstatus::sum));
+        // // csrSet(sstatus,BIT(csr::mstatus::sie));
+        // csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));
     }
     {// test lock
         using namespace mutex;
@@ -249,8 +262,8 @@ void init(int hartid){
         kidle->defaultTask()->kctxs.push(kidle->defaultTask()->kctx);
         schedule();
         Log(info,"first schedule on hart%d",kernel::readHartId());
-        kLogger.outputLevel=warning;
-        enableLevel=warning;
+        // kLogger.outputLevel=warning;
+        // enableLevel=warning;
         _strapexit();
     }
     halt();
