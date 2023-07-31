@@ -59,7 +59,7 @@ namespace pipe{
                 auto rbegin=buf+head%bufSize;
                 auto rlen=klib::min(klib::min(tail-head,bufSize-head%bufSize),bytes.len-off);
                 if(rlen==0){
-                    if(wcnt==0) break;
+                    if(wcnt==0 || off>0) break;
                     canw.notify_one();
                     canr.wait();
                     continue;

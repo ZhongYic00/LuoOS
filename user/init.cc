@@ -51,12 +51,11 @@ int main(){
         // "waitpid",
         // "write",
         // "yield"
-        "./time-test",
         "./busybox"
     };
     const int tsn = sizeof(testsuits) / sizeof(char const*);
-    // char *args[] = { "busybox","sh","/tst.sh",nullptr };
-    char *args[] = { "busybox","sh","busybox_testcode.sh",nullptr };
+    char *args[] = { "busybox","sh","run-static.sh",nullptr };
+    // char *args[] = { "busybox","sh","run-static.sh",nullptr };
 	for (int i = 0; i < tsn; ++i) {
 		if (sys::syscall2(sys::syscalls::clone, 17, 0) == 0) {
             sys::syscall2(sys::syscalls::execve, (xlen_t)testsuits[i], (xlen_t)args);

@@ -80,23 +80,7 @@ namespace syscall {
         // return rt;
         return statcode::ok;
     }
-    xlen_t testFATInit() {
-        Log(info, "initializing fat\n");
-        int init = fs::rootFSInit();
-        if(init != 0) { panic("fat init failed\n"); }
-        auto curproc = kHartObj().curtask->getProcess();
-        // curproc->cwd = fs::entEnter("/");
-        curproc->cwd = Path("/").pathSearch();
-        curproc->files[FdCwd] = make_shared<File>(curproc->cwd,0);
-        // DirEnt *ep = fs::pathCreate("/dev", T_DIR, 0);
-        shared_ptr<DEntry> ep = Path("/dev").pathCreate(T_DIR, 0);
-        if(ep == nullptr) { panic("create /dev failed\n"); }
-        // ep = fs::pathCreate("/dev/vda2", T_DIR, 0);
-        ep = Path("/dev/vda2").pathCreate(T_DIR, 0);
-        if(ep == nullptr) { panic("create /dev/vda2 failed\n"); }
-        Log(info,"fat initialize ok");
-        return statcode::ok;
-    }
+    extern sysrt_t testFATInit();
     xlen_t getCwd(void) {
         auto &ctx = kHartObj().curtask->ctx;
         char *a_buf = (char*)ctx.x(10);
@@ -193,6 +177,17 @@ namespace syscall {
         }
 
         return -EINVAL;  // should never reach here
+    }
+    xlen_t ioCtl() {
+        auto &ctx = kHartObj().curtask->ctx;
+        int a_fd = ctx.x(10);
+        xlen_t a_request = ctx.x(11);
+        addr_t a_arg = ctx.x(12); // @todo 还没用上
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        shared_ptr<File> file = curproc->ofile(a_fd);
+        auto rt=file->ioctl(a_request,a_arg);
+        return rt;
     }
     xlen_t mkDirAt(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -345,7 +340,7 @@ namespace syscall {
         // DirEnt *ep = fs::entEnter(path);
         shared_ptr<DEntry> ep = Path(path).pathSearch();
         if(ep == nullptr) { return statcode::err; }
-        if(!(ep->getINode()->rAttr() & ATTR_DIRECTORY)){ return statcode::err; }
+        if(!S_ISDIR(ep->getINode()->rMode())){ return statcode::err; }
 
         curproc->cwd = ep;
         curproc->files[FdCwd] = make_shared<File>(curproc->cwd, O_RDWR);
@@ -359,8 +354,8 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> nwd = curproc->ofile(a_fd);
         if(nwd == nullptr) { return -EBADF; }
-        if(!(nwd->obj.ep->getINode()->rAttr() & ATTR_DIRECTORY)) { return -ENOTDIR; }
-        curproc->cwd = nwd->obj.ep;
+        if(!S_ISDIR(nwd->obj.getEntry()->getINode()->rMode())) { return -ENOTDIR; }
+        curproc->cwd = nwd->obj.getEntry();
         curproc->files[FdCwd] = nwd;
 
         return statcode::ok;
@@ -469,18 +464,19 @@ namespace syscall {
     }
     xlen_t getDents64(void) {
         auto &ctx = kHartObj().curtask->ctx;
-        int a_fd = ctx.x(10);
+        int a_dirfd = ctx.x(10);
         DStat *a_buf = (DStat*)ctx.x(11);
         size_t a_len = ctx.x(12);
-        if(a_buf==nullptr || a_len<sizeof(DStat)) { return -EFAULT; }
+        if(a_buf==nullptr) { return -EFAULT; }
 
         auto curproc = kHartObj().curtask->getProcess();
-        shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
-        DStat ds = file->obj.ep;
-        curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)&ds,sizeof(ds)));
-
-        return sizeof(ds);
+        shared_ptr<File> dir = curproc->ofile(a_dirfd);
+        if(dir == nullptr) { return -EBADF; }
+        if(dir->obj.rType() != fs::FileType::entry) { return -EINVAL; }
+        ArrayBuff<DStat> buf(a_len / sizeof(DStat));
+        int len = dir->readDir(buf);
+        if(len > 0) { curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)buf.buff, len)); }
+        return len;
     }
     xlen_t lSeek(int fd,off_t offset,int whence) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -628,8 +624,7 @@ namespace syscall {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
         if(file == nullptr) { return -EBADF; }
-        KStat kst = file->obj.ep;
-        curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst,sizeof(kst)));
+        curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&file->obj.kst(), sizeof(KStat)));
         // @bug 用户态读到的数据混乱
         return statcode::ok;
     }
@@ -637,6 +632,9 @@ namespace syscall {
         // 现阶段实现为write-through缓存，自动同步
         return statcode::ok;
     }
+    int futex(int *uaddr, int futex_op, int val,
+                 const struct timespec *timeout,   /* or: uint32_t val2 */
+                 int *uaddr2, int val3);
     __attribute__((naked))
     void sleepSave(ptr_t gpr){
         saveContextTo(gpr);
@@ -738,14 +736,11 @@ namespace syscall {
         size_t a_sigsetsize = ctx.x(13);
 
         auto curproc = kHartObj().curtask->getProcess();
-        ByteArray nsetarr = curproc->vmar.copyin((xlen_t)a_nset, sizeof(SigSet));
-        SigSet *nset = (SigSet*)nsetarr.buff;
-        ByteArray osetarr(sizeof(SigSet));
-        SigSet *oset = (SigSet*)osetarr.buff;
-        if(a_oset == nullptr) { oset = nullptr; }
-
-        int ret = signal::sigProcMask(a_how, nset, oset, a_sigsetsize);
-        if(ret==0 && oset!=nullptr) { curproc->vmar.copyout((xlen_t)a_oset, osetarr); }
+        if(!a_nset) return 0;
+        SigSet nset,oset;
+        curproc->vmar[(addr_t)a_nset]>> nset;
+        int ret = signal::sigProcMask(a_how, &nset, &oset, a_sigsetsize);
+        if(a_oset) curproc->vmar[(addr_t)a_oset]<<oset;
         return ret;
     }
     xlen_t sigReturn() {
@@ -878,13 +873,10 @@ namespace syscall {
     }
     xlen_t uName(void) {
         auto &ctx = kHartObj().curtask->ctx;
-        struct UtSName *a_uts = (struct UtSName*)ctx.x(10);
-        if(a_uts == nullptr) { return -EFAULT; }
-
+        addr_t a_uts=ctx.x(10);
+        if(!a_uts) { return -EFAULT; }
         auto curproc = kHartObj().curtask->getProcess();
-        static struct UtSName uts = { "domainname", "machine", "nodename", "release", "sysname", "version" };
-        curproc->vmar.copyout((xlen_t)a_uts, ByteArray((uint8*)&uts, sizeof(uts)));
-
+        curproc->vmar[a_uts]<<kInfo.uts;
         return statcode::ok;
     }
     xlen_t uMask() {
@@ -946,17 +938,9 @@ namespace syscall {
     xlen_t getTid() {
         return kHartObj().curtask->tid();
     }
-    xlen_t clone(){
-        auto &ctx=kHartObj().curtask->ctx;
-        xlen_t func=ctx.x(10),childStack=ctx.x(11);
-        int flags=ctx.x(12);
-        auto pid=proc::clone(kHartObj().curtask);
-        auto thrd=(**kGlobObjs->procMgr)[pid]->defaultTask();
-        if(childStack)thrd->ctx.sp()=childStack;
-        // if(func)thrd->ctx.pc=func;
-        Log(debug,"clone curproc=%d, new proc=%d",kHartObj().curtask->getProcess()->pid(),pid);
-        return pid;
-    }
+    extern long clone(unsigned long flags, void *stack,
+                      int *parent_tid, int *child_tid,
+                      unsigned long tls);
     int waitpid(pid_t pid,xlen_t wstatus,int options){
         Log(debug,"waitpid(pid=%d,options=%d)",pid,options);
         auto curproc=kHartObj().curtask->getProcess();
@@ -1011,57 +995,14 @@ namespace syscall {
         xlen_t addr=ctx.x(10);
         return curproc.brk(addr);
     }
-    xlen_t mmap(xlen_t addr,size_t len,int prot,int flags,int fd,int offset){
-        auto &curproc=*kHartObj().curtask->getProcess();
-        using namespace vm;
-        // determine target
-        const auto align=[](xlen_t addr){return addr2pn(addr);};
-        const auto choose=[&](){
-            auto rt=curproc.heapTop=ceil(curproc.heapTop);
-            curproc.heapTop+=len;
-            curproc.heapTop=ceil(curproc.heapTop);
-            return addr2pn(rt);
-        };
-        PageNum vpn,pages;
-        if(addr)vpn=align(addr);
-        else vpn=choose();
-        pages = bytes2pages(len);
-        if(!pages)return -1;
-        // assert(pages);
-        Arc<vm::VMO> vmo;
-        /// @todo register for shared mapping
-        /// @todo copy content to vmo
-        if(fd!=-1){
-            auto file=curproc.ofile(fd);
-            vmo=file->vmo();
-        } else {
-            auto pager=make_shared<SwapPager>(nullptr,Segment{0x0,pn2addr(pages)});
-            vmo=make_shared<VMOPaged>(pages,pager);
-        }
-        // actual map
-        /// @todo fix flags
-        auto mappingType= fd==-1 ?PageMapping::MappingType::file : PageMapping::MappingType::anon;
-        auto sharingType=(PageMapping::SharingType)(flags>>8);
-        curproc.vmar.map(PageMapping{vpn,pages,0,vmo,PageMapping::prot2perm((PageMapping::Prot)prot),mappingType,sharingType});
-        // return val
-        return pn2addr(vpn);
-    }
-    xlen_t munmap(xlen_t addr,size_t len){
-        auto &ctx=kHartObj().curtask->ctx;
-        auto &curproc=*kHartObj().curtask->getProcess();
-        /// @todo len, partial unmap?
-        using namespace vm;
-        if(addr&vaddrOffsetMask){
-            Log(warning,"munmap addr not aligned!");
-            return statcode::err;
-        }
-        auto region=vm::Segment{addr2pn(addr),addr2pn(addr+len-1)};
-        curproc.vmar.unmap(region);
-    }
-    sysrt_t mprotect(xlen_t addr,size_t len,int prot){
-        return 0;
-    }
-    int execve_(shared_ptr<fs::File> file,vector<klib::ByteArray> &args,char **envp){
+    sysrt_t mmap(addr_t addr,size_t len,int prot,int flags,int fd,int offset);
+    sysrt_t munmap(addr_t addr,size_t len);
+    sysrt_t mremap(addr_t oldaddr, size_t oldsize,size_t newsize, int flags, addr_t newaddr);
+    sysrt_t mprotect(addr_t addr,size_t len,int prot);
+    sysrt_t madvise(addr_t addr,size_t length,int advice);
+    sysrt_t mlock(addr_t addr, size_t len);
+    sysrt_t munlock(addr_t addr, size_t len);
+    int execve_(shared_ptr<fs::File> file,vector<klib::ByteArray> &args,vector<klib::ByteArray> &envs){
         auto &ctx=kHartObj().curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
         auto curproc=kHartObj().curtask->getProcess();
@@ -1072,29 +1013,48 @@ namespace syscall {
         // static_cast<proc::Context>(kHartObj().curtask->kctx)=proc::Context();
         ctx.sp()=proc::UserStackDefault;
         /// load elf
-        auto [pc,brk]=ld::loadElf(file,curproc->vmar);
-        ctx.pc=pc;
+        auto [entry,brk,info]=ld::loadElf(file,curproc->vmar);
+        ctx.pc=entry;
         curproc->heapTop=curproc->heapBottom=brk;
         /// setup stack
         ArrayBuff<xlen_t> argv(args.size()+1);
+        vector<addr_t> envps;
         int argc=0;
         auto ustream=curproc->vmar[ctx.sp()];
         ustream.reverse=true;
         xlen_t endMarker=0x114514;
         ustream<<endMarker;
+        ustream<<0ul;
+        auto dlRandomAddr=ustream.addr();
         for(auto arg:args){
             ustream<<arg;
             argv.buff[argc++]=ustream.addr();
+        }
+        for(auto env:envs){
+            ustream<<env;
+            envps.push_back(ustream.addr());
         }
         // ctx.sp()=ustream.addr();
         argv.buff[argc]=0;
         // ctx.sp()-=argv.len*sizeof(xlen_t);
         // ctx.sp()-=ctx.sp()%16;
         vector<Elf64_auxv_t> auxv;
+        /* If the main program was already loaded by the kernel,
+        * AT_PHDR will point to some location other than the dynamic
+        * linker's program headers. */
+        if(info.phdr){
+            auxv.push_back({AT_PHDR,info.phdr});
+            auxv.push_back({AT_PHENT,info.e_phentsize});
+            auxv.push_back({AT_PHNUM,info.e_phnum});
+        }
         auxv.push_back({AT_PAGESZ,vm::pageSize});
+        auxv.push_back({AT_BASE,proc::interpreterBase});
+        auxv.push_back({AT_ENTRY,info.e_entry});
+        auxv.push_back({AT_RANDOM,dlRandomAddr});
         auxv.push_back({AT_NULL,0});
         ustream<<ArrayBuff(auxv.data(),auxv.size());
         ustream<<nullptr;
+        ustream<<envps;
         ustream<<argv;
         auto argvsp=ustream.addr();
         // assert(argvsp==ctx.sp());
@@ -1117,27 +1077,40 @@ namespace syscall {
         ByteArray pathbuf = curproc->vmar.copyinstr(pathuva, FAT32_MAX_PATH);
         // string path((char*)pathbuf.buff,pathbuf.len);
         char *path=(char*)pathbuf.buff;
+        curproc->exe=Path(path).pathAbsolute();
 
         Log(debug,"execve(path=%s,)",path);
-        // auto Ent=fs::entEnter(path);
         shared_ptr<DEntry> Ent=Path(path).pathSearch();
         auto file=make_shared<File>(Ent,fs::FileOp::read);
-        // auto buf=file->read(Ent->getINode()->rFileSize());
-        // auto buf=klib::ByteArray{0};
-        // buf.buff=(uint8_t*)((xlen_t)&_uimg_start);buf.len=0x3ba0000;
+        
+        vector<ByteArray> args,envs;
+
+        // check whether elf or script
+        auto interprtArg="sh\0";
+        if(!ld::isElf(file)){
+            string interpreter="/busybox";
+            file=make_shared<File>(Path(interpreter).pathSearch(),fs::FileOp::read);
+            args.push_back(ByteArray((uint8_t*)interprtArg,strlen(interprtArg)+1));
+        }
 
         /// @brief get args
-        vector<ByteArray> args;
         xlen_t str;
         do{
             curproc->vmar[argv]>>str;
             if(!str)break;
-            auto buff=curproc->vmar.copyinstr(str,100);
+            auto buff=curproc->vmar.copyinstr(str,200);
             args.push_back(buff);
             argv+=sizeof(char*);
         }while(str!=0);
         /// @brief get envs
-        return execve_(file,args,0);
+        auto ustream=curproc->vmar[envp];
+        if(envp) do{
+            ustream>>str;
+            if(!str)break;
+            auto buff=curproc->vmar.copyinstr(str,100);
+            envs.push_back(buff);
+        }while(str!=0);
+        return execve_(file,args,envs);
     }
     expected<xlen_t,string> reboot(){
         auto &ctx=kHartObj().curtask->ctx;
@@ -1203,6 +1176,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::dup,dup);
         DECLSYSCALL(scnum::dup3,dup3);
         DECLSYSCALL(scnum::fcntl,fCntl);
+        DECLSYSCALL(scnum::ioctl,ioCtl);
         DECLSYSCALL(scnum::mkdirat,mkDirAt);
         DECLSYSCALL(scnum::linkat,linkAt);
         DECLSYSCALL(scnum::unlinkat,unlinkAt);
@@ -1235,6 +1209,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::exit,exit);
         DECLSYSCALL(scnum::exit_group,exitGroup);
         DECLSYSCALL(scnum::settidaddress,setTidAddress)
+        DECLSYSCALL(scnum::futex,futex);
         DECLSYSCALL(scnum::nanosleep,nanoSleep);
         DECLSYSCALL(scnum::clock_gettime,clock_gettime);
         DECLSYSCALL(scnum::yield,sysyield);
@@ -1268,9 +1243,14 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::gettid,getTid);
         DECLSYSCALL(scnum::brk,brk);
         DECLSYSCALL(scnum::munmap,munmap);
+        DECLSYSCALL(scnum::mremap,mremap);
         DECLSYSCALL(scnum::clone,clone);
         DECLSYSCALL(scnum::execve,execve);
         DECLSYSCALL(scnum::mmap,mmap);
+        DECLSYSCALL(scnum::mprotect,mprotect);
+        DECLSYSCALL(scnum::mlock,mlock);
+        DECLSYSCALL(scnum::munlock,munlock);
+        DECLSYSCALL(scnum::madvise,madvise);
         DECLSYSCALL(scnum::wait,wait);
         DECLSYSCALL(scnum::syncfs,syncFS);
     }

@@ -57,7 +57,7 @@ namespace bio{
     template<int SIZE=512>
     struct alignas(SIZE) AlignedBytes{uint8_t bytes[SIZE];};
     struct BlockKey{
-        dev_t dev;
+        uint64 dev;
         uint32_t secno;
         bool operator==(const BlockKey other) const {return dev==other.dev&&secno==other.secno;}
     };

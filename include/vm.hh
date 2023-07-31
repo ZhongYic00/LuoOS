@@ -128,9 +128,9 @@ namespace vm
         inline PageNum vend() const { return vpn + pages() - 1; }
         inline string toString() const { return klib::format("%lx=>%s", vpn, vmo->toString()); }
         /// @param region absolute vpn region
-        inline PageMapping splitChild(Segment region) const {
+        inline PageMapping splitChild(Segment region,perm_t newperm=0) const {
             /// @todo reduce mem
-            return PageMapping{region.l,region.length(),offset,vmo,perm,mapping,sharing};
+            return PageMapping{region.l,region.length(),offset+region.l-vpn,vmo,newperm?newperm:perm,mapping,sharing};
         }
         inline PageSlice req(PageNum idx) const{return vmo->req(offset+idx);}
         inline PageMapping clone() const {
@@ -141,6 +141,8 @@ namespace vm
         }
         inline static perm_t prot2perm(Prot prot){
             using masks=PageTableEntry::fieldMasks;
+            /// @note how to deal with PROT_NONE
+            if(prot==0)return masks::u;
             perm_t rt=masks::v|masks::u;
             rt|=(prot&mask)<<1;
             return rt;
@@ -158,8 +160,9 @@ namespace vm
     public:
         VMOMapper(Arc<VMO> vmo);
         ~VMOMapper();
-        inline xlen_t start(){return pn2addr(region.l);}
-        inline klib::ByteArray asBytes(){return klib::ByteArray((uint8_t*)pn2addr(region.l),region.length()*pageSize);}
+        inline xlen_t start(){ return pn2addr(region.l); }
+        inline xlen_t end() { return pn2addr(region.r) + pageSize - 1; }  // 最后一页的最后一个字节（包括）
+        inline klib::ByteArray asBytes(){ return klib::ByteArray((uint8_t*)pn2addr(region.l), region.length()*pageSize); }
     };
 
     class PageTable{
@@ -223,6 +226,7 @@ namespace vm
         }
         /// @brief overlap should has been unmapped
         void map(const PageMapping &mapping,bool ondemand=false);
+        void protect(const Segment region, perm_t perm);
         /// @param region absolute vpn
         inline void unmap(const Segment region){
             // Log(debug, "unmap %s", mapping.toString().c_str());
@@ -244,7 +248,7 @@ namespace vm
                         map(rslice);
                     }
                     // remove origin
-                    /// @bug may be incorrect
+                    /// @bug may be incorrect, pagetable should first remove then overwrite?
                     pagetable.removeMapping(*i);
                     i=mappings.erase(i);
                 } else i++;
@@ -269,28 +273,14 @@ namespace vm
             auto buff=ByteArray::from(paddr,len);
             return buff;
         }
-        inline void copyout(xlen_t addr,const ByteArray &buff){
-            // @todo 检查拷贝后是否会越界（addr+buff.len后超出用户进程大小）
-            // xlen_t paddr=pagetable.transaddr(addr);
-            auto mapping=find(addr);
-            VMOMapper mapper(mapping->vmo);
-            auto off=addr-pn2addr(mapping->vpn)+pn2addr(mapping->offset);
-            memmove((ptr_t)mapper.start()+off,buff.buff,buff.len);
-        }
+        void copyout(xlen_t addr,const ByteArray &buff);
         inline bool contains(xlen_t addr){
             for(auto mapping: mappings){
                 if(mapping.contains(addr))return true;
             }
             return false;
         }
-        template<typename Lambda>
-        inline PageMapping find(Lambda predicate){
-            for(auto mapping: mappings){
-                if(predicate(mapping))
-                    return mapping;
-            }
-            /// @todo error handling
-        }
+        inline addr_t transaddr(addr_t vaddr){return pagetable.transaddr(vaddr);}
         class Writer{
             xlen_t vaddr;
             VMAR &parent;
@@ -300,6 +290,12 @@ namespace vm
             template<typename T>
             inline Writer& operator<<(const T &d){
                 auto buff=ByteArray((uint8_t*)&d,sizeof(d));
+                return operator<<(buff);
+            }
+            template<typename T>
+            inline Writer& operator<<(vector<T> &vec){
+                auto buff=ArrayBuff<T>(vec.begin(),vec.size())
+                    .template toArrayBuff<uint8_t>();
                 return operator<<(buff);
             }
             inline Writer& operator<<(const ByteArray &bytes){

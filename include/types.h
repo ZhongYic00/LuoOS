@@ -10,6 +10,7 @@ typedef __UINT8_TYPE__ uint8_t;
 typedef void (*hook_t)(void);
 typedef xlen_t sysrt_t;
 typedef sysrt_t (*syscall_t)(xlen_t,xlen_t,xlen_t,xlen_t,xlen_t,xlen_t);
+typedef xlen_t addr_t;
 typedef unsigned int   uint;
 typedef unsigned short ushort;
 typedef unsigned char  uchar;

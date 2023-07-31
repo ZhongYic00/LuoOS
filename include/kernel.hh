@@ -29,6 +29,7 @@ namespace sys
         dup=23,
         dup3=24,
         fcntl=25,
+        ioctl=29,
         mkdirat=34,
         unlinkat=35,
         symlinkat=36,
@@ -61,6 +62,7 @@ namespace sys
         exit=93,
         exit_group=94,
         settidaddress=96,
+        futex=98,
         nanosleep=101,
         clock_gettime=113,
         yield=124,
@@ -95,9 +97,14 @@ namespace sys
         gettid=178,
         brk=214,
         munmap=215,
+        mremap=216,
         clone=220,
         execve=221,
         mmap=222,
+        mprotect=226,
+        mlock=228,
+        munlock=229,
+        madvise=233,
         wait=260,
         syncfs=267,
         nSyscalls,
@@ -140,17 +147,26 @@ namespace kernel {
     constexpr long INTERVAL = 390000000 / 100;
     constexpr long CLK_FREQ = 8900000;
     constexpr int NMAXSLEEP = 32;
+    constexpr int nameLen=65;
 
     typedef proc::Task KernelTaskObjs;
 
     struct KernelInfo{
         using segment_t=vm::segment_t;
         struct KSegments{
-            segment_t dev,text,rodata,data,kstack,bss,frames,ramdisk;
+            segment_t dev,text,rodata,data,vdso,kstack,bss,frames,ramdisk;
+            segment_t mapper;
         }segments;
         struct KVMOs{
-            Arc<vm::VMO> dev,text,rodata,data,kstack,bss,frames,ramdisk;
+            Arc<vm::VMO> dev,text,rodata,data,vdso,kstack,bss,frames,ramdisk;
         }vmos;
+        struct utsname{
+            const char sysname[nameLen]="LuoOS";
+            const char nodename[nameLen]="0";
+            const char release[nameLen]="5.0.0";
+            const char version[nameLen]="#1";
+            const char machine[nameLen]="RISCV-64";
+        }uts;
     };
     struct KernelGlobalObjs{
         mutex::LockedObject<alloc::HeapMgrGrowable,spinlock<false>> heapMgr;
@@ -160,6 +176,7 @@ namespace kernel {
         mutex::LockedObject<proc::TaskManager,spinlock<false>> taskMgr;
         mutex::LockedObject<proc::ProcManager,spinlock<false>> procMgr;
         vm::PageCacheMgr pageCache;
+        unordered_map<addr_t,condition_variable::condition_variable> futexes;
         xlen_t ksatp;
         xlen_t prevsatp;
         KernelGlobalObjs();

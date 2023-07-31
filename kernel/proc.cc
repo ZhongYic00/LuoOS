@@ -7,6 +7,11 @@ using namespace proc;
 // #define moduleLevel LogLevel::info
 Process::Process(pid_t pid,prior_t prior,pid_t parent):IdManagable(pid),Scheduable(prior),parent(parent),vmar({}){
     kernel::createKernelMapping(vmar);
+    using namespace vm;
+    using perm=PageTableEntry::fieldMasks;
+    using mapping=PageMapping::MappingType;
+    using sharing=PageMapping::SharingType;
+    vmar.map(PageMapping{addr2pn(vDSOBase),vDSOPages,0,kInfo.vmos.vdso,perm::r|perm::x|perm::u|perm::v,mapping::system,sharing::shared});
 }
 Process::Process(prior_t prior,pid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
@@ -48,12 +53,14 @@ Task* Process::newTask(){
     return thrd;
 }
 
-Task* Process::newTask(const Task &other,bool allocStack){
+Task* Process::newTask(const Task &other,addr_t ustack){
     auto [vaddr,buff]=newTrapframe();
     auto thrd=Task::createTask(**kGlobObjs->taskMgr,buff,other,this->pid());
     thrd->kctx.vaddr=vaddr;
-    if(allocStack){
+    if(!ustack){
         thrd->ctx.sp()=newUstack();
+    } else {
+        thrd->ctx.sp()=ustack;
     }
     addTask(thrd);
     kGlobObjs->scheduler->add(thrd);
@@ -146,10 +153,11 @@ Process* proc::createProcess(){
         proc->files[FdCwd] = make_shared<File>(proc->cwd,0);
     }
     else { inited = true; }
-    using op=fs::FileOp;
-    proc->files[0] = make_shared<File>(File::stdin,op::read);
-    proc->files[1] = make_shared<File>(File::stdout,op::write);
-    proc->files[2] = make_shared<File>(File::stderr,op::write);
+    using FileOp = fs::FileOp;
+    using FileType = fs::FileType;
+    proc->files[0] = make_shared<File>(FileType::stdin, FileOp::read);
+    proc->files[1] = make_shared<File>(FileType::stdout, FileOp::write);
+    proc->files[2] = make_shared<File>(FileType::stderr, FileOp::write);
     DBG(proc->print();)
     Log(info,"proc created. pid=%d\n",proc->id);
     return proc;
@@ -160,13 +168,14 @@ pid_t proc::clone(Task *task){
     Log(info,"clone(src=%p:[%d])",proc,proc->pid());
     TRACE(Log(info,"src proc VMAR:\n");proc->vmar.print();)
     auto newproc=new (**kGlobObjs->procMgr) Process(*proc);
-    newproc->newTask(*task,false);
+    newproc->newTask(*task,task->ctx.sp());
     newproc->defaultTask()->ctx.a0()=sys::statcode::ok;
     TRACE(newproc->vmar.print();)
     return newproc->pid();
 }
 
-Process::Process(const Process &other,pid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd){
+Process::Process(const Process &other,pid_t pid):IdManagable(pid),Scheduable(other.prior),vmar(other.vmar),parent(other.id),cwd(other.cwd),
+    heapTop(other.heapBottom),heapBottom(other.heapBottom){
     for(int i=0;i<mOFiles;i++)files[i]=other.files[i];
 }
 void Process::exit(int status){
@@ -187,10 +196,13 @@ void Process::exit(int status){
 }
 void Process::zombieExit(){
     Log(info,"Proc[%d] zombie exit",pid());
-    kGlobObjs->procMgr->del(this);
+    for(auto child:kGlobObjs->procMgr->getChilds(pid())){
+        child->parent=parent;
+    }
+    kGlobObjs->procMgr->del(pid());
 }
 Process::~Process(){
-    for(auto task:tasks)kGlobObjs->taskMgr->del(task);
+    for(auto task:tasks)kGlobObjs->taskMgr->del(task->id);
     tasks.clear();
 }
 Process *Process::parentProc(){return (**kGlobObjs->procMgr)[parent];}

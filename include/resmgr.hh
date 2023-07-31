@@ -12,14 +12,14 @@ struct IdManagable{
 };
 template<typename T>
 class ObjManager{
-    constexpr static int nobjs=128;
+    constexpr static int nobjs=512;
     int idCnt;
     T *objlist[nobjs];
 public:
     inline tid_t newId(){return ++idCnt;}
     inline void addObj(tid_t id,T* obj){objlist[id]=obj;}
     inline int getObjNum() { return nobjs; }
-    void del(T *obj);
+    void del(tid_t id);
     inline T* operator[](tid_t id){return objlist[id];}
 };
 
@@ -32,9 +32,9 @@ ptr_t operator new(size_t size, ObjManager<T> &mgr){
     return obj;
 }
 template<typename T>
-void ObjManager<T>::del(T* obj){
-    obj->~T();
-    objlist[obj->id]=nullptr;
+void ObjManager<T>::del(tid_t id){
+    delete objlist[id];
+    objlist[id]=nullptr;
     /// @todo id recycle
 }
 #endif

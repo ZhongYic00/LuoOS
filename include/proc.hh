@@ -22,7 +22,7 @@ namespace proc
 
     struct Context
     {
-        xlen_t gpr[30];
+        xlen_t gpr[31];
         FORCEDINLINE inline xlen_t& x(int r){return gpr[r-1];}
         FORCEDINLINE inline xlen_t& ra(){return x(1);}
         FORCEDINLINE inline xlen_t& a0(){return x(10);}
@@ -67,10 +67,16 @@ namespace proc
             inline void sTick() { ++m_tms_stime; }
     };
     constexpr xlen_t UserStackDefault=0x8000000,
-        UstackSize=0x4000,
+        UstackSize=0x10000,
         UstackBottom=UserStackDefault-UstackSize,
         TrapframePages=2,
         UserHeapSize=0x100000;
+    constexpr addr_t vDSOBase=0x9000000,
+        vDSOPages=1,
+        /// @note may not be fixed
+        interpreterBase=0x70000000;
+    template<typename fptr_t>
+    constexpr inline addr_t vDSOfuncAddr(fptr_t func){return vDSOBase+(addr_t)func&vm::vaddrOffsetMask;}
     constexpr int mOFiles = 101; // 官网测例往fd=100中写东西
     constexpr int FdCwd = 3;
 
@@ -82,6 +88,7 @@ namespace proc
         unordered_set<Task*> tasks;
         shared_ptr<File> files[mOFiles];
         string name;
+        string exe;
         Tms ti;
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
@@ -123,7 +130,7 @@ namespace proc
         inline xlen_t satp(){return vmar.satp();}
         shared_ptr<File> ofile(int a_fd);  // 要求a_fd所指文件存在时，可以直接使用该函数打开，否则应使用fdOutRange检查范围
         Task* newTask();
-        Task* newTask(const Task &other,bool allocStack=true);
+        Task* newTask(const Task &other,addr_t ustack=0u);
         Task* newKTask(prior_t prior=0);
         void print();
         int fdAlloc(shared_ptr<File> a_file, int a_fd = 0, bool a_appoint = false);
@@ -193,7 +200,7 @@ namespace proc
     public:
         vector<Process*> getChilds(pid_t pid){
             vector<Process*> rt;
-            for(int i=0;i<128;i++){
+            for(int i=0;i<512;i++){
                 auto p=this->operator[](i);
                 if(p && p->parent==pid)
                     rt.push_back(p);
