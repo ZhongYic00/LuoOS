@@ -1098,13 +1098,13 @@ namespace syscall {
         do{
             curproc->vmar[argv]>>str;
             if(!str)break;
-            auto buff=curproc->vmar.copyinstr(str,100);
+            auto buff=curproc->vmar.copyinstr(str,200);
             args.push_back(buff);
             argv+=sizeof(char*);
         }while(str!=0);
         /// @brief get envs
         auto ustream=curproc->vmar[envp];
-        do{
+        if(envp) do{
             ustream>>str;
             if(!str)break;
             auto buff=curproc->vmar.copyinstr(str,100);

@@ -156,6 +156,13 @@ namespace syscall
         // Path("/proc").pathRemove();
         shared_ptr<DEntry> ep = Path("/proc").pathCreate(T_DIR, 0);
         ep->setMntPoint();
+        Path("/etc").pathCreate(T_DIR,0);
+        auto ldpath=Path("/etc/ld-musl-riscv64-sf.path").pathCreate(T_FILE,O_RDWR);
+        {
+            auto file=make_shared<File>(ldpath,O_RDWR);
+            char *content="/";
+            file->write(ByteArray{(uint8_t*)content,2});
+        }
         Log(info,"fat initialize ok");
         auto procfs=make_shared<ramfs::FileSystem>();
         {
