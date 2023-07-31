@@ -26,7 +26,7 @@ inline void disk_intr() {
     #ifdef QEMU
     virtio_disk_intr();
     #else 
-    // dmac_intr(DMAC_CHANNEL0);
+    // dmac_intr(DMAC_CHANNEL0);  // @todo: 中断？
     #endif
 }
 
