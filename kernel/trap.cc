@@ -100,6 +100,10 @@ void externalInterruptHandler(){
             disk_intr();
             break;
         }
+        case platform::sdcard::irq:{
+            disk_intr();
+            break;
+        }
         default:
             panic("unknown irq!");
     }

@@ -103,6 +103,9 @@ namespace platform{
             size=128l*0x100000l,
             end=start+size;
     } // namespace ram
+    namespace sdcard {
+        constexpr auto irq = 33;
+    }
     namespace virtio
     {
         namespace blk
