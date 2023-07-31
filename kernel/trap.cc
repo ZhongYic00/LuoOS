@@ -3,7 +3,8 @@
 #include "rvcsr.hh"
 #include "sbi.hh"
 #include "kernel.hh"
-#include "virtio.hh"
+// #include "virtio.hh"
+#include "disk.hh"
 #include "ipc.hh"
 
 #define moduleLevel LogLevel::warning
@@ -95,7 +96,8 @@ void externalInterruptHandler(){
             break;
         }
         case platform::virtio::blk::irq:{
-            virtio_disk_intr();
+            // virtio_disk_intr();
+            disk_intr();
             break;
         }
         default:

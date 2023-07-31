@@ -7,7 +7,8 @@
 #include "ld.hh"
 #include "sched.hh"
 #include "proc.hh"
-#include "virtio.hh"
+// #include "virtio.hh"
+#include "disk.hh"
 #include "fs.hh"
 #include "fs/ramfs.hh"
 #include "vm/vmo.hh"
@@ -225,7 +226,7 @@ void init(int hartid){
         // plicInit();
         // csrClear(sstatus,1l<<csr::mstatus::spp);
         // csrSet(sstatus,BIT(csr::mstatus::spie));
-        virtio_disk_init();
+        disk_init();
         Log(info,"virtio disk init over");
         bio::init();
         Log(info,"binit over");

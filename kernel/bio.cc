@@ -18,7 +18,8 @@
 // #include "include/sdcard.h"
 // #include "include/printf.h"
 // #include "disk.h"
-#include "virtio.hh"
+// #include "virtio.hh"
+#include "disk.hh"
 #include "alloc.hh"
 #include "kernel.hh"
 #include "klib.h"
@@ -53,7 +54,7 @@ xlen_t bufsCreated,bufsDestructed;
 namespace bio{
     void BlockBuf::reload(){
         /// @todo should use devmgr, <blockdev>(devmgr[dev]).read(sec)
-        virtio_disk_rw(*this,0);
+        disk_rw(*this,0);
     }
     BlockBuf::BlockBuf(const BlockKey& key_):key(key_),d(reinterpret_cast<uint8_t*>(vm::pn2addr(kGlobObjs->pageMgr->alloc(1)))){
         ++bufsCreated;
@@ -67,7 +68,34 @@ namespace bio{
     }
     void BlockBuf::flush(){
         Log(debug,"blockbuf flush");
-        virtio_disk_rw(*this,1);
+        disk_rw(*this,1);
         dirty=false;
     }
 }
+
+// namespace disk {
+//     void disk_init() {
+//         #ifdef QEMU
+//         virtio_disk_init();
+//         #else 
+//         SD::init();
+//         #endif
+//     }
+
+//     inline void disk_rw(bio::BlockBuf &b, int a_write) {
+//         #ifdef QEMU
+//         virtio_disk_rw(b, 0);
+//         #else 
+//         if(a_write) { SD::write(b.key.secno, b.d, BlockBuf::blockSize); }
+//         else { SD::read(b.key.secno, b.d, BlockBuf::blockSize); }
+//         #endif
+//     }
+
+//     inline void disk_intr() {
+//         #ifdef QEMU
+//         virtio_disk_intr();
+//         #else 
+//         // dmac_intr(DMAC_CHANNEL0);
+//         #endif
+//     }
+// }
