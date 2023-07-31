@@ -224,6 +224,7 @@ namespace SD {
         // static int irq_num = 33;  // @todo: 也许有用？中断相关？
         __base = base;
         // enable_interrupt();
+        csrClear(sie,BIT(csr::mie::stie));
         csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
         *reg<uint8_t>(SDHCI_SOFTWARE_RESET) = SDHCI_RESET_ALL;
         while (*reg<uint8_t>(SDHCI_SOFTWARE_RESET) != 0);
@@ -254,6 +255,7 @@ namespace SD {
         Log(info, "SD Init DONE\n");
         // disable_interrupt();
         csrClear(sstatus,BIT(csr::mstatus::sie)); // @todo: 禁用中断
+        csrSet(sie,BIT(csr::mie::stie));
         return true;
     }
 
@@ -265,6 +267,7 @@ namespace SD {
     bool read(uint64_t sector, uint8_t *buf, uint32_t bufsize) {
         assert(__base != 0);
         // enable_interrupt();
+        csrClear(sie,BIT(csr::mie::stie));
         csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
         if (bufsize <= 512) {
             // return read_single_block(sector, (uint8_t *)kva2pa((uintptr_t)buffer));
@@ -274,6 +277,7 @@ namespace SD {
         }
         // disable_interrupt();
         csrClear(sstatus,BIT(csr::mstatus::sie)); // @todo: 禁用中断
+        csrSet(sie,BIT(csr::mie::stie));
         memcpy(buf, buffer, bufsize);
         return true;
     }
@@ -282,6 +286,7 @@ namespace SD {
         assert(__base != 0);
         memcpy(buffer, buf, bufsize);
         // enable_interrupt();
+        csrClear(sie,BIT(csr::mie::stie));
         csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
         if (bufsize <= 512) {
             return write_single_block(sector, (uint8_t *)(uintptr_t)buffer);
@@ -290,5 +295,6 @@ namespace SD {
         }
         // disable_interrupt();
         csrClear(sstatus,BIT(csr::mstatus::sie)); // @todo: 禁用中断
+        csrSet(sie,BIT(csr::mie::stie));
     }
 }
