@@ -147,6 +147,7 @@ namespace kernel {
     constexpr long INTERVAL = 390000000 / 100;
     constexpr long CLK_FREQ = 8900000;
     constexpr int NMAXSLEEP = 32;
+    constexpr int nameLen=65;
 
     typedef proc::Task KernelTaskObjs;
 
@@ -159,6 +160,13 @@ namespace kernel {
         struct KVMOs{
             Arc<vm::VMO> dev,text,rodata,data,vdso,kstack,bss,frames,ramdisk;
         }vmos;
+        struct utsname{
+            const char sysname[nameLen]="LuoOS";
+            const char nodename[nameLen]="0";
+            const char release[nameLen]="5.0.0";
+            const char version[nameLen]="#1";
+            const char machine[nameLen]="RISCV-64";
+        }uts;
     };
     struct KernelGlobalObjs{
         mutex::LockedObject<alloc::HeapMgrGrowable,spinlock<false>> heapMgr;

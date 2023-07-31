@@ -127,6 +127,18 @@ public:
     }
 };
 
+
+class ExeFile:public ramfs::INode{
+public:
+    ExeFile(ino_t ino,ramfs::SuperBlock *super):INode(ino,super){}
+    int readLink(char *a_buf, size_t a_bufsiz) override {
+        auto content=kHartObj().curtask->getProcess()->exe;
+        int rdbytes=klib::min(a_bufsiz,content.size());
+        memcpy(a_buf,content.c_str(),rdbytes);
+        return rdbytes;
+    }
+};
+
 namespace syscall
 {
     using namespace fs;
@@ -153,8 +165,11 @@ namespace syscall
             auto self=root->entCreate(root,"self",S_IFDIR).value();
             auto mountsinfo=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<MountsInfoFile>();
             self->getINode()->link("mountinfo",mountsinfo);
+            auto exe=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<ExeFile>();
+            self->getINode()->link("exe",exe);
             auto meminfo=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<MemInfoFile>();
             root->getINode()->link("meminfo",meminfo);
+
             Log(warning,"%d",mounts->rINo());
             Path("/proc").mount(procfs);
         }

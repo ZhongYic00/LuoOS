@@ -244,7 +244,7 @@ namespace fat {
             inline fs::INodeRef mknod(string a_name,mode_t mode) override {
                 auto attr=(S_ISDIR(mode)?ATTR_DIRECTORY:ATTR_ARCHIVE)
                     | (mode&O_RDONLY?ATTR_READ_ONLY:0);
-                if(auto ptr=entry->entCreate(a_name,mode))
+                if(auto ptr=entry->entCreate(a_name,attr))
                     return make_shared<INode>(ptr);
                 return nullptr;
             }

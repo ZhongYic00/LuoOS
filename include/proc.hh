@@ -88,6 +88,7 @@ namespace proc
         unordered_set<Task*> tasks;
         shared_ptr<File> files[mOFiles];
         string name;
+        string exe;
         Tms ti;
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;

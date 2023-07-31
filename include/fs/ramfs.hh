@@ -92,7 +92,7 @@ namespace ramfs
             memmove(bytes.begin()+a_off,(ptr_t)a_src,a_len);
             return a_len;
         }
-        int readLink(char *a_buf, size_t a_bufsiz) override { return -1; }
+        virtual int readLink(char *a_buf, size_t a_bufsiz) override { return -1; }
         virtual mode_t rMode() const override {return isDir?S_IFDIR:S_IFREG;}
         dev_t rDev() const override {return 0;}
         off_t rFileSize() const override {return bytes.size();}
