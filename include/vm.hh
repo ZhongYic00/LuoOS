@@ -130,7 +130,7 @@ namespace vm
         /// @param region absolute vpn region
         inline PageMapping splitChild(Segment region,perm_t newperm=0) const {
             /// @todo reduce mem
-            return PageMapping{region.l,region.length(),offset,vmo,newperm?newperm:perm,mapping,sharing};
+            return PageMapping{region.l,region.length(),offset+region.l-vpn,vmo,newperm?newperm:perm,mapping,sharing};
         }
         inline PageSlice req(PageNum idx) const{return vmo->req(offset+idx);}
         inline PageMapping clone() const {

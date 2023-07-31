@@ -27,20 +27,21 @@ namespace syscall
         pages = bytes2pages(len);
         if(!pages)return -1;
         // assert(pages);
-        Arc<vm::VMO> vmo;
+        Arc<Pager> pager;
         /// @todo register for shared mapping
         /// @todo copy content to vmo
         if(fd!=-1){
             auto file=curproc.ofile(fd);
-            vmo=file->vmo();
-        } else {
-            auto pager=make_shared<SwapPager>(nullptr,Segment{0x0,pn2addr(pages)});
-            vmo=make_shared<VMOPaged>(pages,pager);
+            pager=eastl::dynamic_pointer_cast<VMOPaged>(file->vmo())->pager;
         }
         // actual map
         /// @todo fix flags
         auto mappingType= fd==-1 ?PageMapping::MappingType::file : PageMapping::MappingType::anon;
         auto sharingType=(PageMapping::SharingType)(flags>>8);
+        if(sharingType==PageMapping::SharingType::privt || !pager){
+            pager=make_shared<SwapPager>(pager,Segment{0x0,pn2addr(pages)});
+        }
+        auto vmo=make_shared<VMOPaged>(pages,pager);
         curproc.vmar.map(PageMapping{vpn,pages,0,vmo,PageMapping::prot2perm((PageMapping::Prot)prot),mappingType,sharingType});
         // return val
         return pn2addr(vpn);
@@ -64,7 +65,7 @@ namespace syscall
             Log(warning,"munmap addr not aligned!");
             return -EINVAL;
         }
-        curproc->vmar.protect({addr2pn(addr),addr2pn(addr+len)},PageMapping::prot2perm((PageMapping::Prot)prot));
+        curproc->vmar.protect({addr2pn(addr),addr2pn(addr+len-1)},PageMapping::prot2perm((PageMapping::Prot)prot));
         return 0;
     }
     sysrt_t madvise(addr_t addr,size_t length,int advice){
