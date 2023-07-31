@@ -17,9 +17,15 @@ namespace ld
         }
     } // namespace elf
     eastl::tuple<xlen_t,xlen_t> loadElf(const uint8_t *buff,vm::VMAR &vmar);
+    struct ElfInfo{
+        addr_t phdr;
+        Elf64_Addr  e_entry;
+        Elf64_Half	e_phentsize;
+        Elf64_Half	e_phnum;
+    };
     /// @brief 
     /// @return [entry, program break, ]
-    eastl::tuple<xlen_t,xlen_t> loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar);
+    eastl::tuple<xlen_t,xlen_t,ElfInfo> loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar,addr_t base=0);
     bool isElf(shared_ptr<fs::File> file);
 } // namespace ld
 

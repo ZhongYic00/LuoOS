@@ -154,6 +154,7 @@ namespace kernel {
         using segment_t=vm::segment_t;
         struct KSegments{
             segment_t dev,text,rodata,data,vdso,kstack,bss,frames,ramdisk;
+            segment_t mapper;
         }segments;
         struct KVMOs{
             Arc<vm::VMO> dev,text,rodata,data,vdso,kstack,bss,frames,ramdisk;

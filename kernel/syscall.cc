@@ -1016,8 +1016,8 @@ namespace syscall {
         // static_cast<proc::Context>(kHartObj().curtask->kctx)=proc::Context();
         ctx.sp()=proc::UserStackDefault;
         /// load elf
-        auto [pc,brk]=ld::loadElf(file,curproc->vmar);
-        ctx.pc=pc;
+        auto [entry,brk,info]=ld::loadElf(file,curproc->vmar);
+        ctx.pc=entry;
         curproc->heapTop=curproc->heapBottom=brk;
         /// setup stack
         ArrayBuff<xlen_t> argv(args.size()+1);
@@ -1035,7 +1035,17 @@ namespace syscall {
         // ctx.sp()-=argv.len*sizeof(xlen_t);
         // ctx.sp()-=ctx.sp()%16;
         vector<Elf64_auxv_t> auxv;
+        /* If the main program was already loaded by the kernel,
+        * AT_PHDR will point to some location other than the dynamic
+        * linker's program headers. */
+        if(info.phdr){
+            auxv.push_back({AT_PHDR,info.phdr});
+            auxv.push_back({AT_PHENT,info.e_phentsize});
+            auxv.push_back({AT_PHNUM,info.e_phnum});
+        }
         auxv.push_back({AT_PAGESZ,vm::pageSize});
+        auxv.push_back({AT_BASE,proc::interpreterBase});
+        auxv.push_back({AT_ENTRY,info.e_entry});
         auxv.push_back({AT_NULL,0});
         ustream<<ArrayBuff(auxv.data(),auxv.size());
         ustream<<nullptr;

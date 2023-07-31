@@ -34,7 +34,8 @@ kernel::KernelInfo kInfo={
         .kstack=vm::segment_t{(xlen_t)&_kstack_start,(xlen_t)&_kstack_end},
         .bss={(xlen_t)&_bss_start,(xlen_t)&_bss_end},
         .frames={(xlen_t)&_frames_start,(xlen_t)&_frames_end},
-        .ramdisk={0x84000000,0x84200000}
+        .ramdisk={0x84000000,0x84200000},
+        .mapper={0x84202,0x84202},
     }
 };
 using vm::pgtbl_t,vm::PageTable;
