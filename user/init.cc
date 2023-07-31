@@ -1,4 +1,4 @@
-#include "kernel.hh"
+#include "sys.hh"
 #include "linux/reboot.h"
 struct Exec{
     const char *exec;
@@ -49,4 +49,12 @@ int main(){
     sys::syscall3(sys::syscalls::reboot, LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_CMD_POWER_OFF);
 	while(true);
 	// exit(0);
+}
+
+
+extern "C" int __cxa_atexit(void (*func)(void*), void* arg, void* dso) {
+return 0;
+}
+extern "C" int __dso_handle(){
+return 0;
 }
