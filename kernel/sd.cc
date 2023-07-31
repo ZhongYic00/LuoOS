@@ -220,7 +220,8 @@ namespace SD {
     }
 
     bool init(/*uintptr_t base, char *msg*/) {
-        static uintptr_t base = 0;  // @todo: 基地址？
+        static uintptr_t base = 0x16020000;  // @todo: 基地址？
+        // static int irq_num = 33;  // @todo: 也许有用？中断相关？
         __base = base;
         // enable_interrupt();
         csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
