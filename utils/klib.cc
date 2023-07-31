@@ -26,6 +26,17 @@ void Logger::log(int level,const char *fmt,...){
     va_end(vl);
     if(level>=outputLevel)puts(item.buf);
 }
+void Logger::dump(){
+    int bufsize=128;
+    for(int lvl=LogLevel::nlevels-1;lvl>=0;lvl--){
+        auto &r=ring[lvl];
+        printf("\n>>>>>> log level %d <<<<<<\n",lvl);
+        for(int i=klib::max(r.tail-10,0);i<r.tail;i++){
+            auto &item=r.buff[i%bufsize];
+            printf("%d: %s",item.id,item.buf);
+        }
+    }
+}
 
 void EASTL_DEBUG_BREAK(){ExecInst(ebreak);}
 void* operator new[](size_t size, const char* pName, int flags, unsigned debugFlags, const char* file, int line){
