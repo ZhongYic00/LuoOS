@@ -19,6 +19,8 @@ compile = $(CC) $(depflags) $(CFLAGS)
 OS: $(OS);
 all:  OS #SBI
 	cp $(OS) kernel-qemu
+	riscv64-unknown-elf-objcopy -O binary kernel-qemu obj/os.bin
+	cp obj/os.bin /srv/tftp/s8/os.bin
 
 ksrcs = kernel/start.S\
 	$(shell find kernel/ -name "*.cc")

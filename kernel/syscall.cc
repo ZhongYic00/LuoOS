@@ -1118,6 +1118,7 @@ namespace syscall {
         int magic=ctx.x(10),magic2=ctx.x(11),cmd=ctx.x(12);
         if(!(magic==LINUX_REBOOT_MAGIC1 && magic2==LINUX_REBOOT_MAGIC2))return nonstd::make_unexpected("magic num unmatched!");
         if(cmd==LINUX_REBOOT_CMD_POWER_OFF){
+            printf("!TEST FINISH!\n");
             Log(error,"LuoOS Shutdown! Bye-Bye");
             sbi_shutdown();
         }
