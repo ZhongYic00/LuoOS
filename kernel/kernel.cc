@@ -49,6 +49,7 @@ uint8_t pool[32*vm::pageSize];
 void nextTimeout(){
     xlen_t time;
     csrRead(time,time);
+    Log(debug,"curtime=%ld,next=%ld",time,time+kernel::timerInterval);
     sbi_set_timer(time+kernel::timerInterval);
 }
 static void timerInit(){
@@ -160,9 +161,10 @@ static void rootfsInit(){
 }
 void idle(){
     while(true){
-        Log(debug,"kidle...");
+        Log(info,"kidle...");
         /// @bug after interrupt, sepc not +4, always return to instr wfi ?
-        ExecInst(wfi);
+        // ExecInst(wfi);
+        while(true);
     }
 }
 std::atomic<uint32_t> started;
@@ -233,12 +235,12 @@ void init(int hartid){
         Log(info,"binit over");
         signal::sigInit();
         std::atomic_thread_fence(std::memory_order_release);
-        sbi_hsm_hart_start(hartid^1,(xlen_t)0x80200000,0);
-        while(started<2){
-            auto rt=sbi_hsm_hart_get_status(1);
-        }
+        // sbi_hsm_hart_start((hartid-1)^1+1,(xlen_t)0x80200000,0);
+        // while(started<2){
+        //     auto rt=sbi_hsm_hart_get_status(1);
+        // }
         xlen_t mask=0x1;
-        sbi_remote_sfence_vma((cpumask*)&mask,0x0,0x84000000);
+        // sbi_remote_sfence_vma((cpumask*)&mask,0x0,0x84000000);
         // for(volatile int i=10000000;i;i--);
     } else {
         halt();
@@ -254,18 +256,21 @@ void init(int hartid){
     }
     
     new (&fs::vmolru) list<shared_ptr<vm::VMO>>();
-    assert(hartid==1||hartid==0);
-    if(hartid == 0){
+    // assert(hartid==1||hartid==0);
+    if(isinit){
+        Log(info,"init timer");
         timerInit();
+        Log(info,"init plic");
         plicInit();
+        Log(info,"init over, create kidle");
         std::atomic_thread_fence(std::memory_order_acquire);
         auto kidle=proc::createKProcess(sched::maxPrior);
         kidle->defaultTask()->kctx.pc=(xlen_t)idle;
         kidle->defaultTask()->kctxs.push(kidle->defaultTask()->kctx);
         schedule();
         Log(info,"first schedule on hart%d",kernel::readHartId());
-        // kLogger.outputLevel=warning;
-        // enableLevel=warning;
+        kLogger.outputLevel=warning;
+        enableLevel=warning;
         _strapexit();
     }
     halt();

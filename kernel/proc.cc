@@ -11,7 +11,7 @@ Process::Process(pid_t pid,prior_t prior,pid_t parent):IdManagable(pid),Scheduab
     using perm=PageTableEntry::fieldMasks;
     using mapping=PageMapping::MappingType;
     using sharing=PageMapping::SharingType;
-    vmar.map(PageMapping{addr2pn(vDSOBase),vDSOPages,0,kInfo.vmos.vdso,perm::r|perm::x|perm::u|perm::v,mapping::system,sharing::shared});
+    vmar.map(PageMapping{addr2pn(vDSOBase),vDSOPages,0,kInfo.vmos.vdso,perm::r|perm::x|perm::u|perm::v2,mapping::system,sharing::shared});
 }
 Process::Process(prior_t prior,pid_t parent):Process(id,prior,parent){}
 xlen_t Process::newUstack(){
@@ -19,7 +19,7 @@ xlen_t Process::newUstack(){
     using perm=vm::PageTableEntry::fieldMasks;
     using namespace vm;
     auto vmo=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(ustackpages),ustackpages);
-    vmar.map(PageMapping{vm::addr2pn(UstackBottom),ustackpages,0,vmo,perm::r|perm::w|perm::u|perm::v,PageMapping::MappingType::system,PageMapping::SharingType::privt});
+    vmar.map(PageMapping{vm::addr2pn(UstackBottom),ustackpages,0,vmo,perm::r|perm::w|perm::u|perm::v2,PageMapping::MappingType::system,PageMapping::SharingType::privt});
     return ustack;
 }
 auto Process::newTrapframe(){
@@ -30,7 +30,7 @@ auto Process::newTrapframe(){
     using namespace vm;
     /// @todo vaddr should be in specific region?
     auto vmo=make_shared<VMOContiguous>(ppn,TrapframePages);
-    vmar.map(PageMapping{vm::addr2pn(vaddr),TrapframePages,0,vmo,perm::r|perm::w|perm::u|perm::v,PageMapping::MappingType::system,PageMapping::SharingType::privt});
+    vmar.map(PageMapping{vm::addr2pn(vaddr),TrapframePages,0,vmo,perm::r|perm::w|perm::u|perm::v2,PageMapping::MappingType::system,PageMapping::SharingType::privt});
     return eastl::make_tuple(vaddr,vm::pn2addr(ppn));
 }
 
@@ -81,7 +81,7 @@ xlen_t Process::brk(xlen_t addr){
         auto pager=make_shared<SwapPager>(nullptr,Segment{0x0,pn2addr(pages)});
         auto vmo=make_shared<VMOPaged>(pages,pager);
         using perm=PageTableEntry::fieldMasks;
-        vmar.map(PageMapping{curtop,pages,0,vmo,perm::r|perm::w|perm::x|perm::u|perm::v,PageMapping::MappingType::anon,PageMapping::SharingType::privt});
+        vmar.map(PageMapping{curtop,pages,0,vmo,perm::r|perm::w|perm::x|perm::u|perm::v2,PageMapping::MappingType::anon,PageMapping::SharingType::privt});
         return heapTop=addr;
     }
 }

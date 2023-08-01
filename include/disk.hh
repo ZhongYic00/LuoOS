@@ -5,6 +5,7 @@
 #include "virtio.hh"
 #include "sd.hh"
 #include "kernel.hh"
+// #define moduleLevel debug
 // #define QEMU 1
 inline void disk_init() {
     #ifdef QEMU
@@ -20,8 +21,9 @@ inline void disk_rw(bio::BlockBuf &b, int a_write) {
     #else 
     // if(a_write) { SD::write(b.key.secno, b.d, 512); }
     // else { SD::read(b.key.secno, b.d, 512); }
+    Log(debug,"rw secno=%d buf=%x",b.key.secno,b.d);
     auto mempos=kInfo.segments.ramdisk.first+(b.key.secno*512);
-    if(mempos>kInfo.segments.ramdisk.second) return ;
+    if(mempos>kInfo.segments.ramdisk.second) panic("mempos out of bound");
     if(a_write) memmove((ptr_t)mempos,b.d,512);
     else memmove(b.d,(ptr_t)mempos,512);
     #endif

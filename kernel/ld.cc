@@ -53,7 +53,7 @@ eastl::tuple<xlen_t,xlen_t> loadElf(shared_ptr<fs::File> file,vm::VMAR &vmar){
             auto shadow=make_shared<vm::VMOPaged>(pages,pager);
             vmar.map(vm::PageMapping{vm::addr2pn(entry.p_vaddr),pages,0,shadow,perm,vm::PageMapping::MappingType::file,vm::PageMapping::SharingType::privt});
         }
-        // Log(debug,"%x<=%x[%d pages@%x]",vm::addr2pn(entry.p_vaddr),ppn,pages,ld::elf::flags2perm(entry.p_flags));
+        // Log(debug,"%x<=[%d pages@%x]",vm::addr2pn(entry.p_vaddr),pages,ld::elf::flags2perm(entry.p_flags));
     }
     vmar.print();
     return eastl::make_tuple(elfHeader->e_entry,programbreak);

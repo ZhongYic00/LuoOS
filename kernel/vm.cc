@@ -15,7 +15,7 @@ PageBuf::~PageBuf(){
 }
 
 VMOMapper::VMOMapper(Arc<VMO> vmo){
-    auto mapping=PageMapping{addr2pn(kInfo.segments.ramdisk.second)+5,vmo->len(),0,vmo,PageTableEntry::fieldMasks::r|PageTableEntry::fieldMasks::w|PageTableEntry::fieldMasks::v,PageMapping::MappingType::file,PageMapping::SharingType::shared};
+    auto mapping=PageMapping{addr2pn(kInfo.segments.frames.second)+5,vmo->len(),0,vmo,PageTableEntry::fieldMasks::r|PageTableEntry::fieldMasks::w|PageTableEntry::fieldMasks::v2,PageMapping::MappingType::file,PageMapping::SharingType::shared};
     kGlobObjs->vmar->map(mapping,true);
     region=mapping.vsegment();
 }

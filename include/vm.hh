@@ -210,6 +210,7 @@ namespace vm
         inline VMAR(const std::initializer_list<PageMapping> &mappings,pgtbl_t root=nullptr):mappings(mappings),pagetable(root){for(auto &mapping:mappings)map(mapping);}
         inline VMAR(const VMAR &other):pagetable(){
             for(const auto &mapping:other.mappings)map(mapping.clone());
+            asm("sfence.vma");
         }
         inline expected<PageMapping,xlen_t> findMapping(xlen_t addr){
             auto it=find(addr);
@@ -224,6 +225,7 @@ namespace vm
             auto [off,ppn,pages]=mapping->req(vpn-mapping->vpn);
             auto voff=off-mapping->offset;
             pagetable.createMapping(mapping->vpn+voff,ppn,pages,mapping->perm);
+            asm("sfence.vma");
         }
         /// @brief overlap should has been unmapped
         void map(const PageMapping &mapping,bool ondemand=false);
@@ -254,6 +256,7 @@ namespace vm
                     i=mappings.erase(i);
                 } else i++;
             }
+            asm("sfence.vma");
             Log(debug, "after unmap, VMAR:%s", klib::toString(mappings).c_str());
         }
         /// @brief clear all mmaps

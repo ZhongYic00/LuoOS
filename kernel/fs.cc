@@ -440,8 +440,10 @@ namespace fs
 
     Result<DERef> DEntry::entSearch(DERef self,string a_dirname, uint *a_off){
         Log(debug,"lookup(%s)",a_dirname.c_str());
-        if(auto it=subs.find(a_dirname); it!=subs.end() && !it->second.expired())
+        if(auto it=subs.find(a_dirname); it!=subs.end() && !it->second.expired()){
+            Log(trace,"dentry cache hit");
             return it->second.lock();
+        }
         if(auto subnod=nod->lookup(a_dirname,a_off)){
             Log(trace,"dentry caching %s",a_dirname.c_str());
             auto sub=make_shared<DEntry>(self,a_dirname,subnod);

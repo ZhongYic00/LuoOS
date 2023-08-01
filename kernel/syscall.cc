@@ -655,8 +655,9 @@ namespace syscall {
         struct proc::SleepingTask tosleep(cur, kHartObj().g_ticks + tv->tv_sec*kernel::CLK_FREQ/kernel::INTERVAL + tv->tv_nsec*kernel::CLK_FREQ/(1000000*kernel::INTERVAL));
         for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
             if(kHartObj().sleep_tasks[i].m_task == nullptr) {
-                kHartObj().sleep_tasks[i] = tosleep;
-                return sleep();
+                // kHartObj().sleep_tasks[i] = tosleep;
+                // return sleep();
+                return 0;
             }
         }
         return statcode::err;
