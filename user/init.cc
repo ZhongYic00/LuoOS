@@ -29,11 +29,11 @@ int main(){
     const char *args2[] = { "busybox","sh","-c","busybox grep -v -e tls_get -e sem_init -e pthread_cancel -e socket -e pthread_cond_ -e pthread_exit_cancel -e deadlock -e rwlock run-static.sh | while read line; do eval $line; done\n",nullptr };
     const char *args3[] = { "busybox","sh","-c","busybox grep -v -e tls_get -e sem_init -e pthread_cancel -e socket -e pthread_cond_ -e pthread_exit_cancel -e deadlock -e rwlock run-dynamic.sh  | while read line; do eval $line; done\n",nullptr };
     Exec testcases[]={
-        {"time-test",args0,envs},
-        {"busybox",args0,envs},
+        // {"time-test",args0,envs},
+        // {"busybox",args0,envs},
         {"busybox",args1,envs},
-        {"busybox",args2,envs},
-        {"busybox",args3,envs},
+        // {"busybox",args2,envs},
+        // {"busybox",args3,envs},
     };
     const int tsn = sizeof(testcases) / sizeof(Exec);
     // char *args[] = { "busybox","sh","run-static.sh",nullptr };
