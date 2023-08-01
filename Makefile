@@ -86,7 +86,7 @@ testrun: all
 .PHONY : starfive
 starfive: all
 	riscv64-unknown-elf-objcopy -O binary kernel-qemu obj/os.bin
-	cp obj/os.bin /srv/tftp/s7/os.bin
+	cp obj/os.bin /srv/tftp/s8/os.bin
 
 .PHONY : debug
 debug: all

@@ -1,5 +1,8 @@
 #include "sd.hh"
 #include "kernel.hh"
+#include "platform.h"
+
+#define moduleLevel debug
 
 namespace SD {
     static uintptr_t __base = 0;
@@ -218,57 +221,155 @@ namespace SD {
         send_command(25, data_address);
         return finish_command(25);
     }
-
-    bool init(/*uintptr_t base, char *msg*/) {
-        static uintptr_t base = 0x16020000;  // @todo: 基地址？
-        // static int irq_num = 33;  // @todo: trap里加了分支，但是搬过来的实现似乎没有intr相关函数
-        __base = base;
-        // enable_interrupt();
-        csrClear(sie,BIT(csr::mie::stie));
-        csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
-        *reg<uint8_t>(SDHCI_SOFTWARE_RESET) = SDHCI_RESET_ALL;
-        while (*reg<uint8_t>(SDHCI_SOFTWARE_RESET) != 0);
-        uint32_t ier = SDHCI_INT_BUS_POWER | SDHCI_INT_DATA_END_BIT |
-            SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_TIMEOUT |
-            SDHCI_INT_INDEX | SDHCI_INT_END_BIT | SDHCI_INT_CRC |
-            SDHCI_INT_TIMEOUT | SDHCI_INT_DATA_END |
-            SDHCI_INT_RESPONSE;
-        *reg<uint32_t>(SDHCI_INT_ENABLE) = ier;
-        *reg<uint32_t>(SDHCI_SIGNAL_ENABLE) = ier;
-        // SD Card Detection
-        *reg<uint16_t>(SDHCI_INT_ENABLE) = *reg<uint16_t>(SDHCI_INT_ENABLE) | SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE;
-        *reg<uint16_t>(SDHCI_SIGNAL_ENABLE) = *reg<uint16_t>(SDHCI_INT_ENABLE) | SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE;
-        if (*reg<uint32_t>(SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT) {
-            Log(error, "SD Card inserted\n");
-        } else {
-            Log(error, "SD Card removed\n");
-            return false;
+    using namespace platform::sdio;
+    bool cmdReady(){ return mmio<Command>(base+cmd).start_cmd==0;}
+    bool cmdDone(){ return mmio<RawIntStat>(base+rintst).intStat&RawIntStat::Kind::CD;}
+    void checkInt(){
+        auto intstat=mmio<RawIntStat>(base+rintst);
+        Log(debug,"intstat=%x",mmio<uint16_t>(base+rintst));
+        mmio<RawIntStat>(base+rintst)=intstat;
+        Log(debug,"intstat=%x",mmio<uint16_t>(base+rintst));
+    }
+    typedef uint64_t resp_t;
+    resp_t send_command(Command command,uint32_t arg=0,int respLen=0){
+        Log(info,"send cmd %x",*reinterpret_cast<uint32_t*>(&command));
+        while(!cmdReady());
+        Log(debug,"wait over");
+        // wait for data ready
+        // send arg then cmd
+        if(arg){
+            mmio<uint32_t>(base+cmdarg)=arg;
         }
-        // Card Initialization and Identification
-        Log(info, "Sending CARD_RESET\n");
-        card_reset();
-        delay(30000);
-        Log(info, "Sending IF_COND\n");
-        send_if_cond();
-        Log(info, "Sending OP_COND\n");
-        send_op_cond();
-        Log(info, "SD Init DONE\n");
-        // disable_interrupt();
-        csrClear(sstatus,BIT(csr::mstatus::sie)); // @todo: 禁用中断
-        csrSet(sie,BIT(csr::mie::stie));
-        return true;
+        command.card_number=0;
+        command.start_cmd=1;
+        command.response_expected=respLen>0;
+        command.response_length=respLen>1;
+
+        mmio<Command>(base+cmd)=command;
+        // wait for cmd accepted
+        while(!cmdReady());
+        // wait for resp
+        resp_t resp=0;
+        if(respLen){
+            while(!cmdDone());
+            resp=mmio<uint32_t>(base+resp0);
+            if(respLen>1){
+                resp|=((resp_t)mmio<uint32_t>(base+resp1))<<32;
+                resp|=((resp_t)mmio<uint32_t>(base+resp2))<<64;
+                resp|=((resp_t)mmio<uint32_t>(base+resp3))<<96;
+            }
+            Log(debug,"recv resp=%x",resp);
+        } else {
+            resp=true;
+        }
+        checkInt();
+        // wait for data valid
+        return resp;
     }
 
-    bool pci_init(uintptr_t base, char *msg) {
-        assert(false);
-        return false;
+    bool init() {
+        // static int irq_num = 33;  // @todo: trap里加了分支，但是搬过来的实现似乎没有intr相关函数
+        Log(info,"begin sd init");
+        __base = base;
+        // enable_interrupt();
+        // csrClear(sie,BIT(csr::mie::stie));
+        // csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
+        Log(info,"card detect %x",mmio<uint32_t>(base+cardDetect));
+        Log(info,"disable clock");
+        mmio<uint16_t>(base+clken)=0;
+        Command clkupd={
+            .wait_prvdata_complete=1,
+            .update_clock_register_only=1,
+            .start_cmd=1
+        };
+        if(!send_command(cmd)) panic("error updating clock to disabled!");
+        Log(info,"set low clock freq");
+        mmio<uint16_t>(base+clkdiv)=255;
+        Log(info,"renable clock");
+        mmio<uint16_t>(base+clken)=1;
+        if(!send_command(cmd)) panic("error updating clock to low speed!");
+        Log(info,"set card type");
+        mmio<uint32_t>(base+ctype)=0;
+        Log(info,"reset bus");
+        mmio<BMod>(base+bmod)=BMod{.software_reset=1};
+        Log(info,"reset fifo");
+
+        mmio<Control>(base+ctrl)=Control{.fifo_reset=1,.dma_enable=0};
+        Log(info,"send cmd0");
+        send_command(Command{.cmd_index=0,.send_initialization=1});
+        Log(info,"setting up volt");
+        if(auto resp=send_command(Command{.cmd_index=8,.wait_prvdata_complete=1,.use_hold_reg=1},(1<<8)|0xAA,1); resp&0xAA==0){
+            Log(error,"cmd8 failed!");
+        } else {
+            Log(info,"volt set ok! resp=%x %d",resp,resp&0xAA==0);
+        }
+
+        Log(info,"send ACMD 41");
+        send_command(Command{.cmd_index=55,.wait_prvdata_complete=1,.use_hold_reg=1});
+        if(auto resp=send_command(Command{.cmd_index=41,.wait_prvdata_complete=1,.use_hold_reg=1},(1 << 30) | (1 << 24) | 0xFF8000,1); resp&(1<<30)!=0){
+            Log(error,"high cap card");
+            return false;
+        }
+        delay(500000000);
+
+        if(auto resp=send_command(Command{.cmd_index=2,.wait_prvdata_complete=1,.use_hold_reg=1},0,4)){
+            Log(info,"cid=%lx",resp);
+        }
+        
+
+        // *reg<uint8_t>(SDHCI_TIMEOUT_CONTROL) = 0;
+        // *reg<uint8_t>(SDHCI_POWER_CONTROL) = 0;
+        // Log(debug,"setting up power");
+        // *reg<uint8_t>(SDHCI_POWER_CONTROL) = SDHCI_POWER_ON | SDHCI_POWER_330;
+        // *reg<uint8_t>(SDHCI_HOST_CONTROL) |= SDHCI_CTRL_HISPD;
+        // *reg<uint8_t>(SDHCI_POWER_CONTROL) = SDHCI_POWER_ON | SDHCI_POWER_180;
+        // *reg<uint16_t>(SDHCI_CLOCK_CONTROL) = (4 << SDHCI_DIVIDER_SHIFT);
+        // mmio<uint16_t>(base+SDHCI_CLOCK_CONTROL) |= SDHCI_CLOCK_CARD_EN;
+
+
+        // Log(debug,"write cmd0 to %x",base+SDHCI_COMMAND);
+        // mmio<uint16_t>(base+SDHCI_COMMAND)=0 | SDHCI_CMD23_ENABLE;
+        // // while(!mmio<uint16_t>(base+SDHCI_STAte))
+        // Log(debug,"cmd0 written, reset timeout");
+        // // *reg<uint8_t>(SDHCI_SOFTWARE_RESET) = SDHCI_RESET_ALL;
+        // // while (*reg<uint8_t>(SDHCI_SOFTWARE_RESET) != 0);
+        // uint32_t ier = SDHCI_INT_BUS_POWER | SDHCI_INT_DATA_END_BIT |
+        //     SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_TIMEOUT |
+        //     SDHCI_INT_INDEX | SDHCI_INT_END_BIT | SDHCI_INT_CRC |
+        //     SDHCI_INT_TIMEOUT | SDHCI_INT_DATA_END |
+        //     SDHCI_INT_RESPONSE;
+        // *reg<uint32_t>(SDHCI_INT_ENABLE) = ier;
+        // *reg<uint32_t>(SDHCI_SIGNAL_ENABLE) = ier;
+        // // SD Card Detection
+        // *reg<uint16_t>(SDHCI_INT_ENABLE) = *reg<uint16_t>(SDHCI_INT_ENABLE) | SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE;
+        // *reg<uint16_t>(SDHCI_SIGNAL_ENABLE) = *reg<uint16_t>(SDHCI_INT_ENABLE) | SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE;
+        // delay(1000000);
+        // if (*reg<uint32_t>(SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT) {
+        //     Log(error, "SD Card inserted\n");
+        // } else {
+        //     Log(error, "SD Card removed\n");
+        //     return false;
+        // }
+        // // Card Initialization and Identification
+        // Log(info, "Sending CARD_RESET\n");
+        // card_reset();
+        // delay(30000);
+        // Log(info, "Sending IF_COND\n");
+        // send_if_cond();
+        // Log(info, "Sending OP_COND\n");
+        // send_op_cond();
+        // Log(info, "SD Init DONE\n");
+        // disable_interrupt();
+        // csrClear(sstatus,BIT(csr::mstatus::sie)); // @todo: 禁用中断
+        // csrSet(sie,BIT(csr::mie::stie));
+        return true;
     }
 
     bool read(uint64_t sector, uint8_t *buf, uint32_t bufsize) {
         assert(__base != 0);
         // enable_interrupt();
-        csrClear(sie,BIT(csr::mie::stie));
-        csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
+        // csrClear(sie,BIT(csr::mie::stie));
+        // csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
         if (bufsize <= 512) {
             // return read_single_block(sector, (uint8_t *)kva2pa((uintptr_t)buffer));
             return read_single_block(sector, (uint8_t *)(uintptr_t)buffer);  // @todo: 检查？
@@ -276,8 +377,8 @@ namespace SD {
             return read_multiple_block(sector, (uint8_t *)(uintptr_t)buffer, (bufsize + 511) / 512);
         }
         // disable_interrupt();
-        csrClear(sstatus,BIT(csr::mstatus::sie)); // @todo: 禁用中断
-        csrSet(sie,BIT(csr::mie::stie));
+        // csrClear(sstatus,BIT(csr::mstatus::sie)); // @todo: 禁用中断
+        // csrSet(sie,BIT(csr::mie::stie));
         memcpy(buf, buffer, bufsize);
         return true;
     }
@@ -286,15 +387,14 @@ namespace SD {
         assert(__base != 0);
         memcpy(buffer, buf, bufsize);
         // enable_interrupt();
-        csrClear(sie,BIT(csr::mie::stie));
-        csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
+        // csrClear(sie,BIT(csr::mie::stie));
+        // csrSet(sstatus,BIT(csr::mstatus::sie));  // @todo: 启用中断
         if (bufsize <= 512) {
             return write_single_block(sector, (uint8_t *)(uintptr_t)buffer);
         } else {
             return write_multiple_block(sector, (uint8_t *)(uintptr_t)buffer, (bufsize + 511) / 512);
         }
-        // disable_interrupt();
-        csrClear(sstatus,BIT(csr::mstatus::sie)); // @todo: 禁用中断
-        csrSet(sie,BIT(csr::mie::stie));
+        // csrClear(sstatus,BIT(csr::mstatus::sie)); // @todo: 禁用中断
+        // csrSet(sie,BIT(csr::mie::stie));
     }
 }

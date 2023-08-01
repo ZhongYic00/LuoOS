@@ -4,7 +4,7 @@
 
 #include "virtio.hh"
 #include "sd.hh"
-#define QEMU 1
+// #define QEMU 1
 inline void disk_init() {
     #ifdef QEMU
     virtio_disk_init();
@@ -17,8 +17,8 @@ inline void disk_rw(bio::BlockBuf &b, int a_write) {
     #ifdef QEMU
     virtio_disk_rw(b, 0);
     #else 
-    if(a_write) { SD::write(b.key.secno, b.d, BlockBuf::blockSize); }
-    else { SD::read(b.key.secno, b.d, BlockBuf::blockSize); }
+    if(a_write) { SD::write(b.key.secno, b.d, 512); }
+    else { SD::read(b.key.secno, b.d, 512); }
     #endif
 }
 

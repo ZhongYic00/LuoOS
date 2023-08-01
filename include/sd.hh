@@ -469,7 +469,7 @@ struct sdhci_adma2_64_desc {
 #define SDHCI_TUNING_MODE_3	2
 
 namespace SD {
-	bool init(uintptr_t base, char *msg);
+	bool init();
 	bool pci_init(uintptr_t base, char *msg);
 	bool read(uint64_t sector, uint8_t *buf, uint32_t bufsize);
 	bool write(uint64_t sector, uint8_t *buf, uint32_t bufsize);
