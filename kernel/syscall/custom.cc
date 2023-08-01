@@ -139,6 +139,22 @@ public:
     }
 };
 
+class ZeroFile:public ramfs::INode{
+public:
+    ZeroFile(ino_t ino,ramfs::SuperBlock *super):INode(ino,super){}
+    int nodRead(addr_t addr, uint32_t uoff, uint32_t len) override {
+        memset((void*)addr, 0, len);
+        return len;
+    }
+    int nodWrite(uint64 a_src, uint a_off, uint a_len) override { return a_len; }
+};
+class NullFile:public ramfs::INode{
+public:
+    NullFile(ino_t ino,ramfs::SuperBlock *super):INode(ino,super){}
+    int nodRead(addr_t addr, uint32_t uoff, uint32_t len) override { return -1; }  // EOF
+    int nodWrite(uint64 a_src, uint a_off, uint a_len) override { return a_len; }
+};
+
 namespace syscall
 {
     using namespace fs;
@@ -185,7 +201,11 @@ namespace syscall
             auto root=devfs->getSpBlk()->getRoot();
             auto misc=root->entCreate(root,"misc",S_IFDIR).value();
             auto rtc=dynamic_cast<ramfs::SuperBlock*>(devfs->getSpBlk().get())->mknod<RTCFile>();
+            auto zero=dynamic_cast<ramfs::SuperBlock*>(devfs->getSpBlk().get())->mknod<ZeroFile>();
+            auto null=dynamic_cast<ramfs::SuperBlock*>(devfs->getSpBlk().get())->mknod<NullFile>();
             misc->getINode()->link("rtc",rtc);
+            misc->getINode()->link("zero",zero);
+            misc->getINode()->link("null",null);
             Path("/dev").mount(devfs);
         }
         {
