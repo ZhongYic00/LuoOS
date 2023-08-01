@@ -100,7 +100,7 @@ int _vsnprintf(char * out, size_t n, const char* s, va_list vl)
 		} else if (*s == '%') {
 			format = 1;
 		} else {
-			if (out && pos < n) {
+			if (out && pos < n && *s<127) {
 				out[pos] = *s;
 			}
 			pos++;
