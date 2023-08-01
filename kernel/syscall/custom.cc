@@ -204,6 +204,8 @@ namespace syscall
             auto zero=dynamic_cast<ramfs::SuperBlock*>(devfs->getSpBlk().get())->mknod<ZeroFile>();
             auto null=dynamic_cast<ramfs::SuperBlock*>(devfs->getSpBlk().get())->mknod<NullFile>();
             misc->getINode()->link("rtc",rtc);
+            misc->getINode()->link("zero",zero);
+            misc->getINode()->link("null",null);
             Path("/dev").mount(devfs);
         }
         {
