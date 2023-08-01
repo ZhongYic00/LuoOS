@@ -44,7 +44,7 @@ class MemInfoFile:public ramfs::INode{
 
 ## devfs
 
-/dev目录下挂载了一个同样基于RamFS的devfs文件系统，目前包含rtc设备文件，可以获取硬件时钟。
+/dev目录下挂载了一个同样基于RamFS的devfs文件系统，目前包含rtc、zero和null设备文件，其中rtc可以获取硬件时钟，zero可以输出任意长的0数据串并丢弃任何输入，null在读取时返回EOF并丢弃任何输入。
 ```c
 class RTCFile:public ramfs::INode{
     public:
@@ -56,5 +56,24 @@ class RTCFile:public ramfs::INode{
         int ioctl(uint64_t req,addr_t arg) override{
             ...
         }
+};
+```
+```c
+class ZeroFile:public ramfs::INode{
+    public:
+        ZeroFile(ino_t ino,ramfs::SuperBlock *super):INode(ino,super){}
+        int nodRead(addr_t addr, uint32_t uoff, uint32_t len) override {
+            memset((void*)addr, 0, len);
+            return len;
+        }
+        int nodWrite(uint64 a_src, uint a_off, uint a_len) override { return a_len; }
+};
+```
+```c
+class NullFile:public ramfs::INode{
+    public:
+        NullFile(ino_t ino,ramfs::SuperBlock *super):INode(ino,super){}
+        int nodRead(addr_t addr, uint32_t uoff, uint32_t len) override { return -1; }  // EOF
+        int nodWrite(uint64 a_src, uint a_off, uint a_len) override { return a_len; }
 };
 ```
