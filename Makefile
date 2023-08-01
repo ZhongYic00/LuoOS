@@ -63,7 +63,7 @@ usersrcs = $(shell find user/ -name "*.cc")
 userprogs := obj/user/init.elf
 # userprogs := user/testsuits/clone
 $(info utilobjs=$(utilobjs))
-$(objdir)/user/%.elf : user/%.cc obj/utils/klibc.o
+$(objdir)/user/%.elf : user/%.cc
 	@echo +CC $^
 	@mkdir -p $(dir $@)
 	$(CC) $(UCFLAGS) -o $@ $^
