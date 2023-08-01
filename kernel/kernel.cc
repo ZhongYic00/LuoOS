@@ -25,6 +25,7 @@ extern char _vdso_start,_vdso_end;
 extern char _bss_start,_bss_end;
 extern char _frames_start,_frames_end;
 extern char _kstack_start,_kstack_end;
+extern char _memdisk_start,_memdisk_end;
 kernel::KernelInfo kInfo={
     .segments={
         .dev=(vm::segment_t){0x0,0x40000000},
@@ -35,7 +36,7 @@ kernel::KernelInfo kInfo={
         .kstack=vm::segment_t{(xlen_t)&_kstack_start,(xlen_t)&_kstack_end},
         .bss={(xlen_t)&_bss_start,(xlen_t)&_bss_end},
         .frames={(xlen_t)&_frames_start,(xlen_t)&_frames_end},
-        .ramdisk={0x84000000,0x84200000}
+        .ramdisk={(xlen_t)&_memdisk_start,(xlen_t)&_memdisk_end}
     }
 };
 using vm::pgtbl_t,vm::PageTable;

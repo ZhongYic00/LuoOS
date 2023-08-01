@@ -47,7 +47,7 @@ ENTRY( _start )
  */
 MEMORY
 {
-	ram   (wxa!ri) : ORIGIN = 0x80200000, LENGTH = 64M-0x200000
+	ram   (wxa!ri) : ORIGIN = 0x80200000, LENGTH = 128M+64M-0x200000
 }
 
 /*
@@ -158,14 +158,19 @@ SECTIONS
 		PROVIDE(_uimg_start = .);
 		*(uimg.data)
 		PROVIDE(_bss_end = .);
-		. = ALIGN(4096);
 	} >ram
 
 	PROVIDE(_memory_start = ORIGIN(ram));
 	PROVIDE(_memory_end = ORIGIN(ram) + LENGTH(ram));
 
-	PROVIDE(_heap_start = _bss_end);
-	PROVIDE(_heap_size = _memory_end - _heap_start);
+	.memdisk :{
+		. = ALIGN(4k);
+		PROVIDE(_memdisk_start = .);
+		*(memdisk.data)
+		PROVIDE(_memdisk_end = .);
+		. = . +4k;
+	} > ram
+
 	PROVIDE(_frames_start = .);
 	PROVIDE(_frames_end = _memory_end);
 	

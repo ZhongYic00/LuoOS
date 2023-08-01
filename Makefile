@@ -52,7 +52,8 @@ $(objdir)/%.o : %.S
 		@mkdir -p $(dir $@)
 		$(compile) -c -o $@ $<
 uimg = $(objdir)/user/uimg.o
-$(OS): $(kobjs) $(uimg)
+dimg = $(objdir)/user/dimg.o
+$(OS): $(kobjs) $(uimg) $(dimg)
 	$(info ksrcs=$(ksrcs), kobjs=$(kobjs))
 	@echo + CC $<
 	$(CC) $(CFLAGS) -T kernel/os.ld -o $(OS) $^
@@ -70,13 +71,15 @@ $(objdir)/user/%.elf : user/%.cc obj/utils/klibc.o
 uprogs: $(userprogs)
 $(uimg): $(userprogs)
 	$(OBJCOPY) -I binary -O elf64-littleriscv --binary-architecture riscv --prefix-sections=uimg $< $@
+$(dimg): sdcard.img
+	$(OBJCOPY) -I binary -O elf64-littleriscv --binary-architecture riscv --prefix-sections=memdisk $< $@
 
 
 TEXTMODE=-nographic > obj/output
 run: all
 	@echo "Press Ctrl-A and then X to exit QEMU"
 	@echo "------------------------------------"
-	@${QEMU} ${QFLAGS} -kernel $(OS) -s ${TEXTMODE} 2> obj/log
+	@${QEMU} ${QFLAGS} -kernel $(OS) -s ${TEXTMODE}
 
 testrun: all
 	rm -rf obj/*

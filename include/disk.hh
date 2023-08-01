@@ -4,12 +4,13 @@
 
 #include "virtio.hh"
 #include "sd.hh"
+#include "kernel.hh"
 // #define QEMU 1
 inline void disk_init() {
     #ifdef QEMU
     virtio_disk_init();
     #else 
-    SD::init();
+    // SD::init();
     #endif
 }
 
@@ -17,8 +18,12 @@ inline void disk_rw(bio::BlockBuf &b, int a_write) {
     #ifdef QEMU
     virtio_disk_rw(b, 0);
     #else 
-    if(a_write) { SD::write(b.key.secno, b.d, 512); }
-    else { SD::read(b.key.secno, b.d, 512); }
+    // if(a_write) { SD::write(b.key.secno, b.d, 512); }
+    // else { SD::read(b.key.secno, b.d, 512); }
+    auto mempos=kInfo.segments.ramdisk.first+(b.key.secno*512);
+    if(mempos>kInfo.segments.ramdisk.second) return ;
+    if(a_write) memmove((ptr_t)mempos,b.d,512);
+    else memmove(b.d,(ptr_t)mempos,512);
     #endif
 }
 
