@@ -9,6 +9,7 @@
 
 enum LogLevel{
     trace,debug,info,warning,error,
+    nlevels
 };
 
 #define IFDEF(cond,x) if(cond){x}

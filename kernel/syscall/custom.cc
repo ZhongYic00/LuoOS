@@ -127,6 +127,18 @@ public:
     }
 };
 
+
+class ExeFile:public ramfs::INode{
+public:
+    ExeFile(ino_t ino,ramfs::SuperBlock *super):INode(ino,super){}
+    int readLink(char *a_buf, size_t a_bufsiz) override {
+        auto content=kHartObj().curtask->getProcess()->exe;
+        int rdbytes=klib::min(a_bufsiz,content.size());
+        memcpy(a_buf,content.c_str(),rdbytes);
+        return rdbytes;
+    }
+};
+
 namespace syscall
 {
     using namespace fs;
@@ -144,6 +156,13 @@ namespace syscall
         // Path("/proc").pathRemove();
         shared_ptr<DEntry> ep = Path("/proc").pathCreate(T_DIR, 0);
         ep->setMntPoint();
+        Path("/etc").pathCreate(T_DIR,0);
+        auto ldpath=Path("/etc/ld-musl-riscv64-sf.path").pathCreate(T_FILE,O_RDWR);
+        {
+            auto file=make_shared<File>(ldpath,O_RDWR);
+            char *content="/";
+            file->write(ByteArray{(uint8_t*)content,2});
+        }
         Log(info,"fat initialize ok");
         auto procfs=make_shared<ramfs::FileSystem>();
         {
@@ -153,8 +172,11 @@ namespace syscall
             auto self=root->entCreate(root,"self",S_IFDIR).value();
             auto mountsinfo=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<MountsInfoFile>();
             self->getINode()->link("mountinfo",mountsinfo);
+            auto exe=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<ExeFile>();
+            self->getINode()->link("exe",exe);
             auto meminfo=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<MemInfoFile>();
             root->getINode()->link("meminfo",meminfo);
+
             Log(warning,"%d",mounts->rINo());
             Path("/proc").mount(procfs);
         }

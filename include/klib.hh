@@ -249,11 +249,12 @@ class Logger{
     int id;
     char buf[500];
   };
-  klib::ringbuf<LogItem> ring[5];
+  klib::ringbuf<LogItem> ring[LogLevel::nlevels];
   std::atomic_uint32_t lid=0;
 public:
   LogLevel outputLevel=LogLevel::debug;
     void log(int level,const char *fmt,...);
+    void dump();
 };
 extern Logger kLogger;
 

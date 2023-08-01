@@ -15,11 +15,16 @@ PageBuf::~PageBuf(){
 }
 
 VMOMapper::VMOMapper(Arc<VMO> vmo){
-    auto mapping=PageMapping{addr2pn(kInfo.segments.frames.second)+5,vmo->len(),0,vmo,PageTableEntry::fieldMasks::r|PageTableEntry::fieldMasks::w|PageTableEntry::fieldMasks::v2,PageMapping::MappingType::file,PageMapping::SharingType::shared};
+    /// @bug can only support stack-like mapping sequence
+    auto mapping=PageMapping{kInfo.segments.mapper.second,vmo->len(),0,vmo,PageTableEntry::fieldMasks::r|PageTableEntry::fieldMasks::w|PageTableEntry::fieldMasks::v2,PageMapping::MappingType::file,PageMapping::SharingType::shared};
+    kInfo.segments.mapper.second+=vmo->len();
     kGlobObjs->vmar->map(mapping,true);
     region=mapping.vsegment();
 }
-VMOMapper::~VMOMapper(){kGlobObjs->vmar->unmap(region);}
+VMOMapper::~VMOMapper(){
+    kGlobObjs->vmar->unmap(region);
+    kInfo.segments.mapper.second-=region.length();
+}
 
 void VMAR::map(const PageMapping &mapping,bool ondemand){
     /// @todo always forget to set v-bit or u-bit

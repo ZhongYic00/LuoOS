@@ -47,7 +47,7 @@ namespace signal
         }
     }
     void sigSend(Task &a_task,int a_sig, shared_ptr<SigInfo> a_info) {
-        if(a_task.siginfos[a_sig] != nullptr){
+        if(a_task.siginfos[a_sig] == nullptr){
             // a_task.sigpending[a_sig] = 1;
             sigMaskBitSet(a_task.sigpending, a_sig, 1);
             a_task.siginfos[a_sig] = a_info;

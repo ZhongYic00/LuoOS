@@ -37,6 +37,7 @@ kernel::KernelInfo kInfo={
         .bss={(xlen_t)&_bss_start,(xlen_t)&_bss_end},
         .frames={(xlen_t)&_frames_start,(xlen_t)&_frames_end},
         .ramdisk={(xlen_t)&_memdisk_start,(xlen_t)&_memdisk_end}
+        .mapper={vm::addr2pn((xlen_t)&_memdisk_end)+2,vm::addr2pn((xlen_t)&_memdisk_end)+2},
     }
 };
 using vm::pgtbl_t,vm::PageTable;

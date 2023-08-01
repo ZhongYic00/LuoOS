@@ -100,7 +100,7 @@ int _vsnprintf(char * out, size_t n, const char* s, va_list vl)
 		} else if (*s == '%') {
 			format = 1;
 		} else {
-			if (out && pos < n) {
+			if (out && pos < n && *s<127) {
 				out[pos] = *s;
 			}
 			pos++;
@@ -145,7 +145,7 @@ int printf(const char* s, ...)
 	va_end(vl);
 	return res;
 }
-
+extern void sbi_shutdown();
 void panic(const char *s)
 {
 	printf("panic: %s\n",s);
@@ -154,7 +154,8 @@ void panic(const char *s)
 	csrRead(scause,scause);
 	csrRead(stval,stval);
 	printf("sepc=%x scause=%x stval=%x\n",sepc,scause,stval);
-	halt();
+	kLogger.dump();
+	sbi_shutdown();
 }
 void assert_(bool cond,const char *s){
 	if(!cond)panic(s);

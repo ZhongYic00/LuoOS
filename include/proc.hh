@@ -72,7 +72,9 @@ namespace proc
         TrapframePages=2,
         UserHeapSize=0x100000;
     constexpr addr_t vDSOBase=0x9000000,
-        vDSOPages=1;
+        vDSOPages=1,
+        /// @note may not be fixed
+        interpreterBase=0x70000000;
     template<typename fptr_t>
     constexpr inline addr_t vDSOfuncAddr(fptr_t func){return vDSOBase+(addr_t)func&vm::vaddrOffsetMask;}
     constexpr int mOFiles = 101; // 官网测例往fd=100中写东西
@@ -86,6 +88,7 @@ namespace proc
         unordered_set<Task*> tasks;
         shared_ptr<File> files[mOFiles];
         string name;
+        string exe;
         Tms ti;
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
