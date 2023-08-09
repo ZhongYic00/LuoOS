@@ -64,7 +64,10 @@ namespace SD {
         while(!rxDone()){
             delay(10000);
             while(!rxReady());
-            buf.buff[off++]=mmio<uint8_t>(base+0x600);
+            while(mmio<Status>(base+status).fifo_count>=2){
+                buf.buff[off++]=mmio<uint8_t>(base+0x600);
+                Log(debug,"fifocnt=%d,off=%d",mmio<Status>(base+status).fifo_count,off);
+            }
             checkInt();
         }
         Log(debug,"recv over");

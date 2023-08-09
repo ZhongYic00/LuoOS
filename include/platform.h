@@ -166,6 +166,7 @@ namespace platform{
             resp2=0x38,
             resp3=0x3c,
             rintst=0x44,
+            status=0x48,
             bmod=0x80;
         struct Command{
             uint32_t
@@ -239,6 +240,10 @@ namespace platform{
                 ACD=1<<14,
                 EBE=1<<15,
             };
+        };
+        struct Status{
+            uint32_t rsv:17,
+            fifo_count:13;
         };
     }
 }
