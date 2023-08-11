@@ -44,7 +44,7 @@ static struct disk {
   // indexed by first descriptor index of chain.
   struct {
     /// @todo 可能需要考虑并发同步，使用lock统一实现
-    int *ready;
+    volatile int *ready;
     char status;
     proc::Task *waiting;
   } info[NUM];
@@ -249,7 +249,7 @@ virtio_disk_rw(bio::BlockBuf &buf, int write)
   disk.desc[idx[2]].next = 0;
 
   // record struct buf for virtio_disk_intr().
-  int ready=0;
+  volatile int ready=0;
   disk.info[idx[0]].ready = &ready;
 
   // avail[0] is flags
@@ -270,7 +270,7 @@ virtio_disk_rw(bio::BlockBuf &buf, int write)
   csrRead(sip,sip);
   csrClear(sie,BIT(csr::mie::stie));
   csrSet(sstatus,BIT(csr::mstatus::sie));
-  for(int retry=std::numeric_limits<int>::max();ready == 0 && retry;retry--) {
+  for(volatile int retry=std::numeric_limits<int>::max();ready == 0 && retry;retry--) {
     // syscall::sleep();
   }
   if(ready)success=1;

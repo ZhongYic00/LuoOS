@@ -12,7 +12,7 @@ using memvec=eastl::vector<Slice>;
 class ScatteredIO{
 public:
     virtual bool avail() const=0;
-    virtual Slice next(size_t){panic("unimplemented!");}
+    virtual Slice next(size_t){panic("unimplemented!"); }
     virtual size_t contConsume(Slice){panic("unimplemented!");}
 };
 
@@ -60,6 +60,7 @@ class UMemScatteredIO:public ScatteredIO{
             mapper.reset();
             mapper=make_unique<VMOMapper>(mp->vmo);
             bias=it->l-pn2addr(mp->vpn)+pn2addr(mp->offset);
+            return true;
         } else return false;
     }
 public:

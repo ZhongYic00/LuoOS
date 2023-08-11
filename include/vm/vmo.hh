@@ -21,7 +21,7 @@ namespace vm
             assert(pages[offset].use_count());
             return {offset,pages[offset]->ppn,1};
         }
-        inline vector<tuple<PageNum,PageNum>> req(const Segment& region){}
+        // inline vector<tuple<PageNum,PageNum>> req(const Segment& region){}
         virtual string toString() const{return klib::format("<VMOPaged>{len=0x%x}",len());}
         // inline Arc<VMO> shallow(PageNum start,PageNum end) override{
         //     auto rt=make_shared<VMOPaged>(*this);
@@ -49,7 +49,9 @@ namespace vm
         }
         bool operator==(const VMOContiguous &other) { return ppn_ == other.ppn_ && pages_ == other.pages_; }
         // inline Arc<VMO> shallow(PageNum start,PageNum end) override{panic("can't shallow copy contiguous vmo");}
+        __attribute__((optimize("O0")))
         inline Arc<VMO> clone() const override{
+            // panic("should not be cloned");
             /// @bug alloc alligned but free unaligend
             auto rt=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(pages_),pages_);
             copyframes(ppn_,rt->ppn(),rt->len());

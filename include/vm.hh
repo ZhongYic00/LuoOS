@@ -68,7 +68,7 @@ namespace vm
     inline constexpr xlen_t addr2offset(xlen_t addr){ return addr&(vaddrOffsetMask); }
     inline constexpr xlen_t bytes2pages(xlen_t bytes){ return bytes/pageSize+((bytes%pageSize)>0); }
     inline constexpr xlen_t ceil(xlen_t addr){ return bytes2pages(addr)*pageSize; }
-    inline xlen_t copyframes(PageNum src,PageNum dst,PageNum pages){
+    inline void copyframes(PageNum src,PageNum dst,PageNum pages){
         memcpy((ptr_t)pn2addr(dst),(ptr_t)pn2addr(src),pages*pageSize);
     }
     

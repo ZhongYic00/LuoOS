@@ -3,6 +3,7 @@
 
 #include "fs.hh"
 #include "bio.hh"
+#include <time.h>
 
 namespace fat {
     using BlockBuf = struct bio::BlockBuf;

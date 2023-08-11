@@ -9,6 +9,7 @@ void (*puts)(const char *s);
 int putchar(char c){
 	char buff[]={c,'\0'};
 	puts(buff);
+	return c;
 }
 
 int _vsnprintf(char * out, size_t n, const char* s, va_list vl)

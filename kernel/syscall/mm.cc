@@ -57,6 +57,7 @@ namespace syscall
         }
         auto region=vm::Segment{addr2pn(addr),addr2pn(addr+len-1)};
         curproc.vmar.unmap(region);
+        return sys::statcode::ok;
     }
     sysrt_t mprotect(addr_t addr,size_t len,int prot){
         auto curproc=kHartObj().curtask->getProcess();
