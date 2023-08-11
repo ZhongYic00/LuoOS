@@ -49,9 +49,7 @@ namespace vm
         }
         bool operator==(const VMOContiguous &other) { return ppn_ == other.ppn_ && pages_ == other.pages_; }
         // inline Arc<VMO> shallow(PageNum start,PageNum end) override{panic("can't shallow copy contiguous vmo");}
-        __attribute__((optimize("O0")))
         inline Arc<VMO> clone() const override{
-            // panic("should not be cloned");
             /// @bug alloc alligned but free unaligend
             auto rt=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(pages_),pages_);
             copyframes(ppn_,rt->ppn(),rt->len());
