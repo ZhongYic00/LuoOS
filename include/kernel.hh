@@ -72,15 +72,15 @@ namespace kernel {
         char machine[65];
         char domainname[65];
     };
-    FORCEDINLINE inline int readHartId(){register int hartid asm("tp"); return hartid;}
     constexpr tid_t kthreadIdBase=0x80000000;
     inline int threadId(){return kthreadIdBase+readHartId();}
     void createKernelMapping(vm::VMAR &vmar);
 }
+inline int readHartId(){int rt;regRead(tp,rt);return rt;}
 extern kernel::KernelGlobalObjs *kGlobObjs;
 extern kernel::KernelHartObjs kHartObjs[8];
 FORCEDINLINE
-inline kernel::KernelHartObjs& kHartObj(){return kHartObjs[kernel::readHartId()];}
+inline kernel::KernelHartObjs& kHartObj(){return kHartObjs[readHartId()];}
 extern kernel::KernelInfo kInfo;
 
 #endif

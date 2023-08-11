@@ -77,7 +77,7 @@ void uartInit(){
     // puts=IO::_nonblockingputs;
 }
 static void plicInit(){
-    int hart=kernel::readHartId();
+    int hart=readHartId();
     using namespace platform::plic;
 
     uartInit();
@@ -249,7 +249,7 @@ void init(int hartid){
         kidle->defaultTask()->kctx.pc=(xlen_t)idle;
         kidle->defaultTask()->kctxs.push(kidle->defaultTask()->kctx);
         schedule();
-        Log(info,"first schedule on hart%d",kernel::readHartId());
+        Log(info,"first schedule on hart%d",readHartId());
         kLogger.outputLevel=warning;
         enableLevel=warning;
         _strapexit();
@@ -259,8 +259,7 @@ void init(int hartid){
 
 extern "C" __attribute__((naked))
 void start_kernel(int hartid){
-    register int tp asm("tp")=hartid;
-    register xlen_t sp asm("sp");
-    sp=irqStackOf(hartid);
+    regWrite(tp,hartid);
+    regWrite(sp,irqStackOf(hartid));
     init(hartid);
 }

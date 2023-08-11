@@ -112,9 +112,10 @@ namespace sys
     }
 
     inline int syscall(int id){
-        register int a7 asm("a7")=id;
+        regWrite(a7,id);
         ExecInst(ecall);
-        register int a0 asm("a0");
+        int a0;
+        regRead(a0,a0);
         return a0;
     }
     inline int syscall1(int id,xlen_t arg0){
