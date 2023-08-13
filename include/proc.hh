@@ -155,6 +155,10 @@ namespace proc
         SigMask sigmask = 0, sigpending = 0;
         shared_ptr<SigInfo> siginfos[numSigs] = { nullptr };
         SigStack sigstack = {};
+        struct Attrs{
+            ptr_t setChildTid=nullptr,clearChildTid=nullptr;
+        }attrs;
+
         inline bool onSigStack() { return ctx.sp()-(xlen_t)sigstack.ss_sp < sigstack.ss_size; }
         // void accept();
         Process *getProcess();

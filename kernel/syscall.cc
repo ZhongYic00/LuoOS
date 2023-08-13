@@ -1131,13 +1131,7 @@ namespace syscall {
             return statcode::err;
         }
     }
-    xlen_t setTidAddress(){
-        auto &cur=kHartObj().curtask;
-        auto &ctx=cur->ctx;
-        xlen_t tidptr=ctx.a0();
-        // cur.attrs.clearChildTid=tidptr;
-        return cur->id;
-    }
+    extern sysrt_t setTidAddress(int *tidptr);
 const char *syscallHelper[sys::syscalls::nSyscalls];
 #define DECLSYSCALL(x,ptr) syscallPtrs[x]=reinterpret_cast<syscall_t>(ptr);syscallHelper[x]=#x;
     void init(){
