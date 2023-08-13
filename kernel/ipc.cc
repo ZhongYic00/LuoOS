@@ -138,37 +138,7 @@ namespace signal
                 case SIGPROF:
                 case SIGVTALRM:
                 // @todo: 实时信号处理不完全
-                case SIGRTMIN:
-                case SIGRTMIN+1:
-                case SIGRTMIN+2:
-                case SIGRTMIN+3:
-                case SIGRTMIN+4:
-                case SIGRTMIN+5:
-                case SIGRTMIN+6:
-                case SIGRTMIN+7:
-                case SIGRTMIN+8:
-                case SIGRTMIN+9:
-                case SIGRTMIN+10:
-                case SIGRTMIN+11:
-                case SIGRTMIN+12:
-                case SIGRTMIN+13:
-                case SIGRTMIN+14:
-                case SIGRTMIN+15:
-                case SIGRTMAX-14:
-                case SIGRTMAX-13:
-                case SIGRTMAX-12:
-                case SIGRTMAX-11:
-                case SIGRTMAX-10:
-                case SIGRTMAX-9:
-                case SIGRTMAX-8:
-                case SIGRTMAX-7:
-                case SIGRTMAX-6:
-                case SIGRTMAX-5:
-                case SIGRTMAX-4:
-                case SIGRTMAX-3:
-                case SIGRTMAX-2:
-                case SIGRTMAX-1:
-                case SIGRTMAX:
+                case SIGRTMIN ... SIGRTMAX:
                     sigExitHandler(signum);
                     break;
                 // 忽略
