@@ -461,6 +461,7 @@ namespace syscall {
         auto wfile=make_shared<File>(pipe,fs::FileOp::write);
         int fds[]={proc->fdAlloc(rfile),proc->fdAlloc(wfile)};
         proc->vmar[fd]<<fds;
+        return statcode::ok;
     }
     xlen_t getDents64(void) {
         auto &ctx = kHartObj().curtask->ctx;
@@ -515,13 +516,13 @@ namespace syscall {
     }
     sysrt_t readv(int fd, xlen_t iov, int iovcnt);
     sysrt_t writev(int fd, xlen_t iov, int iovcnt);
-    xlen_t exit(){
+    void exit(){
         auto cur=kHartObj().curtask;
         auto status=cur->ctx.a0();
         cur->getProcess()->exit(status);
         yield();
     }
-    xlen_t exitGroup() {
+    void exitGroup() {
         return exit();
     }
     xlen_t sendFile() {
@@ -1120,6 +1121,7 @@ namespace syscall {
             Log(error,"LuoOS Shutdown! Bye-Bye");
             sbi_shutdown();
         }
+        return statcode::err;
     }
     xlen_t reboot1(){
         if(auto ret=reboot()){
@@ -1129,13 +1131,7 @@ namespace syscall {
             return statcode::err;
         }
     }
-    xlen_t setTidAddress(){
-        auto &cur=kHartObj().curtask;
-        auto &ctx=cur->ctx;
-        xlen_t tidptr=ctx.a0();
-        // cur.attrs.clearChildTid=tidptr;
-        return cur->id;
-    }
+    extern sysrt_t setTidAddress(int *tidptr);
 const char *syscallHelper[sys::syscalls::nSyscalls];
 #define DECLSYSCALL(x,ptr) syscallPtrs[x]=reinterpret_cast<syscall_t>(ptr);syscallHelper[x]=#x;
     void init(){

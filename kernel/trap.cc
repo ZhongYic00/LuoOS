@@ -67,12 +67,12 @@ void uecallHandler(){
     Log(debug,"uecall exit(id=%d,rtval=%d)",ecallId,rtval);
 }
 int plicClaim(){
-    int hart=kernel::readHartId();
+    int hart=readHartId();
     int irq=mmio<int>(platform::plic::claimOf(hart));
     return irq;
 }
 void plicComplete(int irq){
-    int hart=kernel::readHartId();
+    int hart=readHartId();
     mmio<int>(platform::plic::claimOf(hart))=irq;
 }
 
@@ -206,7 +206,7 @@ void _strapexit(){
     static xlen_t prevs0=0;
     /// @todo chaos
     if(cur->lastpriv==proc::Task::Priv::User){
-        // xlen_t gprvaddr=kInfo.segments.kstack.first+kernel::readHartId()*0x1000+offsetof(proc::Task,ctx.gpr);
+        // xlen_t gprvaddr=kInfo.segments.kstack.first+readHartId()*0x1000+offsetof(proc::Task,ctx.gpr);
         auto gprvaddr=cur->kctx.vaddr+offsetof(proc::Task,ctx.gpr);
         csrWrite(sscratch,gprvaddr);
         csrWrite(sepc,cur->ctx.pc);
@@ -218,8 +218,7 @@ void _strapexit(){
             prevs0--;
         csrWrite(satp,kHartObj().curtask->kctx.satp);
         ExecInst(sfence.vma);
-        register xlen_t t6 asm("t6");
-        csrRead(sscratch,t6);
+        asm("csrr t6,sscratch");
         restoreContext();
         ExecInst(sret);
     } else {
@@ -231,7 +230,7 @@ void _strapexit(){
         assert(!cur->kctxs.empty());
         cur->kctx=cur->kctxs.top();cur->kctxs.pop();
         csrWrite(sepc,cur->kctx.pc);
-        volatile register ptr_t t6 asm("t6")=cur->kctx.gpr;
+        regWrite(t6,cur->kctx.gpr);
         // __asm__("mv t6,sp");
         restoreContext();
         // __asm__("ld ra,8(sp)\ncsrw sepc,ra\nld ra,0(sp)\n addi sp,sp,16");

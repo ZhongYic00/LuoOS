@@ -23,6 +23,7 @@ Scheduable* sched::Scheduler::next(Scheduable* prev){
             return rt;
         }
     }
+    return nullptr;
 }
 string print(Scheduable* const &tsk){
     auto task=static_cast<const proc::Task*>(tsk);

@@ -21,7 +21,7 @@ namespace vm
             assert(pages[offset].use_count());
             return {offset,pages[offset]->ppn,1};
         }
-        inline vector<tuple<PageNum,PageNum>> req(const Segment& region){}
+        // inline vector<tuple<PageNum,PageNum>> req(const Segment& region){}
         virtual string toString() const{return klib::format("<VMOPaged>{len=0x%x}",len());}
         // inline Arc<VMO> shallow(PageNum start,PageNum end) override{
         //     auto rt=make_shared<VMOPaged>(*this);

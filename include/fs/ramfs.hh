@@ -52,7 +52,7 @@ namespace ramfs
             if(auto mynod=eastl::dynamic_pointer_cast<INode>(nod))
                 subs[name]=mynod;
         }
-        inline int nodHardUnlink() override {}
+        inline int nodHardUnlink() override {return -1;}
         inline INodeRef lookup(string a_dirname, uint *a_off = nullptr) override {
             if(!isDir) return nullptr;
             if(auto it=subs.find(a_dirname); it!=subs.end()){

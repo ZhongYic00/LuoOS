@@ -28,7 +28,7 @@ namespace mutex
         int count;
     public:
         spinlock():spin(0),count(0){}
-        bool lock(){
+        inline bool lock(){
             Log(debug,"lock(%p,%d,%d)",this,spin.load());
             /// @todo optimize, use normal read to reduce buslock overhead
             /// @todo use thread class here
@@ -53,8 +53,12 @@ again:      atomic_base_t expected=0;
             else return false;
             // giveup
         }
-        void unlock(){
-            if(!reentrantalbe || count==0)spin.store(0);
+        inline void unlock(){
+            if constexpr(!reentrantalbe)spin.store(0);
+            else {
+                count--;
+                if(count==0)spin.store(0);
+            }
             Log(debug,"unlock(%p,%d)",this,spin.load());
         }
     };

@@ -19,6 +19,8 @@ xlen_t Process::newUstack(){
     using perm=vm::PageTableEntry::fieldMasks;
     using namespace vm;
     auto vmo=make_shared<VMOContiguous>(kGlobObjs->pageMgr->alloc(ustackpages),ustackpages);
+    // auto pager=make_shared<SwapPager>(nullptr,Segment{0,0});
+    // auto vmo=make_shared<VMOPaged>(ustackpages,pager);
     vmar.map(PageMapping{vm::addr2pn(UstackBottom),ustackpages,0,vmo,perm::r|perm::w|perm::u|perm::v,PageMapping::MappingType::system,PageMapping::SharingType::privt});
     return ustack;
 }
@@ -127,7 +129,7 @@ void validate(){
 extern void _strapexit();
 void Task::switchTo(){
     kHartObj().curtask=this;
-    kctx.tp()=kernel::readHartId();
+    kctx.tp()=readHartId();
 }
 void Task::sleep(){
     Log(info,"sleep(this=Task<%d>)",this->id);

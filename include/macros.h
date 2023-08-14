@@ -18,7 +18,7 @@ enum LogLevel{
 #define IFTEST(x) IFDEF(GUEST,x)
 
 extern int enableLevel;
-inline int readHartId(){register int rt asm("tp");return rt;}
+extern int readHartId();
 #ifndef moduleLevel
     #define moduleLevel LogLevel::error
 #endif
