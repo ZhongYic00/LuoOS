@@ -14,7 +14,7 @@ UCFLAGS = -Iinclude/ -g -O0 -T user/user.ld
 UCFLAGS += $(CFLAGS)
 # linuxheaders = /usr/src/linux-headers-$(shell uname -r)/include/
 CFLAGS += -Iinclude/ -Ithirdparty/tinystl/include -Ithirdparty/eastl-port/include -Ithirdparty/eastl-port/test/packages/EABase/include/Common -Ithirdparty/linux -g
-KCFLAGS = $(CFLAGS) -O2 -Werror=return-type
+KCFLAGS = $(CFLAGS) -O0 -Werror=return-type
 compile = $(CC) $(depflags) $(KCFLAGS)
 
 # SBI: sbi/sbi.elf;
