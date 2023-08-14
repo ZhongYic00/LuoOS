@@ -76,6 +76,7 @@ namespace kernel {
     inline int threadId(){return kthreadIdBase+readHartId();}
     void createKernelMapping(vm::VMAR &vmar);
 }
+FORCEDINLINE
 inline int readHartId(){int rt;regRead(tp,rt);return rt;}
 extern kernel::KernelGlobalObjs *kGlobObjs;
 extern kernel::KernelHartObjs kHartObjs[8];
