@@ -67,6 +67,11 @@ eastl::tuple<xlen_t,xlen_t,ElfInfo> loadElf(shared_ptr<fs::File> file,vm::VMAR &
                 auto shadow=make_shared<vm::VMOPaged>(pages,pager);
                 vmar.map(vm::PageMapping{vm::addr2pn(base+entry.p_vaddr),pages,0,shadow,perm,vm::PageMapping::MappingType::file,vm::PageMapping::SharingType::privt});
             }
+            if(!info.phdr){
+                vm::Segment{entry.p_offset,entry.p_offset+entry.p_filesz};
+                if((klib::Segment<addr_t>{entry.p_offset,entry.p_offset+entry.p_filesz})&(klib::Segment<addr_t>{elfHeader->e_phoff,elfHeader->e_phoff}))
+                    info.phdr=entry.p_vaddr+elfHeader->e_phoff-entry.p_offset;
+            }
             // Log(debug,"%x<=%x[%d pages@%x]",vm::addr2pn(entry.p_vaddr),ppn,pages,ld::elf::flags2perm(entry.p_flags));
         } else if(entry.p_type==PT_PHDR){
             /// @todo base should be 0?
