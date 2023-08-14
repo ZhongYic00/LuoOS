@@ -6,6 +6,7 @@
 #include "vm.hh"
 #include "fs.hh"
 #include "resource.hh"
+#include <sys/times.h>
 
 namespace proc
 {
@@ -42,30 +43,6 @@ namespace proc
     };
 
     struct Task; 
-    class Tms {
-        private:
-            long m_tms_utime;
-            long m_tms_stime;
-            long m_tms_cutime;
-            long m_tms_cstime;
-        public:
-            Tms(): m_tms_utime(0), m_tms_stime(0), m_tms_cutime(0), m_tms_cstime(0) {}
-            Tms(const Tms &a_tms): m_tms_utime(a_tms.m_tms_utime), m_tms_stime(a_tms.m_tms_stime), m_tms_cutime(a_tms.m_tms_cutime), m_tms_cstime(a_tms.m_tms_cstime) {}
-            const Tms& operator=(const Tms &a_tms) {
-                m_tms_utime = a_tms.m_tms_utime;
-                m_tms_stime = a_tms.m_tms_stime;
-                m_tms_cutime = a_tms.m_tms_cutime;
-                m_tms_cstime = a_tms.m_tms_cstime;
-                return *this;
-            }
-            const Tms& operator+=(const Tms &a_tms) {
-                m_tms_cutime += a_tms.m_tms_utime;
-                m_tms_cstime += a_tms.m_tms_stime;
-                return *this;
-            }
-            inline void uTick() { ++m_tms_utime; }
-            inline void sTick() { ++m_tms_stime; }
-    };
     constexpr xlen_t UserStackDefault=0x8000000,
         UstackSize=0x10000,
         UstackBottom=UserStackDefault-UstackSize,
@@ -89,7 +66,9 @@ namespace proc
         shared_ptr<File> files[mOFiles];
         string name;
         string exe;
-        Tms ti;
+        struct Stats{
+            tms ti;
+        }stats;
         shared_ptr<DEntry> cwd; // @todo 也许可以去掉，固定在fd = 3处打开工作目录
         int exitstatus;
         shared_ptr<SigAct> sigacts[numSigs];

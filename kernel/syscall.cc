@@ -10,6 +10,7 @@
 #include <linux/reboot.h>
 #include <linux/unistd.h>
 #include <sys/time.h>
+#include <sys/resource.h>
 #include <asm/poll.h>
 using nonstd::expected;
 
@@ -748,19 +749,7 @@ namespace syscall {
         // should never be called
         return signal::sigReturn();
     }
-    xlen_t times(void) {
-        auto &ctx = kHartObj().curtask->ctx;
-        proc::Tms *a_tms = (proc::Tms*)ctx.x(10);
-        // if(a_tms == nullptr) { return statcode::err; } // a_tms留空时不管tms只返回ticks？
-
-        auto curproc = kHartObj().curtask->getProcess();
-        if(a_tms != nullptr) { curproc->vmar.copyout((xlen_t)a_tms, ByteArray((uint8*)&curproc->ti, sizeof(proc::Tms))); }
-        // acquire(&tickslock);
-        int ticks = (int)(kHartObj().g_ticks/kernel::INTERVAL);
-        // release(&tickslock);
-
-        return ticks;
-    }
+    extern sysrt_t times(struct ::tms *buf);
     xlen_t setGid() {
         auto &ctx = kHartObj().curtask->ctx;
         gid_t a_gid = ctx.x(10);
@@ -912,6 +901,7 @@ namespace syscall {
         
         return curproc->setRLimit(a_rsrc, rlim);
     }
+    extern sysrt_t getrusage(int who, struct ::rusage *usage);
     extern int gettimeofday (struct timeval *__restrict __tv,
 			 struct timezone *__tz) __THROW __nonnull ((1));
     xlen_t getPid(){
@@ -973,7 +963,12 @@ namespace syscall {
         else if(pid==0)panic("waitpid: unimplemented!"); // @todo 每个回收的子进程都更新父进程的ti
         else if(pid<0)panic("waitpid: unimplemented!");
         if(target==nullptr)return statcode::err;
-        curproc->ti += target->ti;
+        {   // update curproc stats
+            /// @note should be here?
+            auto &stats=curproc->stats,&cstats=target->stats;
+            stats.ti.tms_cstime+=cstats.ti.tms_stime+cstats.ti.tms_cstime;
+            stats.ti.tms_cutime+=cstats.ti.tms_utime+cstats.ti.tms_cutime;
+        }
         auto rt=target->pid();
         if(wstatus)curproc->vmar[wstatus]<<(int)(target->exitstatus<<8);
         target->zombieExit();
@@ -1228,6 +1223,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::uname,uName);
         DECLSYSCALL(scnum::getrlimit,getRLimit);
         DECLSYSCALL(scnum::setrlimit,setRLimit);
+        DECLSYSCALL(scnum::getrusage,getrusage);
         DECLSYSCALL(scnum::umask,uMask);
         DECLSYSCALL(scnum::gettimeofday,gettimeofday);
         DECLSYSCALL(scnum::getpid,getPid);

@@ -1,6 +1,7 @@
 #include "kernel.hh"
 #include <EASTL/chrono.h>
 #include <sys/time.h>
+#include <sys/times.h>
 
 namespace syscall
 {
@@ -26,5 +27,11 @@ namespace syscall
         }
         /// @note tz is ignored
         return statcode::ok;
+    }
+    sysrt_t times(struct tms *buf){
+        if(!buf) return -EFAULT;
+        auto curproc = kHartObj().curtask->getProcess();
+        curproc->vmar[(addr_t)buf]<<curproc->stats.ti;
+        return kHartObj().g_ticks;
     }
 } // namespace syscall

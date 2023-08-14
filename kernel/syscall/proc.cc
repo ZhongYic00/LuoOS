@@ -1,10 +1,12 @@
 #include "common.h"
 #include "kernel.hh"
-
+#include "time.hh"
 #include <linux/sched.h>
+#include <sys/resource.h>
 
 namespace syscall
 {
+    using namespace sys;
     long clone(unsigned long flags, void *stack,
                       int *parent_tid, int *child_tid,
                       unsigned long tls){
@@ -36,5 +38,27 @@ namespace syscall
         cur->attrs.setChildTid=tidptr;
         cur->getProcess()->vmar[(addr_t)tidptr]<<cur->id;
         return cur->id;
+    }
+
+    sysrt_t getrusage(int who, struct rusage *usage){
+        auto &cur=kHartObj().curtask;
+        switch(who){
+            case RUSAGE_SELF:{
+                auto tms=cur->getProcess()->stats.ti;
+                struct rusage usg={
+                    .ru_utime=timeservice::duration2timeval(timeservice::ticks2chrono(tms.tms_utime)),
+                    .ru_stime={0,0},
+                };
+                cur->getProcess()->vmar[(addr_t)usage]<<usg;
+                return statcode::ok;
+            }
+            case RUSAGE_CHILDREN:{
+
+                return statcode::ok;
+            }
+            default:
+                Log(error,"who is invalid");
+                return -EINVAL;
+        }
     }
 } // namespace syscall

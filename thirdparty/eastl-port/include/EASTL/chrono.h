@@ -311,7 +311,7 @@ namespace chrono
 
 	template <typename Rep1, typename Period1, typename Rep2>
 	duration<typename eastl::common_type<Rep1, Rep2>::type, Period1> EASTL_FORCE_INLINE
-	operator*(const duration<Rep1, Period1>& lhs, const Rep2& rhs)
+	EA_CONSTEXPR operator*(const duration<Rep1, Period1>& lhs, const Rep2& rhs)
 	{
 		typedef duration<typename eastl::common_type<Rep1, Rep2>::type, Period1> common_duration_t;
 		return common_duration_t(common_duration_t(lhs).count() * rhs);
@@ -319,7 +319,7 @@ namespace chrono
 
 	template <typename Rep1, typename Rep2, typename Period2>
 	duration<typename eastl::common_type<Rep1, Rep2>::type, Period2> EASTL_FORCE_INLINE
-	operator*(const Rep1& lhs, const duration<Rep2, Period2>& rhs)
+	EA_CONSTEXPR operator*(const Rep1& lhs, const duration<Rep2, Period2>& rhs)
 	{
 		typedef duration<typename eastl::common_type<Rep1, Rep2>::type, Period2> common_duration_t;
 		return common_duration_t(lhs * common_duration_t(rhs).count());
@@ -327,7 +327,7 @@ namespace chrono
 
 	template <typename Rep1, typename Period1, typename Rep2>
 	duration<typename eastl::common_type<Rep1, Rep2>::type, Period1> EASTL_FORCE_INLINE
-	operator/(const duration<Rep1, Period1>& lhs, const Rep2& rhs)
+	EA_CONSTEXPR operator/(const duration<Rep1, Period1>& lhs, const Rep2& rhs)
 	{
 		typedef duration<typename eastl::common_type<Rep1, Rep2>::type, Period1> common_duration_t;
 		return common_duration_t(common_duration_t(lhs).count() / rhs);
@@ -335,7 +335,7 @@ namespace chrono
 
 	template <typename Rep1, typename Period1, typename Rep2, typename Period2>
 	typename eastl::common_type<duration<Rep1, Period1>, duration<Rep2, Period2>>::type EASTL_FORCE_INLINE
-	operator/(const duration<Rep1, Period1>& lhs, const duration<Rep2, Period2>& rhs)
+	EA_CONSTEXPR operator/(const duration<Rep1, Period1>& lhs, const duration<Rep2, Period2>& rhs)
 	{
 		typedef typename eastl::common_type<duration<Rep1, Period1>, duration<Rep2, Period2>>::type common_duration_t;
 		return common_duration_t(common_duration_t(lhs).count() / common_duration_t(rhs).count());

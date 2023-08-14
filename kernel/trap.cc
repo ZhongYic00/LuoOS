@@ -5,6 +5,7 @@
 #include "kernel.hh"
 #include "virtio.hh"
 #include "ipc.hh"
+#include <EASTL/chrono.h>
 
 #define moduleLevel LogLevel::warning
 
@@ -18,11 +19,6 @@ void timerInterruptHandler(){
     csrRead(time,time);
     Log(info,"timerInterrupt @ %ld",time);
     auto cur = kHartObj().curtask;
-    if(cur != nullptr) {
-        auto curproc = cur->getProcess();
-        if(cur->lastpriv == proc::Task::Priv::User) { curproc->ti.uTick(); }
-        else {curproc->ti.sTick(); }
-    }
     ++kHartObj().g_ticks;
     for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
         auto towake = kHartObj().sleep_tasks[i];
