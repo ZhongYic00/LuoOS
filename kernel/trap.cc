@@ -5,13 +5,14 @@
 #include "kernel.hh"
 #include "virtio.hh"
 #include "ipc.hh"
+#include "time.hh"
 #include <EASTL/chrono.h>
 
 #define moduleLevel LogLevel::warning
 
 static hook_t hooks[]={schedule};
 
-extern void nextTimeout();
+// extern void nextTimeout();
 void ktrapwrapper();
 void strapwrapper();
 void timerInterruptHandler(){
@@ -19,19 +20,18 @@ void timerInterruptHandler(){
     csrRead(time,time);
     Log(info,"timerInterrupt @ %ld",time);
     auto cur = kHartObj().curtask;
-    ++kHartObj().g_ticks;
-    for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
-        auto towake = kHartObj().sleep_tasks[i];
-        if(towake.m_task!=nullptr && towake.m_wakeup_tick<kHartObj().g_ticks) {
-            kGlobObjs->scheduler->wakeup(towake.m_task);
-            kHartObj().sleep_tasks[i].m_task = nullptr;
-        }
-    }
+    // ++kHartObj().g_ticks;
+    // for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
+    //     auto towake = kHartObj().sleep_tasks[i];
+    //     if(towake.m_task!=nullptr && towake.m_wakeup_tick<kHartObj().g_ticks) {
+    //         kGlobObjs->scheduler->wakeup(towake.m_task);
+    //         kHartObj().sleep_tasks[i].m_task = nullptr;
+    //     }
+    // }
     xlen_t sstatus;
     csrRead(sstatus,sstatus);
     if(cur->lastpriv!=proc::Task::Priv::AlwaysKernel&&sstatus&BIT(csr::mstatus::spp))panic("should not happen!");
-    nextTimeout();
-    for(auto hook:hooks)hook();
+    kHartObj().timer->next();
 }
 extern syscall_t syscallPtrs[];
 namespace syscall{ extern const char* syscallHelper[]; }

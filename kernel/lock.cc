@@ -1,5 +1,7 @@
 #include "lock.hh"
 #include "kernel.hh"
+#include "time.hh"
+#include <EASTL/chrono.h>
 
 namespace semaphore
 {
@@ -27,6 +29,10 @@ namespace condition_variable
         kGlobObjs->scheduler->wakeup(waiting.front());
         waiting.pop_front();
     }
+    void condition_variable::notify_specific(proc::Task* task){
+        waiting.remove(task);
+        kGlobObjs->scheduler->wakeup(task);
+    }
     void condition_variable::notify_all(){
         for(auto task:waiting){
             kGlobObjs->scheduler->wakeup(task);
@@ -36,6 +42,12 @@ namespace condition_variable
     void condition_variable::wait(){
         waiting.push_back(kHartObj().curtask);
         syscall::sleep();
+    }
+    bool condition_variable::wait_for(const eastl::chrono::nanoseconds& dura){
+        auto curtask=kHartObj().curtask;
+        kHartObj().timer->setTimeout(dura,[=](){ this->notify_specific(curtask); });
+        wait();
+        return true;
     }
 } // namespace condition_variable
 

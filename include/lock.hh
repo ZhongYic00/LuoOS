@@ -2,6 +2,7 @@
 #define LOCK_HH__
 
 #include "klib.hh"
+#include <EASTL/chrono.h>
 // #define moduleLevel debug
 
 namespace proc{struct Task;}
@@ -119,13 +120,14 @@ namespace condition_variable
 {
     class condition_variable{
         list<proc::Task*> waiting;
+        void notify_specific(proc::Task* task);
     public:
         condition_variable(){}
         void notify_one();
         void notify_all();
         void wait();
         inline int waiters() const {return waiting.size();}
-        inline void wait_for(){panic("unimplemented!");}
+        bool wait_for(const eastl::chrono::nanoseconds& dura);
     };
 } // namespace condition_variable
 

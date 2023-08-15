@@ -2,6 +2,7 @@
 #include "rvcsr.hh"
 #include "sbi.hh"
 #include "kernel.hh"
+#include "time.hh"
 #include "vm.hh"
 #include "alloc.hh"
 #include "ld.hh"
@@ -45,15 +46,20 @@ kernel::KernelObjectsBuf kObjsBuf;
 kernel::KernelGlobalObjs *kGlobObjs=reinterpret_cast<kernel::KernelGlobalObjs*>(&kObjsBuf.kGlobObjsBuf);
 uint8_t pool[32*vm::pageSize];
 
-void nextTimeout(){
-    xlen_t time;
-    csrRead(time,time);
-    sbi_set_timer(time+kernel::timerInterval);
-}
+// void nextTimeout(){
+//     xlen_t time;
+//     csrRead(time,time);
+//     sbi_set_timer(time+(eastl::chrono::duration_cast<eastl::chrono::nanoseconds>(timeservice::tickDuration).count() / timeservice::mtickDuration.count()));
+// }
 static void timerInit(){
-    kHartObj().g_ticks = 0;
+    kHartObj().timer=new timeservice::Timer();
+    // kHartObj().vtimer=new timeservice::Timer();
     csrSet(sie,BIT(csr::mie::stie));
-    nextTimeout();
+    // nextTimeout();
+    kHartObj().timer->setInterval(timeservice::tickDuration,[](){
+        schedule();
+    },0);
+    kHartObj().timer->next();
 }
 
 void uartInitTest(){

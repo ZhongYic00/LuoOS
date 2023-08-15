@@ -68,6 +68,9 @@
 	#include <time.h>
 #endif
 
+namespace timeservice{
+	extern uint64_t getTicks();
+}
 
 namespace eastl
 {
@@ -324,9 +327,12 @@ namespace chrono
 		typedef duration<typename eastl::common_type<Rep1, Rep2>::type, Period2> common_duration_t;
 		return common_duration_t(lhs * common_duration_t(rhs).count());
 	}
+	template<typename _Tp>
+	using __disable_if_is_duration
+		= typename enable_if<!Internal::IsDuration<_Tp>::value, _Tp>::type;
 
 	template <typename Rep1, typename Period1, typename Rep2>
-	duration<typename eastl::common_type<Rep1, Rep2>::type, Period1> EASTL_FORCE_INLINE
+	duration<typename eastl::common_type<Rep1, __disable_if_is_duration<Rep2>>::type, Period1> EASTL_FORCE_INLINE
 	EA_CONSTEXPR operator/(const duration<Rep1, Period1>& lhs, const Rep2& rhs)
 	{
 		typedef duration<typename eastl::common_type<Rep1, Rep2>::type, Period1> common_duration_t;
@@ -334,11 +340,11 @@ namespace chrono
 	}
 
 	template <typename Rep1, typename Period1, typename Rep2, typename Period2>
-	typename eastl::common_type<duration<Rep1, Period1>, duration<Rep2, Period2>>::type EASTL_FORCE_INLINE
+	typename eastl::common_type<Rep1,Rep2>::type EASTL_FORCE_INLINE
 	EA_CONSTEXPR operator/(const duration<Rep1, Period1>& lhs, const duration<Rep2, Period2>& rhs)
 	{
 		typedef typename eastl::common_type<duration<Rep1, Period1>, duration<Rep2, Period2>>::type common_duration_t;
-		return common_duration_t(common_duration_t(lhs).count() / common_duration_t(rhs).count());
+		return common_duration_t(lhs).count() / common_duration_t(rhs).count();
 	}
 
 	template <typename Rep1, typename Period1, typename Rep2>
@@ -621,9 +627,7 @@ namespace chrono
 			#endif
         #else
 			// #error "chrono not implemented for platform"
-			uint64_t timerTicks;
-			csrRead(time,timerTicks);
-			return timerTicks;
+			return timeservice::getTicks();
 		#endif
 		}
 	} // namespace Internal
