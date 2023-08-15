@@ -170,12 +170,6 @@ namespace proc
         void operator delete(ptr_t task){}
         FORCEDINLINE inline static Task* gprToTask(ptr_t gpr){return reinterpret_cast<Task*>(gpr-offsetof(Task,ctx.gpr));}
     };
-    struct SleepingTask {
-        struct Task *m_task;
-        long m_wakeup_tick;
-        SleepingTask():m_task(nullptr), m_wakeup_tick(0) {}
-        SleepingTask(struct Task *a_task, uint a_tick):m_task(a_task), m_wakeup_tick(a_tick) {}
-    };
     struct KTask:public Task{};
     typedef ObjManager<Process> ProcManagerBase;
     typedef ObjManager<Task> TaskManager;

@@ -15,11 +15,8 @@ namespace syscall{
     void init();
     int sleep();
 }
+namespace timeservice{ class Timer; }
 namespace kernel {
-    constexpr int timerInterval=1000000;
-    constexpr long INTERVAL = 390000000 / 100;
-    constexpr long CLK_FREQ = 8900000;
-    constexpr int NMAXSLEEP = 32;
     constexpr int nameLen=65;
 
     typedef proc::Task KernelTaskObjs;
@@ -56,8 +53,7 @@ namespace kernel {
     };
     struct KernelHartObjs{
         KernelTaskObjs *curtask;
-        uint g_ticks;
-        proc::SleepingTask sleep_tasks[NMAXSLEEP];
+        timeservice::Timer *timer,*vtimer;
     };
     typedef mutex::ObjectGuard<kernel::KernelGlobalObjs> KernelGlobalObjsRef;
     struct KernelObjectsBuf{
@@ -76,6 +72,7 @@ namespace kernel {
     inline int threadId(){return kthreadIdBase+readHartId();}
     void createKernelMapping(vm::VMAR &vmar);
 }
+FORCEDINLINE
 inline int readHartId(){int rt;regRead(tp,rt);return rt;}
 extern kernel::KernelGlobalObjs *kGlobObjs;
 extern kernel::KernelHartObjs kHartObjs[8];
