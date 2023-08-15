@@ -106,7 +106,7 @@ namespace proc
         inline Process(const Process &other):Process(other,id){}
         ~Process();
 
-        inline Task* defaultTask(){ return *tasks.begin(); } // @todo needs to mark default
+        inline Task* defaultTask(){ assert(!tasks.empty());return *tasks.begin(); } // @todo needs to mark default
         Process *parentProc();
         inline pid_t pid() { return id; }
         // 下列id读/写一体

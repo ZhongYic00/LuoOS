@@ -181,20 +181,11 @@ Process::Process(const Process &other,pid_t pid):IdManagable(pid),Scheduable(oth
     for(int i=0;i<mOFiles;i++)files[i]=other.files[i];
 }
 void Process::exit(int status){
-    Log(info,"Proc[%d] exit(%d)",pid(),status);
-    
-    this->exitstatus=status;
-    /// @todo resource recycle
-
-    for(auto task:tasks){
-        task->state=sched::Zombie;
-        kGlobObjs->scheduler->remove(task);
-    }
-
+    Log(info,"Proc[%d] exit",pid());
     state=sched::Zombie;
-
-    auto task=parentProc()->defaultTask();
-    kGlobObjs->scheduler->wakeup(task);
+    exitstatus=status;
+    signal::sigSend(*parentProc(),SIGCHLD);
+    kGlobObjs->scheduler->wakeup(parentProc()->defaultTask());
 }
 void Process::zombieExit(){
     Log(info,"Proc[%d] zombie exit",pid());
@@ -204,8 +195,6 @@ void Process::zombieExit(){
     kGlobObjs->procMgr->del(pid());
 }
 Process::~Process(){
-    for(auto task:tasks)kGlobObjs->taskMgr->del(task->id);
-    tasks.clear();
 }
 Process *Process::parentProc(){return (**kGlobObjs->procMgr)[parent];}
 shared_ptr<File> Process::ofile(int a_fd) {
@@ -248,12 +237,18 @@ namespace syscall{
                  int *uaddr2, int val3);
 }
 void Task::exit(int status){
+    Log(info,"Task[%d] exit(%d)",tid(),status);
     attrs.exitstatus=status;
     state=sched::Zombie;
     kGlobObjs->scheduler->remove(this);
+    auto curproc=getProcess();
+    curproc->tasks.erase(this);
     if(attrs.clearChildTid){
-        getProcess()->vmar[(addr_t)attrs.clearChildTid]<<0;
+        curproc->vmar[(addr_t)attrs.clearChildTid]<<0;
         syscall::futex(attrs.clearChildTid,FUTEX_WAKE,1,nullptr,nullptr,0);
     }
-    signal::sigSend(*getProcess(),SIGCHLD);
+    if(curproc->tasks.empty())
+        curproc->exit(status);
+    else
+        signal::sigSend(*curproc,SIGCHLD);
 }

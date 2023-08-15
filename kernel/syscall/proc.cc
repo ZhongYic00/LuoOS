@@ -40,6 +40,17 @@ namespace syscall
         cur->attrs.clearChildTid=tidptr;
         return cur->id;
     }
+    sysrt_t exitGroup(int status){
+        auto cur=kHartObj().curtask;
+        auto curproc=cur->getProcess();
+        for(auto task:curproc->tasks){
+            task->state=sched::Zombie;
+            kGlobObjs->scheduler->remove(task);
+        }
+        curproc->exit(status);
+        yield();
+        return 0;
+    }
     sysrt_t exit(int status){
         auto cur=kHartObj().curtask;
         cur->exit(status);
