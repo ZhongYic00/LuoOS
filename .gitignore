@@ -2,3 +2,6 @@
 os-elf.txt
 obj/*
 kernel-qemu
+.devcontainer
+sdcard.img
+busybox_dir

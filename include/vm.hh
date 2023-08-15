@@ -317,10 +317,12 @@ namespace vm
                 return operator<<(buf);
             }
             template<typename T>
-            void operator>>(T &d){
+            inline Writer& operator>>(T &d){
+                if(reverse)vaddr-=sizeof(T);
                 auto buf=parent.copyin(vaddr,sizeof(T));
                 d=*reinterpret_cast<T*>(buf.buff);
-                vaddr+=reverse?-sizeof(T):sizeof(T);
+                if(!reverse)vaddr+=sizeof(T);
+                return *this;
             }
             inline xlen_t addr() const{return vaddr;}
         };
