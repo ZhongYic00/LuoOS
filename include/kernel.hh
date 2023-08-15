@@ -14,6 +14,7 @@ extern "C" void start_kernel(int hartid);
 namespace syscall{
     void init();
     int sleep();
+    void yield();
 }
 namespace kernel {
     constexpr int timerInterval=1000000;

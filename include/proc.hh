@@ -156,11 +156,13 @@ namespace proc
         shared_ptr<SigInfo> siginfos[numSigs] = { nullptr };
         SigStack sigstack = {};
         struct Attrs{
-            ptr_t setChildTid=nullptr,clearChildTid=nullptr;
+            int *clearChildTid=nullptr;
+            int exitstatus;
         }attrs;
 
+        ~Task();
         inline bool onSigStack() { return ctx.sp()-(xlen_t)sigstack.ss_sp < sigstack.ss_size; }
-        // void accept();
+        void exit(int status);
         Process *getProcess();
         inline tid_t tid() { return id; }
         inline Task(tid_t tid,prior_t pri,tid_t proc):IdManagable(tid),Scheduable(pri),proc(proc),lastpriv(Priv::User){

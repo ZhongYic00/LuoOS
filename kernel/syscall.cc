@@ -516,14 +516,12 @@ namespace syscall {
     }
     sysrt_t readv(int fd, xlen_t iov, int iovcnt);
     sysrt_t writev(int fd, xlen_t iov, int iovcnt);
-    void exit(){
+    sysrt_t exit(int status);
+    sysrt_t exitGroup(int status){
         auto cur=kHartObj().curtask;
-        auto status=cur->ctx.a0();
         cur->getProcess()->exit(status);
         yield();
-    }
-    void exitGroup() {
-        return exit();
+        return 0;
     }
     xlen_t sendFile() {
         auto &ctx=kHartObj().curtask->ctx;

@@ -30,13 +30,20 @@ namespace syscall
             cur->getProcess()->vmar[(addr_t)parent_tid]<<thrd->tid();
         if(flags&CLONE_SETTLS)
             thrd->ctx.tp()=tls;
+        if(flags&CLONE_CHILD_CLEARTID)
+            thrd->attrs.clearChildTid=child_tid;
         return thrd->tid();
     }
     sysrt_t setTidAddress(int *tidptr){
         auto &cur=kHartObj().curtask;
         /// @bug how to use this attr? one-off?
-        cur->attrs.setChildTid=tidptr;
-        cur->getProcess()->vmar[(addr_t)tidptr]<<cur->id;
+        cur->attrs.clearChildTid=tidptr;
         return cur->id;
+    }
+    sysrt_t exit(int status){
+        auto cur=kHartObj().curtask;
+        cur->exit(status);
+        syscall::yield();
+        return 0;
     }
 } // namespace syscall
