@@ -30,6 +30,9 @@ namespace timeservice
         if(s>dura)s-=1s;
         return timespec{s.count(),duration_cast<nanoseconds>(dura-s).count()};
     }
+    inline auto timespec2duration(const timespec &ts){
+        return ts.tv_sec*1s+ts.tv_nsec*1ns;
+    }
 
     class Timer{
         using timepoint_t=time_point<system_clock,nanoseconds>;

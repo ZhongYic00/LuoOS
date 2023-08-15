@@ -30,4 +30,15 @@ namespace syscall
         curproc->vmar[(addr_t)buf]<<curproc->stats.ti;
         return eastl::chrono::system_clock::now().time_since_epoch().count();
     }
+
+    sysrt_t nanoSleep(const struct timespec *preq, struct timespec *prem){
+        struct timespec req;
+        kHartObj().curtask->getProcess()->vmar[(addr_t)preq]>>req;
+        condition_variable::condition_variable cv;
+        cv.wait_for(timeservice::timespec2duration(req));
+        using namespace eastl::chrono_literals;
+        auto rem=0s;
+        kHartObj().curtask->getProcess()->vmar[(addr_t)prem]<<timeservice::duration2timespec(rem);
+        return statcode::err;
+    }
 } // namespace syscall

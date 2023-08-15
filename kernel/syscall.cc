@@ -646,23 +646,7 @@ namespace syscall {
         schedule();
         _strapexit(); //TODO check
     }
-    xlen_t nanoSleep() {
-        auto cur = kHartObj().curtask;
-        auto ctx = cur->ctx;
-        struct timespec *a_tv = (struct timespec*)ctx.x(10);
-
-        auto curproc = cur->getProcess();
-        ByteArray tvarray = curproc->vmar.copyin((xlen_t)a_tv, sizeof(struct timespec));
-        struct timespec *tv = (struct timespec*)tvarray.buff;
-        // struct proc::SleepingTask tosleep(cur,0);
-        // for(int i = 0; i < kernel::NMAXSLEEP; ++i) {
-        //     if(kHartObj().sleep_tasks[i].m_task == nullptr) {
-        //         kHartObj().sleep_tasks[i] = tosleep;
-        //         return sleep();
-        //     }
-        // }
-        return statcode::err;
-    }
+    extern sysrt_t nanoSleep(const struct timespec *req, struct timespec *rem);
     extern int clock_gettime (clockid_t __clock_id, struct timespec *__tp);
     void yield(){
         Log(debug,"yield!");
