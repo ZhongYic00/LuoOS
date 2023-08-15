@@ -1,6 +1,6 @@
 #include "ipc.hh"
 #include "kernel.hh"
-// #define moduleLevel LogLevel::debug
+#define moduleLevel LogLevel::debug
 
 namespace pipe
 {
@@ -87,22 +87,18 @@ namespace signal
         auto &ctx = cur->ctx;
         auto curproc = cur->getProcess();
 
-        uintptr_t *link = reinterpret_cast<uintptr_t*>(ctx.sp());
-        uintptr_t sigstack = *reinterpret_cast<uintptr_t*>(curproc->vmar.copyin((xlen_t)link, sizeof(uintptr_t)).buff);
+        addr_t sigstack;
+        curproc->vmar[ctx.sp()]>>sigstack;
         // if(sigstack == (uintptr_t)cur->sigstack.ss_sp) { cur->sigstack.ss_onstack = 0; }
-
-        sigstack -= sizeof(SigMask);
-        SigMask *oldmask = reinterpret_cast<SigMask*>(sigstack);
-        cur->sigmask = *reinterpret_cast<SigMask*>(curproc->vmar.copyin((xlen_t)oldmask, sizeof(SigMask)).buff);
-
-        sigstack -= sizeof(SigCtx);
-        SigCtx *context = reinterpret_cast<SigCtx*>(sigstack);
-        // for (size_t i = 1; i < NGREG; i++) context->gregs[i] = ctx->gpr[i];
-        ByteArray ksigctxarr = curproc->vmar.copyin((xlen_t)context, sizeof(SigCtx));
-        SigCtx *ksigctx = reinterpret_cast<SigCtx*>(ksigctxarr.buff);
-        memmove((void*)(ctx.gpr), (void*)(((xlen_t)&(ksigctx->sc_regs))+sizeof(xlen_t)), sizeof(ctx.gpr));  // @todo: 写成对象操作
-        // ctx->sepc = context->sc_regs[0];
-        ctx.pc = ksigctx->sc_regs.pc;
+        auto ustream=curproc->vmar[sigstack];
+        ustream.reverse=true;
+        sigcontext sigctx;
+        ustream>>cur->sigmask;
+        Log(debug,"sigmask@%x",ustream.addr());
+        ustream>>sigctx;
+        Log(debug,"sigctx@%x",ustream.addr());
+        memmove(ctx.gpr,&sigctx.sc_regs.ra, sizeof(ctx.gpr));  // @todo: 写成对象操作
+        ctx.pc = sigctx.sc_regs.pc;
 
         return 0;
     }
@@ -180,79 +176,59 @@ namespace signal
             return;
         }
         if(sa->sa_handler == SIG_IGN) { return; }
-        uintptr_t sigstack = ctx.sp();
         // 启用备用信号堆栈（如果需要）
+        addr_t sigstack=ctx.sp();
         bool switch_stack = (sa->sa_flags&SA_ONSTACK) && !cur->onSigStack();
-        if(switch_stack) {
-            sigstack = (uintptr_t)cur->sigstack.ss_sp;
-            Log(error, "SigAltStack enabled at 0x%lx", sigstack);
+        if(switch_stack){
+            sigstack=(addr_t)cur->sigstack.ss_sp;
+            Log(debug, "SigAltStack enabled at 0x%lx", sigstack);
         }  // @todo: 如果事先未设置sigaltstack，则行为未定义
-        else {  // 默认堆栈
-            sigstack &= ~0xf;  // 对齐
-            sigstack -= 0x80;  // red zone
-        }
-        uintptr_t signal_stack_base = sigstack;  // @todo: 是否正确？
+        auto ustream=curproc->vmar[sigstack];
+        ustream.reverse=true;
+        ustream<<(xlen_t)0x0;
+        sigstack=ustream.addr();
+
         // 设置SigSet
-        sigstack -= sizeof(SigSet);
-        SigSet *oldmask = reinterpret_cast<SigSet*>(sigstack);
-        // *oldmask = cur->sigmask;
-        curproc->vmar.copyout((xlen_t)oldmask, ByteArray((uint8*)&(cur->sigmask), sizeof(SigSet)));
+        ustream<<cur->sigmask;
         if (!(sa->sa_flags & SA_NODEFER)) { cur->sigmask |= 1UL << (1-signum); }
         cur->sigmask |= sa->sa_mask.sig[0];
+        Log(debug,"sigmask@%x",ustream.addr());
         // 设置SigCtx
-        sigstack -= sizeof(SigCtx);
-        SigCtx *context = reinterpret_cast<SigCtx*>(sigstack);
         SigCtx ksigctx;
-        // for (size_t i = 1; i < NGREG; i++) context->gregs[i] = ctx->gpr[i];
-        memmove((void*)(((xlen_t)&(ksigctx.sc_regs))+sizeof(xlen_t)), (void*)ctx.gpr, sizeof(ctx.gpr));
-        // context->gregs[0] = ctx->sepc;
+        memmove(&ksigctx.sc_regs.ra,ctx.gpr,sizeof(ctx.gpr));
         ksigctx.sc_regs.pc = ctx.pc;  // pret_code
-        curproc->vmar.copyout((xlen_t)context, ByteArray((uint8*)&ksigctx, sizeof(SigCtx)));
+        ustream<<ksigctx;
+        Log(debug,"sigctx@%x",ustream.addr());
         // 设置UCtx（意义不明）
-        SigInfo *info = nullptr;
-        UCtx *ucontext = nullptr;
+        addr_t pinfo=0,puctx=0;
         if (sa->sa_flags & SA_SIGINFO) {
             // 设置SigInfo
-            sigstack -= sizeof(SigInfo);
-            info = reinterpret_cast<SigInfo*>(sigstack);
             if (cur->siginfos[signum-1] == nullptr) {
-                SigInfo ksiginfo;
-                ksiginfo.si_signo = signum;
-                ksiginfo.si_code = 0;
-                ksiginfo.si_errno = 0;
-                curproc->vmar.copyout((xlen_t)info, ByteArray((uint8*)&ksiginfo, sizeof(SigInfo)));
+                SigInfo info;
+                info.si_signo = signum;
+                info.si_code = 0;
+                info.si_errno = 0;
+                cur->siginfos[signum-1]=make_unique<SigInfo>();
+                *cur->siginfos[signum-1]=info;
             }
-            else {
-                // *info = *cur->siginfos[signum-1];
-                curproc->vmar.copyout((xlen_t)info, ByteArray((uint8*)(cur->siginfos[signum-1].get()), sizeof(SigInfo)));
-                cur->siginfos[signum-1].reset();
-            }
+            ustream<<*cur->siginfos[signum-1];
+            pinfo=ustream.addr();
+            cur->siginfos[signum-1].reset();
             // 设置UCtx
-            sigstack -= sizeof(UCtx);
-            ucontext = reinterpret_cast<UCtx*>(sigstack);
-            UCtx kuctx;
-            kuctx.uc_flags = 0;
-            kuctx.uc_link = nullptr; 
-            // FIXME: Is user stack size limited to LARGE_PAGE_SIZE ?
-            // FIXME: Alt stack size ?
-            // ucontext->uc_stack = SigStack { reinterpret_cast<void *>(sigstack), 0, cur->sigstack.ss_onstack ? sigstack-(reinterpret_cast<uintptr_t>(cur->sigstack.ss_sp)-vm::pageSize) : cur->kernel_sp - (USER_STACK - LARGE_PAGE_SIZE) };
-            kuctx.uc_stack = switch_stack ? cur->sigstack : SigStack({ (void*)signal_stack_base, 0, sigStackSiz });
-            // kuctx.uc_stack.ss_sp = reinterpret_cast<void*>(sigstack); ？？
-            kuctx.uc_sigmask.sig[0] = cur->sigmask;
+            UCtx uctx;
+            uctx.uc_flags = 0;
+            uctx.uc_link = nullptr; 
+            uctx.uc_stack = switch_stack ? cur->sigstack : SigStack({ (void*)sigstack, 0, sigStackSiz });
+            uctx.uc_sigmask.sig[0] = cur->sigmask;
             // Log(error, "unimplemented: siginfos.ucontext.uc_context\n");
-            memmove((void*)(((xlen_t)&(kuctx.uc_mcontext.sc_regs))+sizeof(xlen_t)), (void*)ctx.gpr, sizeof(ctx.gpr));
-            kuctx.uc_mcontext.sc_regs.pc = ctx.pc;  // pret_code
-            curproc->vmar.copyout((xlen_t)ucontext, ByteArray((uint8*)&kuctx, sizeof(UCtx)));
-        }
-        else {
+            uctx.uc_mcontext=ksigctx;
+            ustream<<uctx;
+            puctx=ustream.addr();
+        } else {
             if (cur->siginfos[signum-1] != nullptr) { cur->siginfos[signum-1].reset(); }
         }
         // 存储信号栈底地址
-        sigstack -= sizeof(uintptr_t);
-        sigstack &= ~0xf;
-        uintptr_t *link = reinterpret_cast<uintptr_t*>(sigstack);
-        // *link = signal_stack_base;
-        curproc->vmar.copyout((xlen_t)link, ByteArray((uint8*)&signal_stack_base, sizeof(uintptr_t)));
+        ustream<<sigstack;
         // 切换信号处理上下文
         if(sa->sa_restorer != nullptr) {
             ctx.x(REG_RA) = reinterpret_cast<long>(sa->sa_restorer);
@@ -260,11 +236,11 @@ namespace signal
         else {
             ctx.ra() = proc::vDSOfuncAddr(sigreturn);
         }  // @todo: VSDO
-        ctx.x(REG_SP) = sigstack;
+        ctx.sp() = ustream.addr();
         ctx.x(REG_A0) = signum;
         if(sa->sa_flags & SA_SIGINFO) {
-            ctx.x(REG_A1) = reinterpret_cast<long>(info);
-            ctx.x(REG_A2) = reinterpret_cast<long>(ucontext);
+            ctx.x(REG_A1)=pinfo;
+            ctx.x(REG_A2)=puctx;
         }
         ctx.pc = reinterpret_cast<long>(sa->sa_handler);
         if(sa->sa_flags & SA_RESETHAND) {
