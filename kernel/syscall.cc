@@ -907,8 +907,8 @@ namespace syscall {
         return kHartObj().curtask->tid();
     }
     extern long clone(unsigned long flags, void *stack,
-                      int *parent_tid, int *child_tid,
-                      unsigned long tls);
+                      int *parent_tid, unsigned long tls,
+                      int *child_tid);
     int waitpid(pid_t pid,xlen_t wstatus,int options){
         Log(debug,"waitpid(pid=%d,options=%d)",pid,options);
         auto curproc=kHartObj().curtask->getProcess();

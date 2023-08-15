@@ -6,8 +6,8 @@
 namespace syscall
 {
     long clone(unsigned long flags, void *stack,
-                      int *parent_tid, int *child_tid,
-                      unsigned long tls){
+                      int *parent_tid, unsigned long tls,
+                      int *child_tid){
         auto &cur=kHartObj().curtask;
         auto &ctx=kHartObj().curtask->ctx;
 
@@ -24,10 +24,12 @@ namespace syscall
         }
         
         // set/clear child tid
-        if(flags&CLONE_CHILD_SETTID)
+        if(flags&CLONE_CHILD_SETTID && child_tid)
             thrd->getProcess()->vmar[(addr_t)child_tid]<<thrd->tid();
-        if(flags&CLONE_PARENT_SETTID)
+        if(flags&CLONE_PARENT_SETTID && parent_tid)
             cur->getProcess()->vmar[(addr_t)parent_tid]<<thrd->tid();
+        if(flags&CLONE_SETTLS)
+            thrd->ctx.tp()=tls;
         return thrd->tid();
     }
     sysrt_t setTidAddress(int *tidptr){
