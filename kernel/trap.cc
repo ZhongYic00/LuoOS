@@ -49,7 +49,7 @@ void uecallHandler(){
     using namespace sys;
     cur->lastpriv=proc::Task::Priv::Kernel;
     if(ecallId<nSyscalls){
-        Log(syscallPtrs[ecallId]?info:error,"proc called %s[%d]",syscall::syscallHelper[ecallId],ecallId);
+        Log(syscallPtrs[ecallId]?error:error,"proc called %s[%d]",syscall::syscallHelper[ecallId],ecallId);
         /// @bug is this needed??
         // cur->lastpriv=proc::Task::Priv::Kernel;
         csrWrite(sscratch,cur->kctx.gpr);
