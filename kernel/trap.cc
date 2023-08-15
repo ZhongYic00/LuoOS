@@ -62,7 +62,6 @@ void uecallHandler(){
         Log(error,"syscall num{%d} exceeds valid range",ecallId);
         rtval=1;
     }
-    signal::sigHandler();
     cur->lastpriv=proc::Task::Priv::User;
     Log(debug,"uecall exit(id=%d,rtval=%d)",ecallId,rtval);
 }
@@ -160,6 +159,12 @@ extern "C" void straphandler(){
                 // break;
                 panic("unhandled exception!");
         }
+    }
+    if(kHartObj().curtask->lastpriv==proc::Task::Priv::User){
+        kHartObj().curtask->lastpriv=proc::Task::Priv::Kernel;
+        signal::sigHandler();
+        kHartObj().curtask->lastpriv=proc::Task::Priv::User;
+
     }
     // printf("mtraphandler over\n");
     // if(kHartObj().curtask->lastpriv!=proc::Task::Priv::User)kHartObj().curtask->switchTo();
