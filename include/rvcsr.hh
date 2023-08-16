@@ -44,6 +44,7 @@ namespace csr
         enum exceptions{
             instrMisalligned,
             instrAccessFault,
+            illegalInstr,
             breakpoint=3,
             loadMissalligned,
             loadAccessFault,
@@ -61,6 +62,7 @@ namespace csr
         inline const char *exceptionsHelper[exceptions::nExceptions]={
             EItem(instrMisalligned),
             EItem(instrAccessFault),
+            EItem(illegalInstr),
             EItem(breakpoint=3),
             EItem(loadMissalligned),
             EItem(loadAccessFault),

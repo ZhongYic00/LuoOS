@@ -148,7 +148,7 @@ namespace vm
             return rt;
         }
         inline bool contains(xlen_t addr) const {
-            return addr>=pn2addr(vpn) && addr<=pn2addr(vpn+vmo->len());
+            return addr2pn(addr)>=vpn && addr2pn(addr)<=vend();
         }
         inline Segment vsegment() const{return Segment{vpn,vend()};}
         bool operator==(const PageMapping &other) const { return vpn == other.vpn && vmo == other.vmo && perm == other.perm && mapping == other.mapping && sharing == other.sharing; }
