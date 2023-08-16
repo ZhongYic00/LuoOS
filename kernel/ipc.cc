@@ -92,15 +92,17 @@ namespace signal
         // if(sigstack == (uintptr_t)cur->sigstack.ss_sp) { cur->sigstack.ss_onstack = 0; }
         auto ustream=curproc->vmar[sigstack];
         ustream.reverse=true;
-        UCtx kctx;
-        SigInfo kinfo;
-        ustream>>kinfo;
-        ustream>>kctx;
-        // Log(debug,"sigmask@%x",ustream.addr());
-        // Log(debug,"sigctx@%x",ustream.addr());
-        cur->sigmask = kctx.uc_sigmask.sig[0];
-        memmove(ctx.gpr,&kctx.uc_mcontext.sc_regs.ra, sizeof(ctx.gpr));  // @todo: 写成对象操作
-        ctx.pc = kctx.uc_mcontext.sc_regs.pc;
+        if(cur->signal.hasInfo){
+            SigInfo info;
+            ustream>>info;
+            Log(debug,"siginfo@%x",ustream.addr());
+        }
+        UCtx uctx;
+        ustream>>uctx;
+        Log(debug,"sigctx@%x",ustream.addr());
+        cur->sigmask = uctx.uc_sigmask.sig[0];
+        memmove(ctx.gpr,&uctx.uc_mcontext.sc_regs.ra, sizeof(ctx.gpr));  // @todo: 写成对象操作
+        ctx.pc = uctx.uc_mcontext.sc_regs.pc;
         // @todo: restore_altstack
 
         return 0;
@@ -194,17 +196,9 @@ namespace signal
         // // 设置SigSet
         // ustream<<cur->sigmask;
         // if (!(sa->sa_flags & SA_NODEFER)) { cur->sigmask |= 1UL << (1-signum); }
-        // cur->sigmask |= sa->sa_mask.sig[0];
-        // Log(debug,"sigmask@%x",ustream.addr());
-        // // 设置SigCtx
-        // SigCtx ksigctx;
-        // memmove(&ksigctx.sc_regs.ra,ctx.gpr,sizeof(ctx.gpr));
-        // ksigctx.sc_regs.pc = ctx.pc;  // pret_code
-        // ustream<<ksigctx;
-        // Log(debug,"sigctx@%x",ustream.addr());
-        // 设置UCtx（意义不明）
         addr_t pinfo=0,puctx=0;
-        if (sa->sa_flags & SA_SIGINFO) {
+        cur->signal.hasInfo=sa->sa_flags & SA_SIGINFO;
+        if(cur->signal.hasInfo){
             // 设置SigInfo
             if (cur->siginfos[signum-1] == nullptr) {
                 SigInfo info;
@@ -216,10 +210,8 @@ namespace signal
             }
             ustream<<*cur->siginfos[signum-1];
             pinfo=ustream.addr();
-            cur->siginfos[signum-1].reset();
-        } else {
-            if (cur->siginfos[signum-1] != nullptr) { cur->siginfos[signum-1].reset(); }
         }
+        cur->siginfos[signum-1].reset();
         // 设置SigCtx
         SigCtx ksigctx;
         memmove(&ksigctx.sc_regs.ra,ctx.gpr,sizeof(ctx.gpr));

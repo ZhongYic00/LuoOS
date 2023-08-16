@@ -155,6 +155,10 @@ namespace proc
         SigMask sigmask = 0, sigpending = 0;
         shared_ptr<SigInfo> siginfos[numSigs] = { nullptr };
         SigStack sigstack = {};
+        struct Signal{
+            bool hasInfo=false;
+            bool altStack=false;
+        }signal;
         struct Attrs{
             int *clearChildTid=nullptr;
             int exitstatus;
