@@ -32,7 +32,7 @@ namespace syscall
             thrd->ctx.tp()=tls;
         if(flags&CLONE_CHILD_CLEARTID)
             thrd->attrs.clearChildTid=child_tid;
-        return thrd->tid();
+        return flags&CLONE_THREAD?thrd->tid():thrd->getProcess()->pid();
     }
     sysrt_t setTidAddress(int *tidptr){
         auto &cur=kHartObj().curtask;

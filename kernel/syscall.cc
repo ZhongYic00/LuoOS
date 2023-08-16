@@ -924,6 +924,7 @@ namespace syscall {
         }
         else if(pid>0){
             auto proc=(**kGlobObjs->procMgr)[pid];
+            if(!proc)panic("should not happen");
             while(proc->state!=sched::Zombie){
                 // proc add hook
                 sleep();
