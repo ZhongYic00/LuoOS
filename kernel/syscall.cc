@@ -516,15 +516,8 @@ namespace syscall {
     }
     sysrt_t readv(int fd, xlen_t iov, int iovcnt);
     sysrt_t writev(int fd, xlen_t iov, int iovcnt);
-    void exit(){
-        auto cur=kHartObj().curtask;
-        auto status=cur->ctx.a0();
-        cur->getProcess()->exit(status);
-        yield();
-    }
-    void exitGroup() {
-        return exit();
-    }
+    sysrt_t exit(int status);
+    sysrt_t exitGroup(int status);
     xlen_t sendFile() {
         auto &ctx=kHartObj().curtask->ctx;
         int a_outfd = ctx.x(10);
@@ -672,41 +665,8 @@ namespace syscall {
         yield();
         return statcode::ok;
     }
-    xlen_t kill() {  // @todo: 填充SigInfo？
-        auto &ctx = kHartObj().curtask->ctx;
-        pid_t a_pid = ctx.x(10);
-        int a_sig = ctx.x(11);
-
-        auto curproc = kHartObj().curtask->getProcess();
-        if(a_pid == 0) { a_pid = curproc->pid(); }  // @todo: 进程组信号管理
-        if(a_pid < -1) { a_pid = -a_pid; }  // @todo: 进程组信号管理
-        if(a_pid > 0) {
-            auto proc = (**kGlobObjs->procMgr)[a_pid];
-            if(proc == nullptr) { return statcode::err; }
-            if(a_sig == 0) { return statcode::ok; }
-            sigSend(*proc, a_sig);
-            return statcode::ok;
-        }
-        if(a_pid == -1) {
-            if(a_sig == 0) { return statcode::ok; }
-            else if(a_sig==SIGKILL || a_sig==SIGSTOP) { return -EPERM; }
-            bool success = false;
-            auto procs = (**kGlobObjs->procMgr);
-            int procsnum = procs.getObjNum();
-            for (int i = 0; i < procsnum; ++i) {
-                auto it = procs[i];
-                if(it!=nullptr && it!=curproc && it->pid()>2) {  // @todo: 内核进程写成宏
-                    success = true;
-                    sigSend(*it, a_sig);
-                }
-            }
-            return success ? statcode::ok : statcode::err;
-        }
-        return statcode::ok;
-    }
-    xlen_t tkill() {
-        return kill();
-    }
+    extern sysrt_t kill(pid_t pid, int sig);
+    extern sysrt_t tkill(int tid, int sig);
     xlen_t sigAction() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_sig = ctx.x(10);
@@ -940,8 +900,8 @@ namespace syscall {
         return kHartObj().curtask->tid();
     }
     extern long clone(unsigned long flags, void *stack,
-                      int *parent_tid, int *child_tid,
-                      unsigned long tls);
+                      int *parent_tid, unsigned long tls,
+                      int *child_tid);
     int waitpid(pid_t pid,xlen_t wstatus,int options){
         Log(debug,"waitpid(pid=%d,options=%d)",pid,options);
         auto curproc=kHartObj().curtask->getProcess();
@@ -964,6 +924,7 @@ namespace syscall {
         }
         else if(pid>0){
             auto proc=(**kGlobObjs->procMgr)[pid];
+            if(!proc)panic("should not happen");
             while(proc->state!=sched::Zombie){
                 // proc add hook
                 sleep();
@@ -1132,6 +1093,9 @@ namespace syscall {
         }
     }
     extern sysrt_t setTidAddress(int *tidptr);
+    inline sysrt_t membarrier(int cmd,int flags){
+        return 0;
+    }
 const char *syscallHelper[sys::syscalls::nSyscalls];
 #define DECLSYSCALL(x,ptr) syscallPtrs[x]=reinterpret_cast<syscall_t>(ptr);syscallHelper[x]=#x;
     void init(){
@@ -1249,5 +1213,6 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::madvise,madvise);
         DECLSYSCALL(scnum::wait,wait);
         DECLSYSCALL(scnum::syncfs,syncFS);
+        DECLSYSCALL(scnum::membarrier,membarrier);
     }
 } // namespace syscall

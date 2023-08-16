@@ -14,6 +14,7 @@ extern "C" void start_kernel(int hartid);
 namespace syscall{
     void init();
     int sleep();
+    void yield();
 }
 namespace kernel {
     constexpr int timerInterval=1000000;
@@ -76,6 +77,7 @@ namespace kernel {
     inline int threadId(){return kthreadIdBase+readHartId();}
     void createKernelMapping(vm::VMAR &vmar);
 }
+FORCEDINLINE
 inline int readHartId(){int rt;regRead(tp,rt);return rt;}
 extern kernel::KernelGlobalObjs *kGlobObjs;
 extern kernel::KernelHartObjs kHartObjs[8];
