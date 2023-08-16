@@ -119,7 +119,7 @@ namespace signal
             }
         }
         if(signum == 0) { return; }
-        Log(error, "dealing SIG_%d", signum);
+        Log(info, "dealing SIG_%d", signum);
         cur->sigpending &= ~(1UL << (signum-1));
         if(signum == SIGKILL) { sigExitHandler(signum); return; }
         if(signum == SIGSTOP) { sigStopHandler(); return; }

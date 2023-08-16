@@ -42,13 +42,38 @@ namespace csr
             REPFIELD(ei)
         };
         enum exceptions{
+            instrMisalligned,
+            instrAccessFault,
             breakpoint=3,
+            loadMissalligned,
+            loadAccessFault,
+            storeMisalligned,
             storeAccessFault=7,
             uecall=8,
             secall=9,
+            mecall=11,
             instrPageFault=12,
             loadPageFault=13,
             storePageFault=15,
+            nExceptions
+        };
+        #define EItem(x) #x
+        inline const char *exceptionsHelper[exceptions::nExceptions]={
+            EItem(instrMisalligned),
+            EItem(instrAccessFault),
+            EItem(breakpoint=3),
+            EItem(loadMissalligned),
+            EItem(loadAccessFault),
+            EItem(storeMisalligned),
+            EItem(storeAccessFault=7),
+            EItem(uecall=8),
+            EItem(secall=9),
+            EItem(rsv),
+            EItem(mecall=11),
+            EItem(instrPageFault=12),
+            EItem(loadPageFault=13),
+            EItem(rsv),
+            EItem(storePageFault=15),
         };
         constexpr bool isInterrupt(xlen_t mcause){return (mcause>>63)&1;}
     }

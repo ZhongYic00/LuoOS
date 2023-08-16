@@ -49,7 +49,7 @@ void uecallHandler(){
     using namespace sys;
     cur->lastpriv=proc::Task::Priv::Kernel;
     if(ecallId<nSyscalls){
-        Log(syscallPtrs[ecallId]?error:error,"proc called %s[%d]",syscall::syscallHelper[ecallId],ecallId);
+        Log(syscallPtrs[ecallId]?info:error,"proc called %s[%d]",syscall::syscallHelper[ecallId],ecallId);
         /// @bug is this needed??
         // cur->lastpriv=proc::Task::Priv::Kernel;
         csrWrite(sscratch,cur->kctx.gpr);
@@ -154,7 +154,7 @@ extern "C" void straphandler(){
                 pagefaultHandler(stval);
                 break;
             default:
-                Log(error,"exception[%d] sepc=%x stval=%x",scause,sepc,stval);
+                Log(error,"exception[%d]{%s} sepc=%x stval=%x",scause,csr::mcause::exceptionsHelper[scause],sepc,stval);
                 // kHartObj().curtask->kctx.ra()=(xlen_t)sepc+4;
                 // break;
                 panic("unhandled exception!");
