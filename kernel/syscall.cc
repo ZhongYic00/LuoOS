@@ -1093,6 +1093,9 @@ namespace syscall {
         }
     }
     extern sysrt_t setTidAddress(int *tidptr);
+    inline sysrt_t membarrier(int cmd,int flags){
+        return 0;
+    }
 const char *syscallHelper[sys::syscalls::nSyscalls];
 #define DECLSYSCALL(x,ptr) syscallPtrs[x]=reinterpret_cast<syscall_t>(ptr);syscallHelper[x]=#x;
     void init(){
@@ -1210,5 +1213,6 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::madvise,madvise);
         DECLSYSCALL(scnum::wait,wait);
         DECLSYSCALL(scnum::syncfs,syncFS);
+        DECLSYSCALL(scnum::membarrier,membarrier);
     }
 } // namespace syscall
