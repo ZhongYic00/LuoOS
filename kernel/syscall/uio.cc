@@ -1,6 +1,7 @@
 #include <linux/uio.h>
 #include <asm/errno.h>
 #include <sys/select.h>
+#include <asm/poll.h>
 #include "common.h"
 #include "kernel.hh"
 #include "time.hh"
@@ -73,5 +74,26 @@ namespace syscall
         if(writefds)curproc->vmar[(addr_t)writefds]<<wfds;
         if(exceptfds)curproc->vmar[(addr_t)exceptfds]<<efds;
         return rt;
+    }
+    sysrt_t pPoll(struct pollfd *a_fds, int nfds,
+               const struct timespec *tmo_p, const sigset_t *sigmask,size_t sigsetsize){
+        if(a_fds==nullptr || nfds<0 || sigsetsize!=sizeof(sigset_t)) { return -EINVAL; }
+        
+        auto curproc = kHartObj().curtask->getProcess();
+        ByteArray fdsarr = curproc->vmar.copyin((xlen_t)a_fds, nfds*sizeof(pollfd));
+        pollfd *fds = (pollfd*)fdsarr.buff;
+        // @todo: 处理信号阻塞
+        // @todo: 处理等待时间（类似nanoSleep）
+        int ret = 0;
+        for (xlen_t i = 0; i < nfds; ++i) {  // @todo: 需要完善
+            fds[i].revents = 0;
+            if (fds[i].fd < 0) { continue; }
+            if (fds[i].events & POLLIN) { fds[i].revents |= POLLIN; }  // @todo: we assume this is always available
+            if (fds[i].events & POLLOUT) { fds[i].revents |= POLLOUT; }  // @todo: we assume this is always available
+            ++ret;
+        }
+        curproc->vmar.copyout((xlen_t)a_fds, fdsarr);
+
+        return ret;
     }
 } // namespace syscall
