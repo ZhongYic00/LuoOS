@@ -154,7 +154,7 @@ void panic(const char *s)
 	csrRead(sepc,sepc);
 	csrRead(scause,scause);
 	csrRead(stval,stval);
-	printf("sepc=%x scause=%x stval=%x\n",sepc,scause,stval);
+	printf("sepc=%x scause=%x{%s} stval=%x\n",sepc,scause,csr::mcause::exceptionsHelper[scause&0xf],stval);
 	kLogger.dump();
 	sbi_shutdown();
 }

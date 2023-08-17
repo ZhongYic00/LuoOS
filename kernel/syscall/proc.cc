@@ -32,13 +32,14 @@ namespace syscall
             cur->getProcess()->vmar[(addr_t)parent_tid]<<thrd->tid();
         if(flags&CLONE_SETTLS)
             thrd->ctx.tp()=tls;
-        return thrd->tid();
+        if(flags&CLONE_CHILD_CLEARTID)
+            thrd->attrs.clearChildTid=child_tid;
+        return flags&CLONE_THREAD?thrd->tid():thrd->getProcess()->pid();
     }
     sysrt_t setTidAddress(int *tidptr){
         auto &cur=kHartObj().curtask;
         /// @bug how to use this attr? one-off?
-        cur->attrs.setChildTid=tidptr;
-        cur->getProcess()->vmar[(addr_t)tidptr]<<cur->id;
+        cur->attrs.clearChildTid=tidptr;
         return cur->id;
     }
 
@@ -62,5 +63,22 @@ namespace syscall
                 Log(error,"who is invalid");
                 return -EINVAL;
         }
+    }
+    sysrt_t exitGroup(int status){
+        auto cur=kHartObj().curtask;
+        auto curproc=cur->getProcess();
+        for(auto task:curproc->tasks){
+            task->state=sched::Zombie;
+            kGlobObjs->scheduler->remove(task);
+        }
+        curproc->exit(status);
+        yield();
+        return 0;
+    }
+    sysrt_t exit(int status){
+        auto cur=kHartObj().curtask;
+        cur->exit(status);
+        syscall::yield();
+        return 0;
     }
 } // namespace syscall

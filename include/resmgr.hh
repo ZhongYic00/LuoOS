@@ -14,7 +14,7 @@ template<typename T>
 class ObjManager{
     constexpr static int nobjs=512;
     int idCnt;
-    T *objlist[nobjs];
+    unordered_map<tid_t,T*> objlist;
 public:
     inline tid_t newId(){return ++idCnt;}
     inline void addObj(tid_t id,T* obj){objlist[id]=obj;}

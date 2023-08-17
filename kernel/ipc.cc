@@ -92,13 +92,18 @@ namespace signal
         // if(sigstack == (uintptr_t)cur->sigstack.ss_sp) { cur->sigstack.ss_onstack = 0; }
         auto ustream=curproc->vmar[sigstack];
         ustream.reverse=true;
-        sigcontext sigctx;
-        ustream>>cur->sigmask;
-        Log(debug,"sigmask@%x",ustream.addr());
-        ustream>>sigctx;
+        if(cur->signal.hasInfo){
+            SigInfo info;
+            ustream>>info;
+            Log(debug,"siginfo@%x",ustream.addr());
+        }
+        UCtx uctx;
+        ustream>>uctx;
         Log(debug,"sigctx@%x",ustream.addr());
-        memmove(ctx.gpr,&sigctx.sc_regs.ra, sizeof(ctx.gpr));  // @todo: 写成对象操作
-        ctx.pc = sigctx.sc_regs.pc;
+        cur->sigmask = uctx.uc_sigmask.sig[0];
+        memmove(ctx.gpr,&uctx.uc_mcontext.sc_regs.ra, sizeof(ctx.gpr));  // @todo: 写成对象操作
+        ctx.pc = uctx.uc_mcontext.sc_regs.pc;
+        // @todo: restore_altstack
 
         return 0;
     }
@@ -114,7 +119,7 @@ namespace signal
             }
         }
         if(signum == 0) { return; }
-        Log(error, "dealing SIG_%d", signum);
+        Log(info, "dealing SIG_%d", signum);
         cur->sigpending &= ~(1UL << (signum-1));
         if(signum == SIGKILL) { sigExitHandler(signum); return; }
         if(signum == SIGSTOP) { sigStopHandler(); return; }
@@ -188,20 +193,12 @@ namespace signal
         ustream<<(xlen_t)0x0;
         sigstack=ustream.addr();
 
-        // 设置SigSet
-        ustream<<cur->sigmask;
-        if (!(sa->sa_flags & SA_NODEFER)) { cur->sigmask |= 1UL << (1-signum); }
-        cur->sigmask |= sa->sa_mask.sig[0];
-        Log(debug,"sigmask@%x",ustream.addr());
-        // 设置SigCtx
-        SigCtx ksigctx;
-        memmove(&ksigctx.sc_regs.ra,ctx.gpr,sizeof(ctx.gpr));
-        ksigctx.sc_regs.pc = ctx.pc;  // pret_code
-        ustream<<ksigctx;
-        Log(debug,"sigctx@%x",ustream.addr());
-        // 设置UCtx（意义不明）
+        // // 设置SigSet
+        // ustream<<cur->sigmask;
+        // if (!(sa->sa_flags & SA_NODEFER)) { cur->sigmask |= 1UL << (1-signum); }
         addr_t pinfo=0,puctx=0;
-        if (sa->sa_flags & SA_SIGINFO) {
+        cur->signal.hasInfo=sa->sa_flags & SA_SIGINFO;
+        if(cur->signal.hasInfo){
             // 设置SigInfo
             if (cur->siginfos[signum-1] == nullptr) {
                 SigInfo info;
@@ -213,20 +210,23 @@ namespace signal
             }
             ustream<<*cur->siginfos[signum-1];
             pinfo=ustream.addr();
-            cur->siginfos[signum-1].reset();
-            // 设置UCtx
-            UCtx uctx;
-            uctx.uc_flags = 0;
-            uctx.uc_link = nullptr; 
-            uctx.uc_stack = switch_stack ? cur->sigstack : SigStack({ (void*)sigstack, 0, sigStackSiz });
-            uctx.uc_sigmask.sig[0] = cur->sigmask;
-            // Log(error, "unimplemented: siginfos.ucontext.uc_context\n");
-            uctx.uc_mcontext=ksigctx;
-            ustream<<uctx;
-            puctx=ustream.addr();
-        } else {
-            if (cur->siginfos[signum-1] != nullptr) { cur->siginfos[signum-1].reset(); }
         }
+        cur->siginfos[signum-1].reset();
+        // 设置SigCtx
+        SigCtx ksigctx;
+        memmove(&ksigctx.sc_regs.ra,ctx.gpr,sizeof(ctx.gpr));
+        ksigctx.sc_regs.pc = ctx.pc;  // pret_code
+        // 设置UCtx
+        UCtx uctx;
+        uctx.uc_flags = 0;
+        uctx.uc_link = nullptr; 
+        uctx.uc_stack = switch_stack ? cur->sigstack : SigStack({ (void*)sigstack, 0, sigStackSiz });
+        uctx.uc_sigmask.sig[0] = cur->sigmask;
+        // Log(error, "unimplemented: siginfos.ucontext.uc_context\n");
+        uctx.uc_mcontext=ksigctx;
+        ustream<<uctx;
+        puctx=ustream.addr();
+        cur->sigmask |= sa->sa_mask.sig[0];
         // 存储信号栈底地址
         ustream<<sigstack;
         // 切换信号处理上下文

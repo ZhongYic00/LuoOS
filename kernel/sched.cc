@@ -48,21 +48,22 @@ void sched::Scheduler::add(Scheduable *task){
 Scheduler::Scheduler(){}
 void Scheduler::sleep(Scheduable *task){
     auto &ready=this->ready[task->prior];
+    assert(task->state!=Pending);
     task->state=Pending;
     // Log(debug,"%s",ready.toString(print).c_str());
     ready.remove(task);
     // Log(debug,"%s",ready.toString(print).c_str());
-    pending.push_back(task);
+    pending.insert(task);
 }
 void Scheduler::wakeup(Scheduable *task){
     Log(info,"wakeup %s",static_cast<proc::Task*>(task)->toString().c_str());
     if(task->state!=Pending)return ;
-    pending.remove(task);
+    pending.erase(task);
     task->state=Ready;
     add(task);
 }
 void Scheduler::remove(Scheduable *task){
     auto &ready=this->ready[task->prior];
-    pending.remove(task);
+    pending.insert(task);
     ready.remove(task);
 }

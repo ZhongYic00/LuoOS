@@ -38,8 +38,24 @@ int futex(int *uaddr, int futex_op, int val,
                 cv.notify_one();
             return val;
         }
+        case FUTEX_CMP_REQUEUE:{
+            auto &curval=*reinterpret_cast<std::atomic_int32_t*>((ptr_t)paddr);
+            if(curval.load()!=val3) return -EAGAIN;
+        }
+        case FUTEX_REQUEUE:{
+            auto &cv=kGlobObjs->futexes[paddr];
+            if(val==std::numeric_limits<int>::max()){
+                Log(error,"unexpected combination of FUTEX_REQUEUE and INT_MAX");
+                return -EINVAL;
+            } else for(auto i=0;i<val;i++)
+                cv.notify_one();
+            auto paddr2=curproc->vmar.transaddr((addr_t)uaddr2);
+            kGlobObjs->futexes[paddr2]=cv;
+            kGlobObjs->futexes.erase(paddr);
+            return val;
+        }
         default:
-            Log(warning,"unimplemented! futex op=%d",futex_op);
+            Log(error,"unimplemented! futex op=%d",futex_op);
             return -EINVAL;
     }
 }

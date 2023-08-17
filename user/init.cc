@@ -26,8 +26,8 @@ int main(){
     const char *envs[] = {"PATH=/","LD_LIBRARY_PATH=/",nullptr};
     const char *args0[]={"busybox","sh","lua_testcode.sh",nullptr};
     const char *args1[]={"busybox","sh","busybox_testcode.sh",nullptr};
-    const char *args2[] = { "busybox","sh","-c","busybox grep -v -e tls_get -e sem_init -e pthread_cancel -e socket -e pthread_cond_ -e pthread_exit_cancel -e deadlock -e rwlock run-static.sh | while read line; do eval $line; done\n",nullptr };
-    const char *args3[] = { "busybox","sh","-c","busybox grep -v -e tls_get -e sem_init -e pthread_cancel -e socket -e pthread_cond_ -e pthread_exit_cancel -e deadlock -e rwlock run-dynamic.sh  | while read line; do eval $line; done\n",nullptr };
+    const char *args2[] = { "busybox","sh","-c","busybox grep -v -e socket run-static.sh | while read line; do eval $line; done\n",nullptr };
+    const char *args3[] = { "busybox","sh","-c","busybox grep -v -e socket run-dynamic.sh  | while read line; do eval $line; done\n",nullptr };
     const char *args4[]={"runtest.exe","-w","entry-dynamic.exe","pthread_cancel_points",nullptr};
     Exec testcases[]={
         {"./runtest.exe",args4,envs}

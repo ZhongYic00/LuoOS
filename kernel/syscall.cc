@@ -518,15 +518,8 @@ namespace syscall {
     }
     sysrt_t readv(int fd, xlen_t iov, int iovcnt);
     sysrt_t writev(int fd, xlen_t iov, int iovcnt);
-    void exit(){
-        auto cur=kHartObj().curtask;
-        auto status=cur->ctx.a0();
-        cur->getProcess()->exit(status);
-        yield();
-    }
-    void exitGroup() {
-        return exit();
-    }
+    sysrt_t exit(int status);
+    sysrt_t exitGroup(int status);
     xlen_t sendFile() {
         auto &ctx=kHartObj().curtask->ctx;
         int a_outfd = ctx.x(10);
@@ -909,6 +902,7 @@ namespace syscall {
         }
         else if(pid>0){
             auto proc=(**kGlobObjs->procMgr)[pid];
+            if(!proc)panic("should not happen");
             while(proc->state!=sched::Zombie){
                 // proc add hook
                 sleep();
@@ -1082,6 +1076,9 @@ namespace syscall {
         }
     }
     extern sysrt_t setTidAddress(int *tidptr);
+    inline sysrt_t membarrier(int cmd,int flags){
+        return 0;
+    }
 const char *syscallHelper[sys::syscalls::nSyscalls];
 #define DECLSYSCALL(x,ptr) syscallPtrs[x]=reinterpret_cast<syscall_t>(ptr);syscallHelper[x]=#x;
     void init(){
@@ -1201,5 +1198,6 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::madvise,madvise);
         DECLSYSCALL(scnum::wait,wait);
         DECLSYSCALL(scnum::syncfs,syncFS);
+        DECLSYSCALL(scnum::membarrier,membarrier);
     }
 } // namespace syscall

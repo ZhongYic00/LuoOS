@@ -16,7 +16,7 @@ namespace sched
     };
     class Scheduler{
         list<Scheduable*> ready[maxPrior+1];
-        list<Scheduable*> pending;
+        unordered_set<Scheduable*> pending;
     public:
         Scheduable *next(Scheduable *prev);
         Scheduler();

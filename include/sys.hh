@@ -95,6 +95,7 @@ namespace sys
         madvise=233,
         wait=260,
         syncfs=267,
+        membarrier=283,
         nSyscalls,
     };
     enum statcode{

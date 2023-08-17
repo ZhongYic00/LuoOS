@@ -2,6 +2,7 @@
 #include "rvcsr.hh"
 #include "kernel.hh"
 #include "vm/vmo.hh"
+#include <linux/futex.h>
 
 using namespace proc;
 // #define moduleLevel LogLevel::info
@@ -126,7 +127,6 @@ void validate(){
     // csrClear(sstatus,BIT(csr::mstatus::sum));
 }
 
-extern void _strapexit();
 void Task::switchTo(){
     kHartObj().curtask=this;
     kctx.tp()=readHartId();
@@ -181,20 +181,11 @@ Process::Process(const Process &other,pid_t pid):IdManagable(pid),Scheduable(oth
     for(int i=0;i<mOFiles;i++)files[i]=other.files[i];
 }
 void Process::exit(int status){
-    Log(info,"Proc[%d] exit(%d)",pid(),status);
-    
-    this->exitstatus=status;
-    /// @todo resource recycle
-
-    for(auto task:tasks){
-        task->state=sched::Zombie;
-        kGlobObjs->scheduler->remove(task);
-    }
-
+    Log(info,"Proc[%d] exit",pid());
     state=sched::Zombie;
-
-    auto task=parentProc()->defaultTask();
-    kGlobObjs->scheduler->wakeup(task);
+    exitstatus=status;
+    signal::sigSend(*parentProc(),SIGCHLD);
+    kGlobObjs->scheduler->wakeup(parentProc()->defaultTask());
 }
 void Process::zombieExit(){
     Log(info,"Proc[%d] zombie exit",pid());
@@ -204,8 +195,6 @@ void Process::zombieExit(){
     kGlobObjs->procMgr->del(pid());
 }
 Process::~Process(){
-    for(auto task:tasks)kGlobObjs->taskMgr->del(task->id);
-    tasks.clear();
 }
 Process *Process::parentProc(){return (**kGlobObjs->procMgr)[parent];}
 shared_ptr<File> Process::ofile(int a_fd) {
@@ -241,46 +230,25 @@ int Process::setRLimit(int a_rsrc, const RLim *a_rlim) {
     return 0;
 }
 
-// void Task::accept(){
-//     int sig=(sigpending&~sigmask).find_first();
-//     if(sig==sigpending.kSize)return ;
-//     sigpending[sig]=0;
-//     auto info=std::move(siginfos[sig]);
-//     /// @todo default kill handler
-//     if(sig==SIGKILL) return ;
-//     /// @todo default stop handler
-//     if(sig==SIGSTOP) return ;
-//     auto action=getProcess()->sigacts[sig];
-//     if(action.sa_handler==SIG_ERR);
-//     if(action.sa_handler==SIG_DFL);
-//     if(action.sa_handler==SIG_IGN) return ;
-//     xlen_t SigStack;
-//     /// @todo setup signal stack
-
-//     if(!action.sa_flags&SA_NODEFER){
-//         // prevent nested same signal
-//         sigmask[sig]=1;
-//     }
-//     sigmask|=sigset2bitset(action.sa_mask);
-
-//     /// @todo put context
-
-//     // handle 
-//     if(action.sa_flags&SA_SIGINFO){
-//         /// @todo put siginfo
-
-//         /// @todo put ucontext
-//     }
-// #ifdef SA_RESTORER
-//     if(action.sa_restorer){
-//         ctx.ra()=reinterpret_cast<xlen_t>(action.sa_restorer);
-//     } else {
-//         /// @todo vDSO sigreturn wrapper
-//     }
-// #endif
-//     // setup args
-//     ctx.a0()=sig;
-//     if(action.sa_flags&SA_SIGINFO){
-//         // args: sig, info, ucontext
-//     } else ;// only signum arg
-// }
+Task::~Task(){}
+namespace syscall{
+    int futex(int *uaddr, int futex_op, int val,
+                 const struct timespec *timeout,   /* or: uint32_t val2 */
+                 int *uaddr2, int val3);
+}
+void Task::exit(int status){
+    Log(info,"Task[%d] exit(%d)",tid(),status);
+    attrs.exitstatus=status;
+    state=sched::Zombie;
+    kGlobObjs->scheduler->remove(this);
+    auto curproc=getProcess();
+    curproc->tasks.erase(this);
+    if(attrs.clearChildTid){
+        curproc->vmar[(addr_t)attrs.clearChildTid]<<0;
+        syscall::futex(attrs.clearChildTid,FUTEX_WAKE,1,nullptr,nullptr,0);
+    }
+    if(curproc->tasks.empty())
+        curproc->exit(status);
+    else
+        signal::sigSend(*curproc,SIGCHLD);
+}

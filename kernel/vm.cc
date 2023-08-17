@@ -7,10 +7,10 @@
 
 using namespace vm;
 PageBuf::PageBuf(const PageKey key_):key(key),ppn(kGlobObjs->pageMgr->alloc(1)){
-    Log(info,"alloc(%x)",ppn);
+    Log(trace,"alloc(%x)",ppn);
 }
 PageBuf::~PageBuf(){
-    Log(info,"free(%x)",ppn);
+    Log(trace,"free(%x)",ppn);
     kGlobObjs->pageMgr->free(ppn,0);
 }
 
