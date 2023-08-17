@@ -1,7 +1,9 @@
 #include <linux/uio.h>
 #include <asm/errno.h>
+#include <sys/select.h>
 #include "common.h"
 #include "kernel.hh"
+#include "time.hh"
 #include "scatterio.hh"
 
 namespace syscall
@@ -34,5 +36,42 @@ namespace syscall
 
         UMemScatteredIO umio(curproc->vmar,memvecs);
         return file->writev(umio);
+    }
+    sysrt_t pselect(int nfds, fd_set *readfds, fd_set *writefds,
+        fd_set *exceptfds, const struct timespec *timeout,
+        const sigset_t *sigmask){
+        int rt=0;
+        fd_set rfds,wfds,efds;
+        auto curproc=kHartObj().curtask->getProcess();
+        if(readfds)curproc->vmar[(addr_t)readfds]>>rfds;
+        if(writefds)curproc->vmar[(addr_t)writefds]>>wfds;
+        if(exceptfds)curproc->vmar[(addr_t)exceptfds]>>efds;
+        timespec tmout;
+        if(timeout)curproc->vmar[(addr_t)timeout]>>tmout;
+        auto expired=eastl::chrono::system_clock::now()+timeservice::timespec2duration(tmout);
+        do{
+            for(int i=0;i<nfds;i++){
+                if(readfds && FD_ISSET(i,&rfds)){
+                    if(curproc->ofile(i)->isRReady())
+                        rt++;
+                    else
+                        FD_CLR(i,&rfds);
+                }
+                if(writefds && FD_ISSET(i,&wfds)){
+                    if(curproc->ofile(i)->isWReady())
+                        rt++;
+                    else
+                        FD_CLR(i,&wfds);
+                }
+                if(exceptfds && FD_ISSET(i,&efds)){
+                }
+            }
+            if(rt) break;
+            syscall::yield();
+        }while(!timeout || eastl::chrono::system_clock::now()<expired);
+        if(readfds)curproc->vmar[(addr_t)readfds]<<rfds;
+        if(writefds)curproc->vmar[(addr_t)writefds]<<wfds;
+        if(exceptfds)curproc->vmar[(addr_t)exceptfds]<<efds;
+        return rt;
     }
 } // namespace syscall

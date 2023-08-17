@@ -512,4 +512,24 @@ list<shared_ptr<vm::VMO>> vmolru;
         }
         return -1;
     }
+    bool File::isRReady(){
+        switch(obj.rType()){
+            case FileType::pipe:
+                return obj.getPipe()->readable();
+            case FileType::entry:
+                return true;
+            default:
+                return false;
+        }
+    }
+    bool File::isWReady(){
+        switch(obj.rType()){
+            case FileType::pipe:
+                return obj.getPipe()->writable();
+            case FileType::entry:
+                return true;
+            default:
+                return false;
+        }
+    }
 } // namespace fs

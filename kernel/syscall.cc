@@ -11,6 +11,7 @@
 #include <linux/unistd.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/select.h>
 #include <asm/poll.h>
 using nonstd::expected;
 
@@ -575,6 +576,9 @@ namespace syscall {
 
         return ret;
     }
+    extern sysrt_t pselect(int nfds, fd_set *readfds, fd_set *writefds,
+                   fd_set *exceptfds, const struct timespec *timeout,
+                   const sigset_t *sigmask);
     xlen_t readLinkAt() {
         auto &ctx=kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
@@ -1143,6 +1147,7 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::readv,readv);
         DECLSYSCALL(scnum::writev,writev);
         DECLSYSCALL(scnum::sendfile,sendFile);
+        DECLSYSCALL(scnum::pselect,pselect);
         DECLSYSCALL(scnum::ppoll,pPoll);
         DECLSYSCALL(scnum::readlinkat,readLinkAt);
         DECLSYSCALL(scnum::fstatat,fStatAt);

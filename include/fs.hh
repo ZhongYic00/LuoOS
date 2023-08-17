@@ -238,6 +238,8 @@ namespace fs{
             if (!S_ISCHR(obj.kst().st_mode)) { return -ENOTTY; }
             return obj.getEntry()->getINode()->ioctl(req,arg);
         }
+        bool isRReady();
+        bool isWReady();
     };
     class Path {
         private:
