@@ -67,7 +67,7 @@ namespace syscall
                 }
             }
             if(rt) break;
-            syscall::yield();
+            kernel::yield();
         }while(!timeout || eastl::chrono::system_clock::now()<expired);
         if(readfds)curproc->vmar[(addr_t)readfds]<<rfds;
         if(writefds)curproc->vmar[(addr_t)writefds]<<wfds;

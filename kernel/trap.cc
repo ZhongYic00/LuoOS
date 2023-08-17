@@ -220,6 +220,7 @@ void _strapexit(){
         csrWrite(satp,kHartObj().curtask->kctx.satp);
         ExecInst(sfence.vma);
         asm("csrr t6,sscratch");
+umodeEntry:
         restoreContext();
         ExecInst(sret);
     } else {

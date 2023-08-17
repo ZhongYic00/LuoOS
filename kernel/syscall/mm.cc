@@ -10,6 +10,10 @@ namespace syscall
 {
     using namespace vm;
     using sys::statcode;
+    sysrt_t brk(addr_t addr){
+        auto &curproc=*kHartObj().curtask->getProcess();
+        return curproc.brk(addr);
+    }
     sysrt_t mmap(addr_t addr,size_t len,int prot,int flags,int fd,int offset){
         auto &curproc=*kHartObj().curtask->getProcess();
         using namespace vm;

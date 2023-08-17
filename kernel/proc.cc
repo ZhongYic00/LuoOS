@@ -186,6 +186,7 @@ void Process::exit(int status){
     exitstatus=status;
     signal::sigSend(*parentProc(),SIGCHLD);
     kGlobObjs->scheduler->wakeup(parentProc()->defaultTask());
+    kernel::yield();
 }
 void Process::zombieExit(){
     Log(info,"Proc[%d] zombie exit",pid());
@@ -251,4 +252,5 @@ void Task::exit(int status){
         curproc->exit(status);
     else
         signal::sigSend(*curproc,SIGCHLD);
+    kernel::yield();
 }

@@ -269,3 +269,25 @@ void start_kernel(int hartid){
     regWrite(sp,irqStackOf(hartid));
     init(hartid);
 }
+
+namespace kernel{
+    __attribute__((naked))
+    void sleepSave(ptr_t gpr){
+        saveContextTo(gpr);
+        auto curtask=kHartObj().curtask;
+        curtask->kctx.pc=curtask->kctx.ra();
+        curtask->kctxs.push(curtask->kctx);
+        schedule();
+        _strapexit(); //TODO check
+    }
+    void yield(){
+        Log(debug,"yield!");
+        auto &cur=kHartObj().curtask;
+        sleepSave(cur->kctx.gpr);
+    }
+    void sleep(){
+        auto &cur=kHartObj().curtask;
+        cur->sleep();
+        yield();
+    }
+}

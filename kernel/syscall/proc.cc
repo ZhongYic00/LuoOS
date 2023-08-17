@@ -72,13 +72,11 @@ namespace syscall
             kGlobObjs->scheduler->remove(task);
         }
         curproc->exit(status);
-        yield();
         return 0;
     }
     sysrt_t exit(int status){
         auto cur=kHartObj().curtask;
         cur->exit(status);
-        syscall::yield();
         return 0;
     }
 } // namespace syscall

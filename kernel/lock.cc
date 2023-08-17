@@ -8,7 +8,7 @@ namespace semaphore
     void Semaphore::req(){
         while(count==0){
             waiting.push_back(kHartObj().curtask);
-            syscall::sleep();
+            kernel::sleep();
         }
         count--;
     }
@@ -41,7 +41,7 @@ namespace condition_variable
     }
     void condition_variable::wait(){
         waiting.push_back(kHartObj().curtask);
-        syscall::sleep();
+        kernel::sleep();
     }
     bool condition_variable::wait_for(const eastl::chrono::nanoseconds& dura){
         auto curtask=kHartObj().curtask;

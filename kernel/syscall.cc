@@ -40,8 +40,6 @@ namespace syscall {
     // using signal::sigReturn;
     using resource::RLim;
     using resource::RSrc;
-    // 前向引用
-    void yield();
     xlen_t none() { return 0; }
     xlen_t testExit() {
         static bool b = false;
@@ -56,33 +54,48 @@ namespace syscall {
         return statcode::ok;
     }
     xlen_t testIdle() {
-        return sleep();
-    }
-    xlen_t testMount() {
-        // int rt = fs::rootFSInit();
-        // kHartObj().curtask->getProcess()->cwd = Path("/").pathSearch();
-        // printf("0x%lx\n", kHartObj().curtask->getProcess()->cwd);
-        // shared_ptr<File> f;
-        // // auto testfile = fs::pathCreateAt("/testfile", T_FILE, O_CREAT|O_RDWR, f);
-        // auto testfile = Path("/testfile").pathCreate(T_FILE, O_CREAT|O_RDWR, f);
-        // assert(rt == 0);
-        // Log(info, "pathCreateAt success\n---------------------------------------------------------");
-        // string content = "test write";
-        // rt=testfile->entWrite(false, (xlen_t)content.c_str(), 0, content.size());
-        // assert(rt == content.size());
-        // testfile->entRelse();
-        // Log(info, "entWrite success\n---------------------------------------------------------");
-        // testfile = Path("/testfile").pathSearch(f);
-        // char buf[2 * content.size()];
-        // rt = testfile->entRead(false, (xlen_t)buf, 0, content.size());
-        // assert(rt == content.size());
-        // testfile->entRelse();
-        // Log(info, "entRead success\n---------------------------------------------------------");
-        // printf("%s\n", buf);
-        // return rt;
+        kernel::sleep();
         return statcode::ok;
     }
-    extern sysrt_t testFATInit();
+    xlen_t testMount() {
+        return statcode::ok;
+    }
+    sysrt_t testFATInit();
+
+    sysrt_t exit(int status);
+    sysrt_t exitGroup(int status);
+
+    sysrt_t readv(int fd, xlen_t iov, int iovcnt);
+    sysrt_t writev(int fd, xlen_t iov, int iovcnt);
+    sysrt_t pselect(int nfds, fd_set *readfds, fd_set *writefds,
+                   fd_set *exceptfds, const struct timespec *timeout,
+                   const sigset_t *sigmask);
+    int futex(int *uaddr, int futex_op, int val,
+                 const struct timespec *timeout,   /* or: uint32_t val2 */
+                 int *uaddr2, int val3);
+    sysrt_t nanoSleep(const struct timespec *req, struct timespec *rem);
+    sysrt_t clock_gettime (clockid_t __clock_id, struct timespec *__tp);
+    sysrt_t kill(pid_t pid, int sig);
+    sysrt_t tkill(int tid, int sig);
+
+    sysrt_t clone(unsigned long flags, void *stack,
+                    int *parent_tid, unsigned long tls,
+                    int *child_tid);
+    sysrt_t setTidAddress(int *tidptr);
+    sysrt_t getrusage(int who, struct ::rusage *usage);
+    sysrt_t gettimeofday (struct timeval *__restrict __tv,
+			 struct timezone *__tz) __THROW __nonnull ((1));
+    sysrt_t times(struct ::tms *buf);
+
+    sysrt_t brk(addr_t addr);
+    sysrt_t mmap(addr_t addr,size_t len,int prot,int flags,int fd,int offset);
+    sysrt_t munmap(addr_t addr,size_t len);
+    sysrt_t mremap(addr_t oldaddr, size_t oldsize,size_t newsize, int flags, addr_t newaddr);
+    sysrt_t mprotect(addr_t addr,size_t len,int prot);
+    sysrt_t madvise(addr_t addr,size_t length,int advice);
+    sysrt_t mlock(addr_t addr, size_t len);
+    sysrt_t munlock(addr_t addr, size_t len);
+
     xlen_t getCwd(void) {
         auto &ctx = kHartObj().curtask->ctx;
         char *a_buf = (char*)ctx.x(10);
@@ -516,10 +529,6 @@ namespace syscall {
 
         return file->write(curproc->vmar.copyin((xlen_t)a_src, a_len));
     }
-    sysrt_t readv(int fd, xlen_t iov, int iovcnt);
-    sysrt_t writev(int fd, xlen_t iov, int iovcnt);
-    sysrt_t exit(int status);
-    sysrt_t exitGroup(int status);
     xlen_t sendFile() {
         auto &ctx=kHartObj().curtask->ctx;
         int a_outfd = ctx.x(10);
@@ -569,9 +578,6 @@ namespace syscall {
 
         return ret;
     }
-    extern sysrt_t pselect(int nfds, fd_set *readfds, fd_set *writefds,
-                   fd_set *exceptfds, const struct timespec *timeout,
-                   const sigset_t *sigmask);
     xlen_t readLinkAt() {
         auto &ctx=kHartObj().curtask->ctx;
         int a_basefd = ctx.x(10);
@@ -631,31 +637,10 @@ namespace syscall {
         // 现阶段实现为write-through缓存，自动同步
         return statcode::ok;
     }
-    int futex(int *uaddr, int futex_op, int val,
-                 const struct timespec *timeout,   /* or: uint32_t val2 */
-                 int *uaddr2, int val3);
-    __attribute__((naked))
-    void sleepSave(ptr_t gpr){
-        saveContextTo(gpr);
-        auto curtask=kHartObj().curtask;
-        curtask->kctx.pc=curtask->kctx.ra();
-        curtask->kctxs.push(curtask->kctx);
-        schedule();
-        _strapexit(); //TODO check
-    }
-    extern sysrt_t nanoSleep(const struct timespec *req, struct timespec *rem);
-    extern int clock_gettime (clockid_t __clock_id, struct timespec *__tp);
-    void yield(){
-        Log(debug,"yield!");
-        auto &cur=kHartObj().curtask;
-        sleepSave(cur->kctx.gpr);
-    }
     xlen_t sysyield(){
-        yield();
+        kernel::yield();
         return statcode::ok;
     }
-    extern sysrt_t kill(pid_t pid, int sig);
-    extern sysrt_t tkill(int tid, int sig);
     xlen_t sigAction() {
         auto &ctx = kHartObj().curtask->ctx;
         int a_sig = ctx.x(10);
@@ -697,7 +682,6 @@ namespace syscall {
         // should never be called
         return signal::sigReturn();
     }
-    extern sysrt_t times(struct ::tms *buf);
     xlen_t setGid() {
         auto &ctx = kHartObj().curtask->ctx;
         gid_t a_gid = ctx.x(10);
@@ -849,19 +833,10 @@ namespace syscall {
         
         return curproc->setRLimit(a_rsrc, rlim);
     }
-    extern sysrt_t getrusage(int who, struct ::rusage *usage);
-    extern int gettimeofday (struct timeval *__restrict __tv,
-			 struct timezone *__tz) __THROW __nonnull ((1));
     xlen_t getPid(){
         return kHartObj().curtask->getProcess()->pid();
     }
     xlen_t getPPid() { return kHartObj().curtask->getProcess()->parentProc()->pid(); }
-    int sleep(){
-        auto &cur=kHartObj().curtask;
-        cur->sleep();
-        yield();
-        return statcode::ok;
-    }
     xlen_t getUid() {
         return kHartObj().curtask->getProcess()->ruid();
     }
@@ -877,9 +852,7 @@ namespace syscall {
     xlen_t getTid() {
         return kHartObj().curtask->tid();
     }
-    extern long clone(unsigned long flags, void *stack,
-                      int *parent_tid, unsigned long tls,
-                      int *child_tid);
+    
     int waitpid(pid_t pid,xlen_t wstatus,int options){
         Log(debug,"waitpid(pid=%d,options=%d)",pid,options);
         auto curproc=kHartObj().curtask->getProcess();
@@ -896,7 +869,7 @@ namespace syscall {
                     }
                 }
                 if(target)break;
-                sleep();
+                kernel::sleep();;
                 childs=kGlobObjs->procMgr->getChilds(curproc->pid());
             }
         }
@@ -905,7 +878,7 @@ namespace syscall {
             if(!proc)panic("should not happen");
             while(proc->state!=sched::Zombie){
                 // proc add hook
-                sleep();
+                kernel::sleep();;
             }
             target=proc;
         }
@@ -934,19 +907,6 @@ namespace syscall {
         // 同sync()
         return statcode::ok;
     }
-    xlen_t brk(){
-        auto &ctx=kHartObj().curtask->ctx;
-        auto &curproc=*kHartObj().curtask->getProcess();
-        xlen_t addr=ctx.x(10);
-        return curproc.brk(addr);
-    }
-    sysrt_t mmap(addr_t addr,size_t len,int prot,int flags,int fd,int offset);
-    sysrt_t munmap(addr_t addr,size_t len);
-    sysrt_t mremap(addr_t oldaddr, size_t oldsize,size_t newsize, int flags, addr_t newaddr);
-    sysrt_t mprotect(addr_t addr,size_t len,int prot);
-    sysrt_t madvise(addr_t addr,size_t length,int advice);
-    sysrt_t mlock(addr_t addr, size_t len);
-    sysrt_t munlock(addr_t addr, size_t len);
     int execve_(shared_ptr<fs::File> file,vector<klib::ByteArray> &args,vector<klib::ByteArray> &envs){
         auto &ctx=kHartObj().curtask->ctx;
         /// @todo reset cur proc vmar, refer to man 2 execve for details
@@ -1075,7 +1035,6 @@ namespace syscall {
             return statcode::err;
         }
     }
-    extern sysrt_t setTidAddress(int *tidptr);
     inline sysrt_t membarrier(int cmd,int flags){
         return 0;
     }
@@ -1093,28 +1052,6 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::testmount,testMount);
         DECLSYSCALL(scnum::testfatinit,testFATInit);
         DECLSYSCALL(scnum::reboot,reboot1);
-        // syscallPtrs[SYS_fcntl] = sys_fcntl;
-        // syscallPtrs[SYS_ioctl] = sys_ioctl;
-        // syscallPtrs[SYS_flock] = sys_flock;
-        // syscallPtrs[SYS_mknodat] = sys_mknodat;
-        // syscallPtrs[SYS_symlinkat] = sys_symlinkat;
-        // syscallPtrs[SYS_renameat] = sys_renameat;
-        // syscallPtrs[SYS_pivot_root] = sys_pivot_root;
-        // syscallPtrs[SYS_nfsservctl] = sys_nfsservctl;
-        // syscallPtrs[SYS_statfs] = sys_statfs;
-        // syscallPtrs[SYS_truncate] = sys_truncate;
-        // syscallPtrs[SYS_ftruncate] = sys_ftruncate;
-        // syscallPtrs[SYS_fallocate] = sys_fallocate;
-        // syscallPtrs[SYS_faccessat] = sys_faccessat;
-        // syscallPtrs[SYS_fchdir] = sys_fchdir;
-        // syscallPtrs[SYS_chroot] = sys_chroot;
-        // syscallPtrs[SYS_fchmod] = sys_fchmod;
-        // syscallPtrs[SYS_fchmodat] = sys_fchmodat;
-        // syscallPtrs[SYS_fchownat] = sys_fchownat;
-        // syscallPtrs[SYS_fchown] = sys_fchown;
-        // syscallPtrs[SYS_vhangup] = sys_vhangup;
-        // syscallPtrs[SYS_quotactl] = sys_quotactl;
-        // syscallPtrs[SYS_lseek] = sys_lseek;
         DECLSYSCALL(scnum::getcwd,getCwd);
         DECLSYSCALL(scnum::dup,dup);
         DECLSYSCALL(scnum::dup3,dup3);
