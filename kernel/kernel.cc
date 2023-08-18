@@ -10,6 +10,7 @@
 #include "proc.hh"
 #include "virtio.hh"
 #include "fs.hh"
+#include "syscall.hh"
 #include "fs/ramfs.hh"
 #include "vm/vmo.hh"
 

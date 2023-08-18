@@ -1,3 +1,4 @@
+#include "syscall.hh"
 #include "common.h"
 #include "kernel.hh"
 #include "proc.hh"
@@ -37,7 +38,7 @@ namespace syscall
         return statcode::ok;
     }
     sysrt_t getRESgid(gid_t *a_rgid,gid_t *a_egid,gid_t *a_sgid) {
-        if(a_rgid==nullptr || a_egid==nullptr || a_sgid==nullptr) { return -EFAULT; }
+        if(a_rgid==nullptr || a_egid==nullptr || a_sgid==nullptr) { return Err(EFAULT); }
         
         auto curproc = kHartObj().curtask->getProcess();
         curproc->vmar.copyout((xlen_t)a_rgid, ByteArray((uint8*)&curproc->rgid(), sizeof(gid_t)));
@@ -47,7 +48,7 @@ namespace syscall
         return statcode::ok;
     }
     sysrt_t getRESuid(uid_t *a_ruid,uid_t *a_euid,uid_t *a_suid) {
-        if(a_ruid==nullptr || a_euid==nullptr || a_suid==nullptr) { return -EFAULT; }
+        if(a_ruid==nullptr || a_euid==nullptr || a_suid==nullptr) { return Err(EFAULT); }
         
         auto curproc = kHartObj().curtask->getProcess();
         curproc->vmar.copyout((xlen_t)a_ruid, ByteArray((uint8*)&curproc->ruid(), sizeof(uid_t)));
@@ -58,33 +59,33 @@ namespace syscall
     }
     sysrt_t setPGid(pid_t a_pid,pid_t a_pgid) {
         auto proc = (a_pid==0 ? kHartObj().curtask->getProcess() : (**kGlobObjs->procMgr)[a_pid]);
-        if(proc == nullptr) { return -ESRCH; }
+        if(proc == nullptr) { return Err(ESRCH); }
         proc->pgid() = (a_pgid==0 ? proc->pid() : a_pgid);
 
         return statcode::ok;
     }
     sysrt_t getPGid(pid_t a_pid) {
         auto proc = (a_pid==0 ? kHartObj().curtask->getProcess() : (**kGlobObjs->procMgr)[a_pid]);
-        if(proc == nullptr) { return -ESRCH; }
+        if(proc == nullptr) { return Err(ESRCH); }
 
         return proc->pgid();
     }
     sysrt_t getSid(pid_t a_pid) {
         auto proc = (a_pid==0 ? kHartObj().curtask->getProcess() : (**kGlobObjs->procMgr)[a_pid]);
-        if(proc == nullptr) { return -ESRCH; }
+        if(proc == nullptr) { return Err(ESRCH); }
 
         return proc->sid();
     }
     sysrt_t setSid() {
         auto curproc = kHartObj().curtask->getProcess();
-        if(curproc->pgid() == curproc->pid()) { return -EPERM; }
+        if(curproc->pgid() == curproc->pid()) { return Err(EPERM); }
         curproc->sid()  = curproc->pid();
         curproc->pgid() = curproc->pid();
 
         return curproc->sid();
     }
     sysrt_t getGroups(int a_size,gid_t *a_list) {
-        if(a_list == nullptr) { return -EFAULT; }
+        if(a_list == nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         if(a_size == 0) { return curproc->getGroupsNum(); }
@@ -94,7 +95,7 @@ namespace syscall
         return grps.len / sizeof(gid_t);
     }
     sysrt_t setGroups(int a_size,gid_t *a_list) {
-        if(a_list == nullptr) { return -EFAULT; }
+        if(a_list == nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray listarr = curproc->vmar.copyin((xlen_t)a_list, a_size * sizeof(gid_t));
@@ -105,7 +106,7 @@ namespace syscall
     }
 
     sysrt_t getRLimit(int a_rsrc,RLim *a_rlim) {
-        if(a_rlim==nullptr || a_rsrc<0 || a_rsrc>=RSrc::RLIMIT_NLIMITS) { return -EFAULT; }
+        if(a_rlim==nullptr || a_rsrc<0 || a_rsrc>=RSrc::RLIMIT_NLIMITS) { return Err(EFAULT); }
         
         auto curproc = kHartObj().curtask->getProcess();
         curproc->vmar.copyout((xlen_t)a_rlim, curproc->getRLimit(a_rsrc));
@@ -113,7 +114,7 @@ namespace syscall
         return 0;
     }
     sysrt_t setRLimit(int a_rsrc,RLim *a_rlim) {
-        if(a_rlim==nullptr || a_rsrc<0 || a_rsrc>=RSrc::RLIMIT_NLIMITS) { return -EFAULT; }
+        if(a_rlim==nullptr || a_rsrc<0 || a_rsrc>=RSrc::RLIMIT_NLIMITS) { return Err(EFAULT); }
         
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray rlimarr = curproc->vmar.copyin((xlen_t)a_rlim, sizeof(RLim));

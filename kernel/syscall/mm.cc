@@ -1,3 +1,4 @@
+#include "syscall.hh"
 #include "common.h"
 #include "vm.hh"
 #include "vm/vmo.hh"
@@ -57,7 +58,7 @@ namespace syscall
         using namespace vm;
         if(addr&vaddrOffsetMask){
             Log(warning,"munmap addr not aligned!");
-            return -EINVAL;
+            return Err(EINVAL);
         }
         auto region=vm::Segment{addr2pn(addr),addr2pn(addr+len-1)};
         curproc.vmar.unmap(region);
@@ -68,7 +69,7 @@ namespace syscall
         // check region validity
         if(addr&vaddrOffsetMask){
             Log(warning,"munmap addr not aligned!");
-            return -EINVAL;
+            return Err(EINVAL);
         }
         curproc->vmar.protect({addr2pn(addr),addr2pn(addr+len-1)},PageMapping::prot2perm((PageMapping::Prot)prot));
         return 0;
@@ -81,12 +82,12 @@ namespace syscall
         auto curproc=kHartObj().curtask->getProcess();
         // check region
         if(oldaddr&vaddrOffsetMask){
-            return -EINVAL;
+            return Err(EINVAL);
         }
         auto oldpages=bytes2pages(oldsize),newpages=bytes2pages(newsize);
         // St.stub!
         if(newpages>oldpages)
-            return -ENOMEM;
+            return Err(ENOMEM);
         // try remap in place
         auto oldvpn=addr2pn(oldaddr);
         auto shrink=Segment{oldvpn+newpages,oldvpn+oldpages-1};

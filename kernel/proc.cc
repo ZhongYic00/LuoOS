@@ -234,7 +234,7 @@ int Process::setRLimit(int a_rsrc, const RLim *a_rlim) {
 Task::~Task(){}
 namespace syscall{
     int futex(int *uaddr, int futex_op, int val,
-                 const struct timespec *timeout,   /* or: uint32_t val2 */
+                 eastl::optional<eastl::chrono::nanoseconds> timeout,   /* or: uint32_t val2 */
                  int *uaddr2, int val3);
 }
 void Task::exit(int status){
@@ -246,7 +246,7 @@ void Task::exit(int status){
     curproc->tasks.erase(this);
     if(attrs.clearChildTid){
         curproc->vmar[(addr_t)attrs.clearChildTid]<<0;
-        syscall::futex(attrs.clearChildTid,FUTEX_WAKE,1,nullptr,nullptr,0);
+        syscall::futex(attrs.clearChildTid,FUTEX_WAKE,1,{},nullptr,0);
     }
     if(curproc->tasks.empty())
         curproc->exit(status);

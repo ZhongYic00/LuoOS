@@ -1,3 +1,4 @@
+#include "syscall.hh"
 #include "common.h"
 #include "kernel.hh"
 #include "ipc.hh"
@@ -20,14 +21,14 @@ namespace syscall
         if(pid < -1) { pid = -pid; }  // @todo: 进程组信号管理
         if(pid > 0) {
             auto proc = (**kGlobObjs->procMgr)[pid];
-            if(proc == nullptr) { return -ESRCH; }
+            if(proc == nullptr) { return Err(ESRCH); }
             if(sig == 0) { return 0; }
             sigSend(*proc, sig);
             return statcode::ok;
         }
         if(pid == -1) {
             if(sig == 0) { return statcode::ok; }
-            else if(sig==SIGKILL || sig==SIGSTOP) { return -EPERM; }
+            else if(sig==SIGKILL || sig==SIGSTOP) { return Err(EPERM); }
             bool success = false;
             auto procs = (**kGlobObjs->procMgr);
             int procsnum = procs.getObjNum();

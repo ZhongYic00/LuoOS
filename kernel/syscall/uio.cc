@@ -2,6 +2,7 @@
 #include <asm/errno.h>
 #include <sys/select.h>
 #include <asm/poll.h>
+#include "syscall.hh"
 #include "common.h"
 #include "kernel.hh"
 #include "time.hh"
@@ -12,7 +13,7 @@ namespace syscall
     sysrt_t readv(int fd, xlen_t iov, int iovcnt){
         auto curproc=kHartObj().curtask->getProcess();
         auto file = kHartObj().curtask->getProcess()->ofile(fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
 
         auto ustream=curproc->vmar[iov];
         vector<Slice> memvecs;
@@ -26,7 +27,7 @@ namespace syscall
     sysrt_t writev(int fd, xlen_t iov, int iovcnt){
         auto curproc=kHartObj().curtask->getProcess();
         auto file=curproc->ofile(fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
 
         auto ustream=curproc->vmar[iov];
         vector<Slice> memvecs;
@@ -77,7 +78,7 @@ namespace syscall
     }
     sysrt_t pPoll(struct pollfd *a_fds, int nfds,
                const struct timespec *tmo_p, const sigset_t *sigmask,size_t sigsetsize){
-        if(a_fds==nullptr || nfds<0 || sigsetsize!=sizeof(sigset_t)) { return -EINVAL; }
+        if(a_fds==nullptr || nfds<0 || sigsetsize!=sizeof(sigset_t)) { return Err(EINVAL); }
         
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray fdsarr = curproc->vmar.copyin((xlen_t)a_fds, nfds*sizeof(pollfd));

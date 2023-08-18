@@ -1,3 +1,4 @@
+#include "syscall.hh"
 #include "kernel.hh"
 #include "proc.hh"
 #include <linux/sched.h>
@@ -29,16 +30,16 @@ namespace syscall
     sysrt_t dup(int a_fd) {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
 
         return curproc->fdAlloc(file);
     }
     sysrt_t dup3(int a_fd,int a_newfd,int a_flags) {
-        if(a_fd == a_newfd) { return -EINVAL; }
+        if(a_fd == a_newfd) { return Err(EINVAL); }
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
 
         int newfd = curproc->fdAlloc(file, a_newfd, true);
         if(newfd >= 0) {
@@ -50,7 +51,7 @@ namespace syscall
     sysrt_t fCntl(int a_fd,int a_cmd,uint64_t a_arg) {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
         switch(a_cmd) {
             case F_DUPFD: { return curproc->fdAlloc(file, a_arg); }
             // NOTE: file descripter flags and file status flags are not the same
@@ -84,11 +85,11 @@ namespace syscall
             }
             default: {
                 Log(error, "fcntl: unimplemented cmd %d\n", a_cmd);
-                return -EINVAL;
+                return Err(EINVAL);
             }
         }
 
-        return -EINVAL;  // should never reach here
+        return Err(EINVAL);  // should never reach here
     }
     sysrt_t ioCtl(int a_fd,uint64_t a_request,addr_t a_arg) {
         auto curproc = kHartObj().curtask->getProcess();
@@ -97,13 +98,13 @@ namespace syscall
         return rt;
     }
     sysrt_t mkDirAt(int a_basefd,const char *a_path,mode_t a_mode) {
-        if(a_path == nullptr) { return -EFAULT; }
+        if(a_path == nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
         shared_ptr<File> base = curproc->ofile(a_basefd);
-        if(base == nullptr) { return -EBADF; }
+        if(base == nullptr) { return Err(EBADF); }
         shared_ptr<DEntry> entry = Path(path, base).pathCreate(T_DIR, 0);
         if(entry == nullptr) {
             printf("can't create %s\n", path);
@@ -113,13 +114,13 @@ namespace syscall
         return statcode::ok;
     }
     sysrt_t unlinkAt(int a_basefd,const char *a_path,int a_flags) {
-        if(a_path == nullptr) { return -EFAULT; }
+        if(a_path == nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
         shared_ptr<File> base = curproc->ofile(a_basefd);
-        if(base == nullptr) { return -EBADF; }
+        if(base == nullptr) { return Err(EBADF); }
 
         return Path(path, base).pathHardUnlink();
     }
@@ -130,12 +131,12 @@ namespace syscall
         const char *target = (const char*)targetarr.buff;
         const char *link = (const char*)linkarr.buff;
         shared_ptr<File> base = curproc->ofile(a_basefd);
-        if(base == nullptr) { return -EBADF; }
+        if(base == nullptr) { return Err(EBADF); }
 
         return Path(link, base).pathSymLink(target);
     }
     sysrt_t linkAt(int a_oldbasefd,const char *a_oldpath,int a_newbasefd,const char *a_newpath,int a_flags) {
-        if(a_oldpath==nullptr || a_newpath==nullptr) { return -EFAULT; }
+        if(a_oldpath==nullptr || a_newpath==nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray oldpatharr = curproc->vmar.copyinstr((xlen_t)a_oldpath, FAT32_MAX_PATH);
@@ -144,12 +145,12 @@ namespace syscall
         const char *newpath = (const char*)newpatharr.buff;
         shared_ptr<File> oldbase = curproc->ofile(a_oldbasefd);
         shared_ptr<File> newbase = curproc->ofile(a_newbasefd);
-        if(oldbase==nullptr || newbase==nullptr) { return -EBADF; }
+        if(oldbase==nullptr || newbase==nullptr) { return Err(EBADF); }
 
         return Path(oldpath, oldbase).pathHardLink(Path(newpath, newbase));
     }
     sysrt_t umount2(const char *a_devpath,int a_flags) {
-        if(a_devpath == nullptr) { return -EFAULT; }
+        if(a_devpath == nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray devpatharr = curproc->vmar.copyinstr((xlen_t)a_devpath, FAT32_MAX_PATH);
@@ -157,7 +158,7 @@ namespace syscall
         return Path(devpath).pathUnmount();
     }
     sysrt_t mount(const char *a_devpath,const char *a_mountpath, const char *a_fstype, uint64_t flags, const void *a_data) {
-        if(a_devpath==nullptr || a_mountpath==nullptr || a_fstype==nullptr) { return -EFAULT; }
+        if(a_devpath==nullptr || a_mountpath==nullptr || a_fstype==nullptr) { return Err(EFAULT); }
         // 错误输出可以合并
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray devpatharr = curproc->vmar.copyinstr((xlen_t)a_devpath, FAT32_MAX_PATH);
@@ -181,26 +182,26 @@ namespace syscall
         return statcode::ok;
     }
     sysrt_t fAccessAt(int a_basefd,const char *a_path,int a_mode,int a_flags) {
-        if(a_path == nullptr) { return -EFAULT; }
+        if(a_path == nullptr) { return Err(EFAULT); }
 
         int flags = 0;
         if ((a_mode & (R_OK | X_OK)) && (a_mode & W_OK)) { flags = O_RDWR; }
         else if (a_mode & W_OK) { flags = O_WRONLY; }
         else if (a_mode & (R_OK | X_OK)) { flags = O_RDONLY; }
-        else { return -EINVAL; }
+        else { return Err(EINVAL); }
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         const char *path = (const char*)patharr.buff;
         shared_ptr<File> base = curproc->ofile(a_basefd);
-        if(base == nullptr) { return -EBADF; }
+        if(base == nullptr) { return Err(EBADF); }
 
         int fd = Path(path, base).pathOpen(flags | a_flags);
-        if(fd<0 && fd!=-EISDIR) { return fd; }  // @todo: 存疑
+        if(fd<0 && fd!=Err(EISDIR)) { return fd; }  // @todo: 存疑
         else if(fd >= 0) { curproc->files[fd].reset(); }
         return 0;
     }
     sysrt_t chDir(const char *a_path) {
-        if(a_path == nullptr) { return -EFAULT; }
+        if(a_path == nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
@@ -217,8 +218,8 @@ namespace syscall
     sysrt_t fChDir(int a_fd) {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> nwd = curproc->ofile(a_fd);
-        if(nwd == nullptr) { return -EBADF; }
-        if(!S_ISDIR(nwd->obj.getEntry()->getINode()->rMode())) { return -ENOTDIR; }
+        if(nwd == nullptr) { return Err(EBADF); }
+        if(!S_ISDIR(nwd->obj.getEntry()->getINode()->rMode())) { return Err(ENOTDIR); }
         curproc->cwd = nwd->obj.getEntry();
         curproc->files[FdCwd] = nwd;
 
@@ -227,7 +228,7 @@ namespace syscall
     sysrt_t fChMod(int a_fd,mode_t a_mode) {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
 
         return file->chMod(a_mode);
     }
@@ -236,7 +237,7 @@ namespace syscall
         ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_FILENAME);
         const char *path = (const char*)patharr.buff;
         shared_ptr<File> base = curproc->ofile(a_basefd);
-        if(base == nullptr) { return -EBADF; }
+        if(base == nullptr) { return Err(EBADF); }
 
         int fd = Path(path, base).pathOpen(a_flags, S_IFREG);
 
@@ -250,7 +251,7 @@ namespace syscall
         ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_FILENAME);
         const char *path = (const char*)patharr.buff;
         shared_ptr<File> base = curproc->ofile(a_basefd);
-        if(base == nullptr) { return -EBADF; }
+        if(base == nullptr) { return Err(EBADF); }
 
         int fd = Path(path, base).pathOpen(a_flags, S_IFREG);
 
@@ -262,24 +263,24 @@ namespace syscall
     sysrt_t fChOwn(int a_fd,uid_t a_uid,gid_t a_gid) {
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
 
         return file->chOwn(a_uid, a_gid);
     }
     sysrt_t openAt(int a_basefd,const char *a_path,int a_flags,mode_t a_mode) {
-        if(a_path==nullptr) { return -EFAULT; }
+        if(a_path==nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         char *path = (char*)patharr.buff;
         shared_ptr<File> base = curproc->ofile(a_basefd);
-        if(base == nullptr) { return -EBADF; }
+        if(base == nullptr) { return Err(EBADF); }
 
         return Path(path, base).pathOpen(a_flags, a_mode);
     }
     sysrt_t close(int a_fd) {
         auto curproc = kHartObj().curtask->getProcess();
-        if(curproc->ofile(a_fd) == nullptr) { return -EBADF; } // 不能关闭一个已关闭的文件
+        if(curproc->ofile(a_fd) == nullptr) { return Err(EBADF); } // 不能关闭一个已关闭的文件
         // 不能用新的局部变量代替，局部变量和files[a_fd]是两个不同的SharedPtr
         curproc->files[a_fd].reset();
 
@@ -296,12 +297,12 @@ namespace syscall
         return statcode::ok;
     }
     sysrt_t getDents64(int a_dirfd,DStat *a_buf,size_t a_len) {
-        if(a_buf==nullptr) { return -EFAULT; }
+        if(a_buf==nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> dir = curproc->ofile(a_dirfd);
-        if(dir == nullptr) { return -EBADF; }
-        if(dir->obj.rType() != fs::FileType::entry) { return -EINVAL; }
+        if(dir == nullptr) { return Err(EBADF); }
+        if(dir->obj.rType() != fs::FileType::entry) { return Err(EINVAL); }
         ArrayBuff<DStat> buf(a_len / sizeof(DStat));
         int len = dir->readDir(buf);
         if(len > 0) { curproc->vmar.copyout((xlen_t)a_buf, ByteArray((uint8*)buf.buff, len)); }
@@ -312,13 +313,13 @@ namespace syscall
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(fd);
-        if(!file) { return -EBADF; }
+        if(!file) { return Err(EBADF); }
 
         return file->lSeek(offset, whence);
     }
     sysrt_t read(int fd,addr_t uva,size_t len){
         auto file = kHartObj().curtask->getProcess()->ofile(fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
         auto buf_=new uint8_t[len];
         ByteArray buf(buf_,len);
         auto rdbytes=file->read(buf);
@@ -327,11 +328,11 @@ namespace syscall
         return rdbytes;
     }
     sysrt_t write(int a_fd,addr_t a_src,size_t a_len){
-        if(!a_src) { return -EFAULT; }
+        if(!a_src) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
 
         return file->write(curproc->vmar.copyin(a_src, a_len));
     }
@@ -339,7 +340,7 @@ namespace syscall
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> outfile = curproc->ofile(a_outfd);
         shared_ptr<File> infile = curproc->ofile(a_infd);
-        if(outfile==nullptr || infile==nullptr) { return -EBADF; }
+        if(outfile==nullptr || infile==nullptr) { return Err(EBADF); }
         off_t *offset = nullptr;
         ssize_t ret = statcode::err;
         if(a_offset != nullptr) {
@@ -368,27 +369,27 @@ namespace syscall
         return ret;
     }
     sysrt_t fStatAt(int a_basefd,const char *a_path,KStat *a_kst,int a_flags) {
-        if(a_kst==nullptr || a_path==nullptr) { return -EFAULT; }
+        if(a_kst==nullptr || a_path==nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         ByteArray patharr = curproc->vmar.copyinstr((xlen_t)a_path, FAT32_MAX_PATH);
         const char *path = (const char*)patharr.buff;
         shared_ptr<File> base = curproc->ofile(a_basefd);
-        if(base == nullptr) { return -EBADF; }
+        if(base == nullptr) { return Err(EBADF); }
 
         shared_ptr<DEntry> entry = Path(path, base).pathSearch();
-        if(entry == nullptr) { return -ENOENT; }
+        if(entry == nullptr) { return Err(ENOENT); }
         KStat kst = entry;
         curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&kst, sizeof(kst)));
 
         return statcode::ok;
     }
     sysrt_t fStat(int a_fd,KStat *a_kst) {
-        if(a_kst==nullptr) { return -EFAULT; }
+        if(a_kst==nullptr) { return Err(EFAULT); }
 
         auto curproc = kHartObj().curtask->getProcess();
         shared_ptr<File> file = curproc->ofile(a_fd);
-        if(file == nullptr) { return -EBADF; }
+        if(file == nullptr) { return Err(EBADF); }
         curproc->vmar.copyout((xlen_t)a_kst, ByteArray((uint8*)&file->obj.kst(), sizeof(KStat)));
         // @bug 用户态读到的数据混乱
         return statcode::ok;

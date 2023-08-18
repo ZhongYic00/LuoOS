@@ -1,3 +1,4 @@
+#include "syscall.hh"
 #include "kernel.hh"
 #include "sched.hh"
 #include "fs.hh"
@@ -17,10 +18,12 @@ using nonstd::expected;
 
 #define moduleLevel LogLevel::info
 
-syscall_t syscallPtrs[sys::syscalls::nSyscalls];
+
 extern void _strapexit();
 extern char _uimg_start;
 namespace syscall {
+    syscall_t syscallPtrs[sys::syscalls::nSyscalls];
+
     using sys::statcode;
     using kernel::UtSName;
     using fs::File;
@@ -40,32 +43,12 @@ namespace syscall {
     // using signal::sigReturn;
     using resource::RLim;
     using resource::RSrc;
-    xlen_t none() { return 0; }
-    xlen_t testExit() {
-        static bool b = false;
-        b =! b;
-        if(b) { return statcode::ok; }
-        return statcode::err;
-    }
-    xlen_t testBio() {
-        for(int i=0;i<300;i++){
-            auto buf=bcache[{0,i%260}];
-        }
-        return statcode::ok;
-    }
-    xlen_t testIdle() {
-        kernel::sleep();
-        return statcode::ok;
-    }
-    xlen_t testMount() {
-        return statcode::ok;
-    }
     sysrt_t testFATInit();
 
     sysrt_t exit(int status);
     sysrt_t exitGroup(int status);
 
-    int futex(int *uaddr, int futex_op, int val,
+    sysrt_t futex(int *uaddr, int futex_op, int val,
                  const struct timespec *timeout,   /* or: uint32_t val2 */
                  int *uaddr2, int val3);
     sysrt_t nanoSleep(const struct timespec *req, struct timespec *rem);
@@ -151,7 +134,7 @@ namespace syscall {
     sysrt_t fStat(int a_basefd,KStat *a_kst);
     sysrt_t sync();
 
-    xlen_t sysyield(){
+    sysrt_t sysyield(){
         kernel::yield();
         return statcode::ok;
     }
@@ -191,13 +174,6 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
     void init(){
         using scnum=sys::syscalls;
         for(int i=0;i<scnum::nSyscalls;i++)syscallHelper[i]="";
-        DECLSYSCALL(scnum::none,none);
-        DECLSYSCALL(scnum::testexit,testExit);
-        DECLSYSCALL(scnum::testyield,sysyield);
-        DECLSYSCALL(scnum::testwrite,write);
-        DECLSYSCALL(scnum::testbio,testBio);
-        DECLSYSCALL(scnum::testidle,testIdle);
-        DECLSYSCALL(scnum::testmount,testMount);
         DECLSYSCALL(scnum::testfatinit,testFATInit);
         DECLSYSCALL(scnum::reboot,reboot1);
         DECLSYSCALL(scnum::getcwd,getCwd);

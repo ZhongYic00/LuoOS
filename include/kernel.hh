@@ -11,9 +11,6 @@
 #include "sys.hh"
 
 extern "C" void start_kernel(int hartid);
-namespace syscall{
-    void init();
-}
 namespace timeservice{ class Timer; }
 namespace kernel {
     constexpr int nameLen=65;

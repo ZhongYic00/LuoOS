@@ -43,6 +43,7 @@ void uecallHandler(){
     ctx.pc+=4;
     Log(trace,"uecall [%d]",ecallId);
     using namespace sys;
+    using namespace syscall;
     cur->lastpriv=proc::Task::Priv::Kernel;
     if(ecallId<nSyscalls){
         Log(syscallPtrs[ecallId]?info:error,"proc called %s[%d]",syscall::syscallHelper[ecallId],ecallId);
@@ -51,9 +52,15 @@ void uecallHandler(){
         csrWrite(sscratch,cur->kctx.gpr);
         // csrSet(sstatus,BIT(csr::mstatus::sie));
         if(syscallPtrs[ecallId])
-            rtval=reinterpret_cast<syscall_t>(syscallPtrs[ecallId])(ctx.x(10),ctx.x(11),ctx.x(12),ctx.x(13),ctx.x(14),ctx.x(15));
+            // rtval=reinterpret_cast<syscall_t>(syscallPtrs[ecallId])(ctx.x(10),ctx.x(11),ctx.x(12),ctx.x(13),ctx.x(14),ctx.x(15));
+            if(auto rt=reinterpret_cast<syscall_t>(syscallPtrs[ecallId])(ctx.x(10),ctx.x(11),ctx.x(12),ctx.x(13),ctx.x(14),ctx.x(15))){
+                Log(info,"syscall {%d} success");
+                rtval=rt.value();
+            } else {
+                Log(warning,"syscall {%d} has encountered error{%d}",rt.error());
+                rtval=-rt.error();
+            }
         // csrClear(sstatus,BIT(csr::mstatus::sie));
-        Log(debug,"syscall %d %s",ecallId,rtval!=statcode::err?"success":"failed");
     } else {
         Log(error,"syscall num{%d} exceeds valid range",ecallId);
         rtval=1;

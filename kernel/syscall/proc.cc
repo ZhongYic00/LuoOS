@@ -1,3 +1,4 @@
+#include "syscall.hh"
 #include "common.h"
 #include "kernel.hh"
 #include "time.hh"
@@ -8,7 +9,7 @@
 namespace syscall
 {
     using namespace sys;
-    long clone(unsigned long flags, void *stack,
+    sysrt_t clone(unsigned long flags, void *stack,
                       int *parent_tid, unsigned long tls,
                       int *child_tid){
         auto &cur=kHartObj().curtask;
@@ -173,7 +174,7 @@ namespace syscall
             }
             default:
                 Log(error,"who is invalid");
-                return -EINVAL;
+                return Err(EINVAL);
         }
     }
     sysrt_t exitGroup(int status){
