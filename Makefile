@@ -22,7 +22,7 @@ OS: $(OS);
 all:  OS #SBI
 	cp $(OS) kernel-qemu
 
-ksrcs = kernel/start.S\
+ksrcs = $(shell find kernel/ -name "*.S") \
 	$(shell find kernel/ -name "*.cc")
 utilsrcs = $(shell find utils/ -name "*.cc")
 utilobjs = $(patsubst %.cc,$(objdir)/%.o,$(utilsrcs))
@@ -57,7 +57,7 @@ uimg = $(objdir)/user/uimg.o
 $(OS): $(kobjs) $(uimg)
 	$(info ksrcs=$(ksrcs), kobjs=$(kobjs))
 	@echo + CC $<
-	$(CC) $(CFLAGS) -T kernel/os.ld -o $(OS) $^
+	$(CC) $(KCFLAGS) -T kernel/os.ld -o $(OS) $^
 
 usersrcs = $(shell find user/ -name "*.cc")
 # userprogs := $(patsubst %.cc,$(objdir)/%.elf,$(usersrcs))

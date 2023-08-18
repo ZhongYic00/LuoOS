@@ -6,14 +6,15 @@
 #include "virtio.hh"
 #include "ipc.hh"
 #include "time.hh"
+#include "syscall.hh"
 #include <EASTL/chrono.h>
 
-#define moduleLevel LogLevel::warning
+#define moduleLevel LogLevel::info
 
 static hook_t hooks[]={schedule};
 
 // extern void nextTimeout();
-void ktrapwrapper();
+extern "C" void ktrapwrapper();
 void strapwrapper();
 void timerInterruptHandler(){
     xlen_t time;
@@ -32,9 +33,8 @@ void timerInterruptHandler(){
     csrRead(sstatus,sstatus);
     if(cur->lastpriv!=proc::Task::Priv::AlwaysKernel&&sstatus&BIT(csr::mstatus::spp))panic("should not happen!");
     kHartObj().timer->next();
+    Log(info,"after timer.next,curtask=%d",kHartObj().curtask->tid());
 }
-extern syscall_t syscallPtrs[];
-namespace syscall{ extern const char* syscallHelper[]; }
 void uecallHandler(){
     auto cur=kHartObj().curtask;
     auto &ctx=cur->ctx;
@@ -251,9 +251,17 @@ __attribute__((naked)) void strapwrapper(){
     straphandler();
     _strapexit();
 }
-__attribute__((naked))
-void ktrapwrapper(){
-    _strapenter<false>();
+extern "C"
+void ktrapwrapper1(){
+    auto curtask=kHartObj().curtask;
+    csrRead(sepc,curtask->kctx.pc);
+    curtask->kctxs.push(curtask->kctx);
+    // csrWrite(sscratch,curtask->kctx.gpr);
     straphandler();
-    _strapexit();
+    csrSet(sstatus,1l<<csr::mstatus::spp);
+    // csrWrite(stvec,ktrapwrapper);
+    // csrWrite(sscratch,cur->kctx.gpr);
+    if(curtask->lastpriv==proc::Task::Priv::AlwaysKernel)csrSet(sstatus,BIT(csr::mstatus::spie))
+    else csrClear(sstatus,BIT(csr::mstatus::spie))
+    csrWrite(sepc,curtask->kctx.pc);
 }
