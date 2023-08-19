@@ -1,3 +1,6 @@
+#ifndef SYS_HH__
+#define SYS_HH__
+
 #include "rvcsr.hh"
 
 namespace sys
@@ -132,3 +135,4 @@ namespace sys
     }
     
 } // namespace sy
+#endif

@@ -23,10 +23,9 @@ namespace timeservice
             } else {
                 if(mtp<now-tole)
                     Log(error,"can't catch up");
-                events.top().second();
-                // events.begin()->second();
-                // events.erase(events.begin());
+                auto func=events.top().second;
                 events.pop();
+                func();
             }
         }
         assert(!events.empty());

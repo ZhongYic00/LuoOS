@@ -86,6 +86,7 @@ void VMAR::copyout(xlen_t addr,const ByteArray &buff) {
     // @todo 检查拷贝后是否会越界（addr+buff.len后超出用户进程大小）
     for(xlen_t va_begin = addr, src_begin = (xlen_t)buff.buff, len = buff.len, cpylen = 0; len > 0; va_begin += cpylen, src_begin += cpylen, len -= cpylen) {
         auto mapping = find(va_begin);
+        assert(mapping!=mappings.end());
         VMOMapper mapper(mapping->vmo);
         xlen_t off = va_begin - pn2addr(mapping->vpn) + pn2addr(mapping->offset);
         xlen_t pa_begin = mapper.start() + off;

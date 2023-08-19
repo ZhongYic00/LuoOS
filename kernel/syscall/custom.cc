@@ -1,3 +1,4 @@
+#include "syscall.hh"
 #include "common.h"
 #include "kernel.hh"
 #include "proc.hh"

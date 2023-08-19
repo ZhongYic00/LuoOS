@@ -10,6 +10,7 @@
 #include "proc.hh"
 #include "virtio.hh"
 #include "fs.hh"
+#include "syscall.hh"
 #include "fs/ramfs.hh"
 #include "vm/vmo.hh"
 
@@ -160,6 +161,7 @@ static void rootfsInit(){
     // auto root=rootfs->getRoot();
 }
 void idle(){
+    csrSet(sstatus,BIT(csr::mstatus::sie));
     while(true){
         Log(debug,"kidle...");
         /// @bug after interrupt, sepc not +4, always return to instr wfi ?
@@ -170,7 +172,7 @@ std::atomic<uint32_t> started;
 mutex::spinlock spin;
 extern void schedule();
 extern void program0();
-extern void strapwrapper();
+extern "C" void ktrapwrapper();
 extern void _strapexit();
 
 FORCEDINLINE
@@ -196,7 +198,7 @@ void init(int hartid){
     "                                                                   \n"\
     );
         sbi_init();
-        csrWrite(stvec,strapwrapper);
+        csrWrite(stvec,ktrapwrapper);
         puts=IO::_blockingputs;
         isinit=true;
 
@@ -234,7 +236,7 @@ void init(int hartid){
         sbi_remote_sfence_vma((cpumask*)&mask,0x0,0x84000000);
         // for(volatile int i=10000000;i;i--);
     } else {
-        csrWrite(stvec,strapwrapper);
+        csrWrite(stvec,ktrapwrapper);
         csrSet(sstatus,BIT(csr::mstatus::sum));
         // csrSet(sstatus,BIT(csr::mstatus::sie));
         csrSet(sie,BIT(csr::mie::ssie)|BIT(csr::mie::seie));
@@ -253,14 +255,14 @@ void init(int hartid){
         std::atomic_thread_fence(std::memory_order_acquire);
         auto kidle=proc::createKProcess(sched::maxPrior);
         kidle->defaultTask()->kctx.pc=(xlen_t)idle;
-        kidle->defaultTask()->kctxs.push(kidle->defaultTask()->kctx);
-        schedule();
+        // kidle->defaultTask()->kctxs.push(kidle->defaultTask()->kctx);
         Log(info,"first schedule on hart%d",readHartId());
         kLogger.outputLevel=warning;
-        enableLevel=warning;
-        _strapexit();
+        // enableLevel=warning;
+        kHartObj().curtask=kidle->defaultTask();
+        // schedule();
     }
-    halt();
+    idle();
 }
 
 extern "C" __attribute__((naked))
@@ -268,4 +270,23 @@ void start_kernel(int hartid){
     regWrite(tp,hartid);
     regWrite(sp,irqStackOf(hartid));
     init(hartid);
+}
+
+namespace kernel{
+    void sleepSave(){
+        // save callee-saved registers
+        // emit soft-irq to ktrapwrapper
+        // return from ktrapwrapper
+        // restore callee-saved registers
+    }
+    void yield(){
+        Log(debug,"yield!");
+        auto &cur=kHartObj().curtask;
+        schedule();
+    }
+    void sleep(){
+        auto &cur=kHartObj().curtask;
+        cur->sleep();
+        yield();
+    }
 }

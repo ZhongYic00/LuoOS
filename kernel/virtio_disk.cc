@@ -207,7 +207,7 @@ virtio_disk_rw(bio::BlockBuf &buf, int write)
       break;
     }
     waiting.push_back(kHartObj().curtask);
-    syscall::sleep();
+    kernel::sleep();
   }
   
   // format the three descriptors.
