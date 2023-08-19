@@ -1,17 +1,24 @@
+define loadsymbol
+	add-symbol-file obj/testsuit/sdcard/$arg0
+end
+define logoutput
+    set enableLevel=$arg0
+    set kLogger.outputLevel=$arg0
+end
+
+define gotoUmode
+	b _strapexit:umodeEntry
+	c
+	delete breakpoints
+	advance *$sepc
+end
+
+directory obj/testsuit/busybox
+directory obj/testsuit/musl/riscv-musl
+directory obj/testsuit/libc-test/src
+
 set disassemble-next-line off
 layout split
 target remote : 1234
 
 b panic
-b ipc.cc:253
-c
-b trap.cc:223
-c
-set enableLevel=1
-set kLogger.outputLevel=1
-delete breakpoints
-add-symbol-file obj/testsuit/sdcard/entry-dynamic.exe
-add-symbol-file obj/testsuit/sdcard/libc.so 0x70014250
-directory obj/testsuit/libc-test
-directory obj/testsuit/musl/riscv-musl
-b *0x7005f8bc
