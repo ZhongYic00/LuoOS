@@ -7,15 +7,32 @@
 
 using namespace sched;
 
+extern void _strapexit();
+// FORCEDINLINE
+// extern "C" void contextSave();
+// FORCEDINLINE
+// extern "C" void contextRestore();
 void schedule(){
     Log(info,"scheduling");
-
+    auto prvtask=kHartObj().curtask;
     auto curtask=static_cast<proc::Task*>(kGlobObjs->scheduler->next(kHartObj().curtask));
-    Log(info,"current task=%d proc=[%d]%s",curtask->id,curtask->getProcess()->pid(),curtask->getProcess()->name.c_str());
+    Log(info,"prevtask=%x current task=%d proc=[%d]%s",prvtask,curtask->id,curtask->getProcess()->pid(),curtask->getProcess()->name.c_str());
     curtask->switchTo();
     // clock tick
     curtask->getProcess()->stats.ti.tms_utime++;
     assert(kHartObjs[0].curtask!=kHartObjs[1].curtask);
+    // save context
+    // if(prvtask){
+    saveContextTo(prvtask->kctx.gpr);
+    // Log(info,"prvtask=%s",prvtask->toString(true).c_str());
+    // }
+    if(curtask->lastpriv==proc::Task::Priv::User)
+        _strapexit();
+    else {
+        // restore context
+        Log(debug,"restore kctx");
+        restoreContextFrom(curtask->kctx.gpr);
+    }
 }
 Scheduable* sched::Scheduler::next(Scheduable* prev){
     if(prev)add(prev);

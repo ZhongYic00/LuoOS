@@ -8,7 +8,7 @@
 namespace syscall
 {
     using sys::statcode;
-    int clock_gettime (clockid_t __clock_id, struct timespec *__tp){
+    sysrt_t clock_gettime (clockid_t __clock_id, struct timespec *__tp){
         /// @note @bug clockid is ignored
         if(__tp){
             auto curproc = kHartObj().curtask->getProcess();
@@ -17,7 +17,7 @@ namespace syscall
         }
         return statcode::ok;
     }
-    int gettimeofday (struct timeval *tv,struct timezone *tz){
+    sysrt_t gettimeofday (struct timeval *tv,struct timezone *tz){
         auto curproc = kHartObj().curtask->getProcess();
         if(tv){
             curproc->vmar[(xlen_t)tv]<<timeservice::duration2timespec(eastl::chrono::system_clock::now().time_since_epoch());
