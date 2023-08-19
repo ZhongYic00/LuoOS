@@ -10,6 +10,7 @@
 #define saveReg(reg,dst,off) asm("sd "#reg","#off"(%0)"::"r"(dst))
 // #define saveContextTo(gpr) {saveReg(x1,gpr,0);saveReg(x2,gpr,8);saveReg(x3,gpr,16);saveReg(x4,gpr,24);saveReg(x5,gpr,32);saveReg(x6,gpr,40);saveReg(x7,gpr,48);saveReg(x8,gpr,56);saveReg(x9,gpr,64);saveReg(x10,gpr,72);saveReg(x11,gpr,80);saveReg(x12,gpr,88);saveReg(x13,gpr,96);saveReg(x14,gpr,104);saveReg(x15,gpr,112);saveReg(x16,gpr,120);saveReg(x17,gpr,128);saveReg(x18,gpr,136);saveReg(x19,gpr,144);saveReg(x20,gpr,152);saveReg(x21,gpr,160);saveReg(x22,gpr,168);saveReg(x23,gpr,176);saveReg(x24,gpr,184);saveReg(x25,gpr,192);saveReg(x26,gpr,200);saveReg(x27,gpr,208);saveReg(x28,gpr,216);saveReg(x29,gpr,224);saveReg(x30,gpr,232);}
 #define saveContextTo(gpr) {regWrite(t6,gpr); saveContext();}
+#define restoreContextFrom(gpr) {regWrite(t6,gpr); restoreContext();}
 
 #ifdef GUEST
 

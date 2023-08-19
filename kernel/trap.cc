@@ -6,14 +6,15 @@
 #include "virtio.hh"
 #include "ipc.hh"
 #include "time.hh"
+#include "syscall.hh"
 #include <EASTL/chrono.h>
 
-#define moduleLevel LogLevel::warning
+#define moduleLevel LogLevel::info
 
 static hook_t hooks[]={schedule};
 
 // extern void nextTimeout();
-void ktrapwrapper();
+extern "C" void ktrapwrapper();
 void strapwrapper();
 void timerInterruptHandler(){
     xlen_t time;
@@ -32,9 +33,8 @@ void timerInterruptHandler(){
     csrRead(sstatus,sstatus);
     if(cur->lastpriv!=proc::Task::Priv::AlwaysKernel&&sstatus&BIT(csr::mstatus::spp))panic("should not happen!");
     kHartObj().timer->next();
+    Log(info,"after timer.next,curtask=%d",kHartObj().curtask->tid());
 }
-extern syscall_t syscallPtrs[];
-namespace syscall{ extern const char* syscallHelper[]; }
 void uecallHandler(){
     auto cur=kHartObj().curtask;
     auto &ctx=cur->ctx;
@@ -54,10 +54,10 @@ void uecallHandler(){
         if(syscallPtrs[ecallId])
             // rtval=reinterpret_cast<syscall_t>(syscallPtrs[ecallId])(ctx.x(10),ctx.x(11),ctx.x(12),ctx.x(13),ctx.x(14),ctx.x(15));
             if(auto rt=reinterpret_cast<syscall_t>(syscallPtrs[ecallId])(ctx.x(10),ctx.x(11),ctx.x(12),ctx.x(13),ctx.x(14),ctx.x(15))){
-                Log(info,"syscall {%d} success");
+                Log(info,"syscall {%d} success",ecallId);
                 rtval=rt.value();
             } else {
-                Log(warning,"syscall {%d} has encountered error{%d}",rt.error());
+                Log(warning,"syscall {%d} has encountered error{%d}",ecallId,rt.error());
                 rtval=-rt.error();
             }
         // csrClear(sstatus,BIT(csr::mstatus::sie));
@@ -211,7 +211,6 @@ void _strapenter(){
 __attribute__((always_inline))
 void _strapexit(){
     auto cur=kHartObj().curtask;
-    static xlen_t prevs0=0;
     /// @todo chaos
     if(cur->lastpriv==proc::Task::Priv::User){
         // xlen_t gprvaddr=kInfo.segments.kstack.first+readHartId()*0x1000+offsetof(proc::Task,ctx.gpr);
@@ -222,8 +221,6 @@ void _strapexit(){
         csrClear(sstatus,1l<<csr::mstatus::spp);
         csrSet(sstatus,BIT(csr::mstatus::spie));
         csrWrite(stvec,strapwrapper);
-        if(cur->ctx.pc<0x100000)
-            prevs0--;
         csrWrite(satp,kHartObj().curtask->kctx.satp);
         ExecInst(sfence.vma);
         asm("csrr t6,sscratch");
@@ -231,19 +228,20 @@ umodeEntry:
         restoreContext();
         ExecInst(sret);
     } else {
-        csrSet(sstatus,1l<<csr::mstatus::spp);
-        csrWrite(stvec,ktrapwrapper);
-        csrWrite(sscratch,cur->kctx.gpr);
-        if(cur->lastpriv==proc::Task::Priv::AlwaysKernel)csrSet(sstatus,BIT(csr::mstatus::spie))
-        else csrClear(sstatus,BIT(csr::mstatus::spie))
-        assert(!cur->kctxs.empty());
-        cur->kctx=cur->kctxs.top();cur->kctxs.pop();
-        csrWrite(sepc,cur->kctx.pc);
-        regWrite(t6,cur->kctx.gpr);
-        // __asm__("mv t6,sp");
-        restoreContext();
-        // __asm__("ld ra,8(sp)\ncsrw sepc,ra\nld ra,0(sp)\n addi sp,sp,16");
-        ExecInst(sret);
+        panic("should not go here");
+        // csrSet(sstatus,1l<<csr::mstatus::spp);
+        // csrWrite(stvec,ktrapwrapper);
+        // csrWrite(sscratch,cur->kctx.gpr);
+        // if(cur->lastpriv==proc::Task::Priv::AlwaysKernel)csrSet(sstatus,BIT(csr::mstatus::spie))
+        // else csrClear(sstatus,BIT(csr::mstatus::spie))
+        // assert(!cur->kctxs.empty());
+        // cur->kctx=cur->kctxs.top();cur->kctxs.pop();
+        // csrWrite(sepc,cur->kctx.pc);
+        // regWrite(t6,cur->kctx.gpr);
+        // // __asm__("mv t6,sp");
+        // restoreContext();
+        // // __asm__("ld ra,8(sp)\ncsrw sepc,ra\nld ra,0(sp)\n addi sp,sp,16");
+        // ExecInst(sret);
     }
 }
 __attribute__((naked)) void strapwrapper(){
@@ -251,9 +249,24 @@ __attribute__((naked)) void strapwrapper(){
     straphandler();
     _strapexit();
 }
-__attribute__((naked))
-void ktrapwrapper(){
-    _strapenter<false>();
+extern "C"
+void ktrapwrapper1(){
+    // xlen_t spbak;
+    {
+        auto curtask=kHartObj().curtask;
+        csrRead(sepc,curtask->kctx.pc);
+        // regRead(sp,curtask->kctx.sp());
+        // regRead(sp,spbak);
+    }
     straphandler();
-    _strapexit();
+    {
+        auto curtask=kHartObj().curtask;
+        csrSet(sstatus,1l<<csr::mstatus::spp);
+        // csrWrite(stvec,ktrapwrapper);
+        // csrWrite(sscratch,curtask);
+        if(curtask->lastpriv==proc::Task::Priv::AlwaysKernel)csrSet(sstatus,BIT(csr::mstatus::spie))
+        else csrClear(sstatus,BIT(csr::mstatus::spie))
+        // assert(spbak==curtask->kctx.sp());
+        // regWrite(sp,curtask->kctx.sp());
+    }
 }
