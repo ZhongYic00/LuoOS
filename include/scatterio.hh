@@ -17,6 +17,7 @@ public:
 };
 
 inline size_t scatteredCopy(ScatteredIO &dst,ScatteredIO &src){
+    if(!dst.avail())return 0;
     auto davail=dst.next(0);
     size_t tot=0,cnt;
     while(src.avail() && davail){
@@ -75,6 +76,7 @@ public:
             off=0;it++;
             if(!nextRegion())return Slice{1,0};
         }
+        assert(mapper!=nullptr);
         return Slice{mapper->start()+bias+off,mapper->start()+bias+it->length()-1};
     }
 };
