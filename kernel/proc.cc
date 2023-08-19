@@ -184,7 +184,7 @@ void Process::exit(int status){
     Log(info,"Proc[%d] exit",pid());
     state=sched::Zombie;
     exitstatus=status;
-    signal::sigSend(*parentProc(),SIGCHLD);
+    // signal::sigSend(*parentProc(),SIGCHLD);
     kGlobObjs->scheduler->wakeup(parentProc()->defaultTask());
     kernel::yield();
 }
