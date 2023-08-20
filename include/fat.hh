@@ -253,7 +253,7 @@ namespace fat {
 
             inline int chMod(mode_t a_mode) { Log(error,"FAT32 does not support chmod\n"); return -EPERM; }
             inline int chOwn(uid_t a_owner, gid_t a_group) { Log(error,"FAT32 does not support chown\n"); return -EPERM; }
-            inline void nodTrunc() { nodPanic(); entry->entTrunc(); }
+            inline void nodTrunc(size_t size) { nodPanic(); entry->entTrunc(); }
             inline int nodRead(uint64 a_dst, uint a_off, uint a_len) { nodPanic(); return entry->entRead(a_dst, a_off, a_len); }
             inline int nodWrite(uint64 a_src, uint a_off, uint a_len) { nodPanic(); return entry->entWrite(a_src, a_off, a_len); }
             inline int readLink(char *a_buf, size_t a_bufsiz) { Log(error,"FAT32 does not support readlink\n"); return -EPERM; }

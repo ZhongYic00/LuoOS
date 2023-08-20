@@ -79,7 +79,7 @@ namespace ramfs
         void nodRemove() override {}
         int chMod(mode_t a_mode) override {return -1;}
         int chOwn(uid_t a_owner, gid_t a_group) override {return -1;}
-        void nodTrunc() override {return ;}
+        void nodTrunc(size_t size) override {return ;}
         virtual int nodRead(uint64 a_dst, uint a_off, uint a_len) override {
             if(isDir) return -1;
             auto rdbytes=klib::min(a_len,bytes.size()-a_off);
