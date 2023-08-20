@@ -155,6 +155,29 @@ public:
     int nodRead(addr_t addr, uint32_t uoff, uint32_t len) override { return -1; }  // EOF
     int nodWrite(uint64 a_src, uint a_off, uint a_len) override { return a_len; }
 };
+class InterruptsFile:public ramfs::INode{
+public:
+    InterruptsFile(ino_t ino,ramfs::SuperBlock *super):INode(ino,super){}
+    int nodRead(addr_t addr, uint32_t uoff, uint32_t len) override {
+        auto dst = (uint8_t*)addr;
+        int rdbytes = 0, off = uoff;
+        for(int i = 0; i < kernel::irqNum; ++i) {
+            int cnt = kGlobObjs->irqcnt[i];
+            if(cnt > 0) {
+                string line = klib::format("%d", i) + ": " + klib::format("%d", cnt) + '\n';
+                int bytes = klib::min(len, line.size()) - off;
+                if(off < bytes) {
+                    memmove(dst, line.c_str() + off, bytes);
+                    dst += bytes;
+                    rdbytes += bytes;
+                }
+                if(off > 0) { off -= klib::min(bytes, off); }
+            }
+        }
+        return rdbytes;
+    }
+    int nodWrite(uint64 a_src, uint a_off, uint a_len) override { return a_len; }
+};
 
 namespace syscall
 {
@@ -193,6 +216,8 @@ namespace syscall
             self->getINode()->link("exe",exe);
             auto meminfo=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<MemInfoFile>();
             root->getINode()->link("meminfo",meminfo);
+            auto interrupts=dynamic_cast<ramfs::SuperBlock*>(procfs->getSpBlk().get())->mknod<InterruptsFile>();
+            root->getINode()->link("interrupts",interrupts);
 
             Log(warning,"%d",mounts->rINo());
             Path("/proc").mount(procfs);

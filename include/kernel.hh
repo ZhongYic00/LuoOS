@@ -14,6 +14,7 @@ extern "C" void start_kernel(int hartid);
 namespace timeservice{ class Timer; }
 namespace kernel {
     constexpr int nameLen=65;
+    constexpr int irqNum = 1024;
 
     typedef proc::Task KernelTaskObjs;
 
@@ -48,6 +49,7 @@ namespace kernel {
         unordered_map<addr_t,condition_variable::condition_variable> futexes;
         xlen_t ksatp;
         xlen_t prevsatp;
+        xlen_t irqcnt[irqNum] = { 0 };
         KernelGlobalObjs();
     };
     struct KernelHartObjs{

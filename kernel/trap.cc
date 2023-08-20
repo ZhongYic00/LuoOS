@@ -80,6 +80,7 @@ void plicComplete(int irq){
 
 void externalInterruptHandler(){
     int irq=plicClaim();
+    ++(kGlobObjs->irqcnt[irq]);
     Log(debug,"externalInterruptHandler(irq=%d)",irq);
     switch(irq){
         case 0:{
