@@ -389,7 +389,7 @@ void DirEnt::entRelse() {
     --ref;
     return;
 }
-void DirEnt::entTrunc() {
+void DirEnt::entTrunc(size_t a_len) {
     if(!(attribute & ATTR_LINK)){
         for (uint32 clus = first_clus; clus >= 2 && clus < FAT32_EOC; ) {
             uint32 next = spblk->fatRead(clus);
@@ -397,8 +397,8 @@ void DirEnt::entTrunc() {
             clus = next;
         }
     }
-    file_size = 0;
-    first_clus = 0;
+    file_size = a_len;
+    if(a_len == 0) { first_clus = 0; }
     dirty = true;
 }
 void DirEnt::parentUpdate() {

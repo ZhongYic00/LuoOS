@@ -86,7 +86,7 @@ namespace fs{
             virtual void nodRemove() = 0;  // 删除该INode对应的磁盘文件内容
             virtual int chMod(mode_t a_mode) = 0;
             virtual int chOwn(uid_t a_owner, gid_t a_group) = 0;
-            virtual void nodTrunc(size_t size) = 0;  // 清空该INode的元信息，并标志该INode为脏
+            virtual void nodTrunc(size_t size = 0) = 0;  // 清空该INode的元信息，并标志该INode为脏
             virtual int nodRead(uint64 a_dst, uint a_off, uint a_len) = 0;  // 从该文件的a_off偏移处开始，读取a_len字节的数据到a_dst处，返回实际读取的字节数
             virtual int nodWrite(uint64 a_src, uint a_off, uint a_len) = 0;  // 从a_src处开始，写入a_len字节的数据到该文件的a_off偏移处，返回实际写入的字节数
             /// @brief copy contents from src to dst

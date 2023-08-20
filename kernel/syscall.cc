@@ -170,7 +170,8 @@ static constexpr int SEEK_END = 2;
         auto file=kHartObj().curtask->getProcess()->ofile(fd);
         if(file->obj.rType()!=fs::FileType::entry) return Err(EINVAL);
         if(S_ISDIR(file->obj.getEntry()->getINode()->rMode())) return Err(EISDIR);
-        return file->obj.getEntry()->getINode()->nodTrunc();
+        file->obj.getEntry()->getINode()->nodTrunc();
+        return statcode::ok;
     }
 
     sysrt_t sysyield(){
