@@ -107,6 +107,7 @@ namespace syscall {
     sysrt_t umount2(const char *a_devpath,int a_flags);
     sysrt_t mount(const char *a_devpath,const char *a_mountpath, const char *a_fstype, uint64_t flags, const void *a_data);
     sysrt_t statFS(const char *a_path,StatFS *a_buf);
+    sysrt_t ftruncate(unsigned int fd, loff_t length);
     sysrt_t fAccessAt(int a_basefd,const char *a_path,int a_mode,int a_flags);
     sysrt_t chDir(const char *a_path);
     sysrt_t fChDir(int a_fd);
@@ -133,6 +134,44 @@ namespace syscall {
     sysrt_t fStatAt(int a_basefd,const char *a_path,KStat *a_kst,int a_flags);
     sysrt_t fStat(int a_basefd,KStat *a_kst);
     sysrt_t sync();
+
+    sysrt_t copyfilerange(int fd_in, loff_t *off_in, int fd_out, loff_t *off_out, size_t len, unsigned int flags);
+
+static constexpr int SEEK_SET = 0;
+static constexpr int SEEK_CUR = 1;
+static constexpr int SEEK_END = 2;
+    sysrt_t copyfilerange(int fd_in, loff_t *off_in, int fd_out, loff_t *off_out, size_t len, unsigned int flags){
+        Log(info,"copyfilerange fin=%d inoff=%x fout=%d outoff=%x len=%d",fd_in,off_in,fd_out,off_out,len);
+        auto curproc=kHartObj().curtask->getProcess();
+        auto fin=curproc->ofile(fd_in);
+        auto fout=curproc->ofile(fd_out);
+        auto offinOld=fin->lSeek(0,SEEK_CUR),offoutOld=fout->lSeek(0,SEEK_CUR);
+        loff_t offin=offinOld,offout=offoutOld;
+        if(off_in)curproc->vmar[(addr_t)off_in]>>offin;
+        if(off_out)curproc->vmar[(addr_t)off_out]>>offout;
+        if(fin->lSeek(offin,SEEK_SET)<0) return 0;
+        if(fout->lSeek(offout,SEEK_SET)<0) return 0;
+        auto buf_=(uint8_t*)vm::pn2addr(kGlobObjs->pageMgr->alloc(1));
+        size_t cpbytes=0;
+        while (len > 0) {
+            ssize_t rdbytes = klib::min(vm::pageSize,len);
+            rdbytes=fin->read(ByteArray{buf_,rdbytes});  // @todo: 安全检查
+            if(rdbytes==0)break;
+            int wbytes = fout->write(ByteArray(buf_,rdbytes));
+            if (wbytes < 0) return make_unexpected(-wbytes);
+            cpbytes += wbytes;
+            if (rdbytes != wbytes) { break; } // EOF reached in in_fd or out_fd is full
+            len -= rdbytes;
+        }
+        kGlobObjs->pageMgr->free(vm::addr2pn((xlen_t)buf_),0);
+        return cpbytes;
+    }
+    sysrt_t ftruncate(unsigned int fd, loff_t length){
+        auto file=kHartObj().curtask->getProcess()->ofile(fd);
+        if(file->obj.rType()!=fs::FileType::entry) return Err(EINVAL);
+        if(S_ISDIR(file->obj.getEntry()->getINode()->rMode())) return Err(EISDIR);
+        return file->obj.getEntry()->getINode()->nodTrunc();
+    }
 
     sysrt_t sysyield(){
         kernel::yield();
@@ -260,5 +299,6 @@ const char *syscallHelper[sys::syscalls::nSyscalls];
         DECLSYSCALL(scnum::wait,wait);
         DECLSYSCALL(scnum::syncfs,syncFS);
         DECLSYSCALL(scnum::membarrier,membarrier);
+        DECLSYSCALL(scnum::copyfilerange,copyfilerange);
     }
 } // namespace syscall

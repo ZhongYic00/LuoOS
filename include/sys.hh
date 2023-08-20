@@ -99,6 +99,7 @@ namespace sys
         wait=260,
         syncfs=267,
         membarrier=283,
+        copyfilerange=285,
         nSyscalls,
     };
     enum statcode{
