@@ -30,12 +30,12 @@ int main(){
     const char *args3[] = { "busybox","sh","-c","busybox grep -v -e socket run-dynamic.sh  | while read line; do eval $line; done\n",nullptr };
     const char *args4[]={"runtest.exe","-w","entry-dynamic.exe","pthread_cancel_points",nullptr};
     Exec testcases[]={
-        {"./runtest.exe",args4,envs}
-        // {"time-test",args0,envs},
-        // {"busybox",args0,envs},
-        // {"busybox",args1,envs},
-        // {"busybox",args2,envs},
-        // {"busybox",args3,envs},
+        // {"./runtest.exe",args4,envs}
+        {"time-test",args0,envs},
+        {"busybox",args0,envs},
+        {"busybox",args1,envs},
+        {"busybox",args2,envs},
+        {"busybox",args3,envs},
     };
     const int tsn = sizeof(testcases) / sizeof(Exec);
     // char *args[] = { "busybox","sh","run-static.sh",nullptr };
